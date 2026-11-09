@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>吞噬之蛇 — 温室与神庙</title>
+<style>
+  :root {
+    --ink: #0b0f0e;
+    --jade: #4fd1a5;
+    --gold: #f2c14e;
+    --crimson: #e4572e;
+    --paper: #e8e3d3;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--ink); overflow: hidden; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; color: var(--paper); }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .hud { position: fixed; pointer-events: none; user-select: none; }
+  .panel {
+    background: rgba(10, 16, 14, 0.74);
+    border: 1px solid rgba(232, 227, 211, 0.16);
+    border-radius: 10px;
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+  }
+  #stats { top: 18px; left: 18px; min-width: 220px; }
+  #stats .row { display: flex; justify-content: space-between; gap: 18px; font-size: 13px; letter-spacing: .04em; }
+  #stats .row b { font-size: 17px; font-variant-numeric: tabular-nums; }
+  #hpbar { margin-top: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #hpfill { height: 100%; width: 100%; background: linear-gradient(90deg, #2f9e7a, #6ee7b7); transition: width .12s linear; }
+  #objective { margin-top: 8px; font-size: 12px; letter-spacing: .05em; color: rgba(242,193,78,.92); }
+
+  #bossbar {
+    display: none; top: 16px; left: 50%; transform: translateX(-50%);
+    width: min(560px, 62vw); text-align: center;
+  }
+  #bossbar .bname { font-size: 12px; letter-spacing: .18em; color: #f0b7a4; margin-bottom: 6px; }
+  #bossbar .bbar { height: 12px; border-radius: 999px; background: rgba(255,255,255,.10); overflow: hidden; }
+  #bfill { height: 100%; width: 100%; background: linear-gradient(90deg, #8d2b16, #e4572e, #f2c14e); transition: width .15s linear; }
+
+  #help {
+    bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 12.5px; letter-spacing: .05em;
+    color: rgba(232,227,211,.82);
+    transition: opacity .45s ease;
+  }
+  #help.hide { opacity: 0; pointer-events: none; }
+  #help kbd {
+    display: inline-block; min-width: 20px; text-align: center;
+    padding: 2px 6px; margin: 0 2px; border-radius: 5px;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
+    font-family: inherit; font-size: 11.5px;
+  }
+  #mode { top: 18px; right: 18px; font-size: 12px; letter-spacing: .08em; color: rgba(232,227,211,.7); }
+
+  #toast {
+    display: none; top: 46%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; font-size: 15px; letter-spacing: .08em; padding: 14px 26px;
+  }
+  #toast b { color: var(--gold); font-size: 20px; display: block; margin-top: 4px; }
+
+  #overlay {
+    position: fixed; inset: 0; display: none; place-items: center;
+    background: radial-gradient(circle at 50% 45%, rgba(8,12,11,.55), rgba(5,7,6,.92));
+  }
+  #overlay.show { display: grid; }
+  #overlay .card { text-align: center; padding: 28px 34px; }
+  #overlay h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .12em; color: var(--jade); }
+  #overlay p { margin: 6px 0; font-size: 14px; color: rgba(232,227,211,.8); }
+  #overlay .big { font-size: 40px; font-weight: 700; color: var(--gold); margin: 10px 0 4px; }
+  #overlay #ovtime { font-size: 26px; margin: 0 0 8px; }
+  #overlay .hint { margin-top: 14px; font-size: 13px; color: rgba(232,227,211,.65); }
+
+  /* ---------- 启动界面 ---------- */
+  #startScreen {
+    position: fixed; inset: 0; z-index: 80; overflow: hidden;
+    background:
+      repeating-linear-gradient(0deg, rgba(63,224,196,.035) 0 1px, transparent 1px 96px),
+      repeating-linear-gradient(90deg, rgba(63,224,196,.035) 0 1px, transparent 1px 96px),
+      linear-gradient(180deg, #0a120f 0%, #0e1a15 60%, #0a1410 100%);
+    transition: opacity .45s ease;
+  }
+  #startScreen.gone { opacity: 0; pointer-events: none; }
+  #startfx { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .st-inner {
+    position: relative; z-index: 2; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 24px 40px;
+  }
+  .st-title {
+    margin: 0; font-size: clamp(56px, 7.2vw, 112px); font-weight: 800; letter-spacing: .06em;
+    color: #f2c14e; text-shadow: 0 0 40px rgba(242,193,78,.35), 0 6px 0 rgba(0,0,0,.35);
+    animation: titlePulse 4.5s ease-in-out infinite;
+  }
+  @keyframes titlePulse { 0%,100% { text-shadow: 0 0 34px rgba(242,193,78,.28), 0 6px 0 rgba(0,0,0,.35); } 50% { text-shadow: 0 0 58px rgba(242,193,78,.5), 0 6px 0 rgba(0,0,0,.35); } }
+  .st-en { margin-top: 6px; font-size: clamp(16px, 1.6vw, 30px); letter-spacing: .55em; color: #3fe0c4; font-weight: 700; text-indent: .55em; }
+  .st-sub { margin: 14px 0 0; font-size: clamp(13px, 1.1vw, 20px); color: #8fa79b; letter-spacing: .18em; }
+  .st-start {
+    margin-top: clamp(34px, 5vh, 64px);
+    width: min(520px, 62vw); height: clamp(76px, 9vh, 120px);
+    border: 2px solid #ffe296; border-radius: 22px; cursor: pointer;
+    background: linear-gradient(180deg, #ffd76a 0%, #f2c14e 55%, #e0a92f 100%);
+    color: #0b1410; font-family: inherit; font-weight: 800;
+    font-size: clamp(28px, 2.9vw, 48px); letter-spacing: .12em;
+    box-shadow: 0 0 0 rgba(242,193,78,.0), 0 10px 30px rgba(0,0,0,.45);
+    animation: btnGlow 2.6s ease-in-out infinite;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .st-start:hover { transform: translateY(-2px) scale(1.015); filter: brightness(1.06); }
+  .st-start:active { transform: translateY(1px) scale(.995); }
+  @keyframes btnGlow {
+    0%,100% { box-shadow: 0 0 22px rgba(242,193,78,.35), 0 10px 30px rgba(0,0,0,.45); }
+    50%     { box-shadow: 0 0 54px rgba(242,193,78,.7), 0 10px 30px rgba(0,0,0,.45); }
+  }
+  .st-subs { display: flex; gap: 22px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
+  .st-sub-btn {
+    min-width: 150px; padding: 12px 22px; border-radius: 12px; cursor: pointer;
+    background: rgba(20,34,28,.9); border: 1px solid #2e463a;
+    color: #c8d8ce; font-family: inherit; font-size: 17px; letter-spacing: .08em;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .st-sub-btn:hover:not(:disabled) { border-color: #3fe0c4; color: #eafff8; background: rgba(28,46,38,.95); }
+  .st-sub-btn:disabled { opacity: .38; cursor: not-allowed; }
+  .st-panel {
+    margin-top: 22px; max-width: 720px; min-height: 0; padding: 0 18px;
+    font-size: 15px; line-height: 1.8; color: #b9cec3; text-align: center;
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .st-panel.show { opacity: 1; }
+  .st-footer {
+    position: absolute; left: 0; right: 0; bottom: 26px;
+    display: flex; justify-content: space-between; gap: 24px;
+    padding: 0 clamp(24px, 5vw, 120px);
+    font-size: 13px; letter-spacing: .05em; color: #5f7a6c;
+  }
+  .st-footer b { color: #8fa79b; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud panel" id="stats">
+  <div class="row"><span>关卡</span><b id="level">1 / 4</b></div>
+  <div class="row"><span>体长 / HP</span><b id="len">6</b></div>
+  <div class="row"><span>分数</span><b id="score">0</b></div>
+  <div class="row"><span>击杀</span><b id="kills">0</b></div>
+  <div id="hpbar"><div id="hpfill"></div></div>
+  <div id="objective">清光敌人，门会打开</div>
+</div>
+
+<div class="hud panel" id="bossbar">
+  <div class="bname" id="bname">腐根盘蛇 · ROOTCOIL</div>
+  <div class="bbar"><div id="bfill"></div></div>
+</div>
+
+<div class="hud panel" id="mode">视角：全图（F 切换）</div>
+<div class="hud panel" id="toast"><span id="toasttext"></span><b id="toastbig"></b></div>
+
+<div class="hud panel" id="help">
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键 移动（8 方向） ·
+  <kbd>空格</kbd> 射击（耗 1 节） · <kbd>E</kbd> 能量球（耗 3 节 · 需 &gt; 4 节） ·
+  <kbd>F</kbd> 视角 · <kbd>P</kbd> 暂停 · <kbd>R</kbd> 重开
+</div>
+
+<div id="overlay">
+  <div class="card panel">
+    <h1 id="ovtitle">DEVOUR</h1>
+    <p id="ovsub">吞得越多，越长；越长，越能打。</p>
+    <div class="big" id="ovscore"></div>
+    <div class="big" id="ovtime"></div>
+    <p id="ovdetail"></p>
+    <p class="hint">按 <b>R</b> 重新开始</p>
+  </div>
+</div>
+
+<div id="startScreen">
+  <canvas id="startfx"></canvas>
+  <div class="st-inner">
+    <h1 class="st-title">吞噬之蛇</h1>
+    <div class="st-en">D E V O U R</div>
+    <p class="st-sub">一条蛇，吃掉整座温室</p>
+    <button class="st-start" id="btnStart">开始游戏</button>
+    <div class="st-subs">
+      <button class="st-sub-btn" id="btnContinue" disabled>继续游戏</button>
+      <button class="st-sub-btn" id="btnHelp">操作说明</button>
+      <button class="st-sub-btn" id="btnCredits">制作名单</button>
+    </div>
+    <div class="st-panel" id="stPanel"></div>
+  </div>
+  <div class="st-footer">
+    <span>WASD / 方向键 移动　·　空格 射击（消耗 1 节）　·　F 切换视角</span>
+    <span>v0.1 prototype</span>
+    <span>最高分 <b id="stBest">0</b></span>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="game.js"></script>
+<script src="start.js"></script>
+</body>
+</html>
