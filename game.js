@@ -1550,6 +1550,7 @@
     enemySpeedMul: 1,
     enemyShoot: false,
     spawnGrace: 0,
+    slowTimer: 0,
   };
 
   let viewMode = 'full';
@@ -1765,6 +1766,7 @@
     state.prevTail = null;
     state.invuln = 1.0;
     state.shootCd = 0;
+    state.slowTimer = 0;
     state.pelletsOff = false; // 新关卡重新开始刷豆
 
     for (let k = 0; k < 10; k++) spawnPellet();
@@ -2078,7 +2080,8 @@
 
   // ---------- 更新 ----------
   function updateSnake(dt) {
-    state.progress += dt / STEP;
+    const slowMul = state.slowTimer > 0 ? 0.55 : 1;
+    state.progress += (dt / STEP) * slowMul;
     let guard = 0;
     while (state.progress >= 1 && !state.over && guard++ < 4) {
       state.progress -= 1;
@@ -2726,7 +2729,7 @@
     mesh.material.opacity = 0.76;
     mesh.scale.setScalar(1);
     mesh.position.set(x, 0.09, z);
-    state.hazards.push({ mesh, x, z, life: 3, hit: false });
+    state.hazards.push({ mesh, x, z, life: 3.5, hit: false });
   }
 
   function updateHazards(dt) {
@@ -2737,7 +2740,9 @@
       h.mesh.scale.setScalar(1 + Math.sin(state.time * 5 + k) * 0.08);
       if (!h.hit && bodyDistanceSq(h.x, h.z) < 0.62 * 0.62) {
         h.hit = true;
+        state.slowTimer = Math.max(state.slowTimer, 2);
         damage(1);
+        toast('岩浆灼伤', '体长 -1 · 移动速度降低 2 秒');
         if (state.over) return;
       }
       if (h.life <= 0) {
@@ -2966,6 +2971,7 @@
     state.paused = false;
     state.shootCd = 0;
     state.energyCd = 0;
+    state.slowTimer = 0;
     state.roomActive = false;
     state.roomTimer = 0;
     if (startRoom) startRoom.visible = false;
@@ -3043,6 +3049,7 @@
     if (!state.paused && !state.over) {
       state.shootCd = Math.max(0, state.shootCd - dt);
       state.invuln = Math.max(0, state.invuln - dt);
+      state.slowTimer = Math.max(0, state.slowTimer - dt);
 
       // 受击时身体整体闪一下（包括被身体挡下的伤害）
       state.hitFlash = Math.max(0, state.hitFlash - dt);
