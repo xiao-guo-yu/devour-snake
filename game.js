@@ -33,6 +33,10 @@
     { theme: 'temple', kind: 'clear', enemies: 11, types: ['mummy'], name: '沙海神庙 · 供奉廊' },
     { theme: 'temple', kind: 'clear', enemies: 13, types: ['anubis'], name: '沙海神庙 · 内殿' },
     { theme: 'temple', kind: 'boss', boss: 'pharaoh', name: '黄金法老 · PHARAOH' },
+    { theme: 'volcano', kind: 'clear', enemies: 9, types: ['magmaSlime'], name: '熔火地脉 · 裂谷' },
+    { theme: 'volcano', kind: 'clear', enemies: 11, types: ['obsidianBeetle'], name: '熔火地脉 · 焦岩廊' },
+    { theme: 'volcano', kind: 'clear', enemies: 10, types: ['emberWisp'], name: '熔火地脉 · 余烬祭坛' },
+    { theme: 'volcano', kind: 'boss', boss: 'magma_colossus', name: '熔岩巨像 · MAGMA COLOSSUS' },
   ];
   const ROOM_COUNT = ROOMS.length;
 
@@ -84,6 +88,20 @@
     tilesB.instanceMatrix.needsUpdate = true;
   }
   scene.add(tilesA, tilesB);
+
+  const lavaUnderlay = new THREE.Mesh(
+    new THREE.PlaneGeometry(N + 2, N + 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xb43b08,
+      transparent: true,
+      opacity: 0.9,
+      fog: false,
+    })
+  );
+  lavaUnderlay.rotation.x = -Math.PI / 2;
+  lavaUnderlay.position.y = -0.13;
+  lavaUnderlay.visible = false;
+  scene.add(lavaUnderlay);
 
   // ---------- 外墙 ----------
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x352d20, roughness: 0.88 });
@@ -903,6 +921,206 @@
     g.fill();
   }
 
+  function drawMagmaSlime(g, S) {
+    const cx = S * 0.5, cy = S * 0.53;
+    g.clearRect(0, 0, S, S);
+    const glow = g.createRadialGradient(cx, cy, S * 0.05, cx, cy, S * 0.44);
+    glow.addColorStop(0, '#ff8b22');
+    glow.addColorStop(0.45, '#c83f0c');
+    glow.addColorStop(1, 'rgba(87,18,4,.1)');
+    g.fillStyle = glow;
+    g.beginPath();
+    g.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
+    g.fill();
+
+    g.beginPath();
+    g.moveTo(S * 0.16, S * 0.57);
+    g.bezierCurveTo(S * 0.12, S * 0.18, S * 0.88, S * 0.16, S * 0.85, S * 0.59);
+    g.bezierCurveTo(S * 0.82, S * 0.84, S * 0.68, S * 0.79, S * 0.63, S * 0.9);
+    g.bezierCurveTo(S * 0.57, S * 0.79, S * 0.48, S * 0.84, S * 0.42, S * 0.77);
+    g.bezierCurveTo(S * 0.34, S * 0.84, S * 0.22, S * 0.79, S * 0.16, S * 0.57);
+    g.closePath();
+    g.fillStyle = '#24100c';
+    g.fill();
+    g.strokeStyle = '#ff6b17';
+    g.lineWidth = S * 0.025;
+    g.stroke();
+
+    g.strokeStyle = '#ff8b25';
+    g.lineWidth = S * 0.018;
+    g.lineCap = 'round';
+    const cracks = [
+      [0.25, 0.34, 0.38, 0.44, 0.33, 0.6],
+      [0.76, 0.33, 0.63, 0.45, 0.72, 0.62],
+      [0.5, 0.18, 0.47, 0.34, 0.55, 0.48],
+      [0.22, 0.66, 0.35, 0.65, 0.42, 0.76],
+    ];
+    for (const c of cracks) {
+      g.beginPath();
+      g.moveTo(S * c[0], S * c[1]);
+      g.lineTo(S * c[2], S * c[3]);
+      g.lineTo(S * c[4], S * c[5]);
+      g.stroke();
+    }
+    for (const dx of [-0.12, 0.12]) {
+      g.beginPath();
+      g.ellipse(cx + S * dx, cy - S * 0.02, S * 0.047, S * 0.06, 0, 0, Math.PI * 2);
+      g.fillStyle = '#ffd867';
+      g.fill();
+      g.shadowColor = '#ff9b22';
+      g.shadowBlur = S * 0.08;
+      g.fill();
+      g.shadowBlur = 0;
+    }
+  }
+
+  function drawObsidianBeetle(g, S) {
+    const cx = S / 2, cy = S * 0.54;
+    g.clearRect(0, 0, S, S);
+    g.strokeStyle = '#160b08';
+    g.lineWidth = S * 0.035;
+    g.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      for (let k = -1; k <= 1; k++) {
+        g.beginPath();
+        g.moveTo(cx + side * S * 0.24, cy + k * S * 0.1);
+        g.lineTo(cx + side * S * 0.43, cy + (k - 0.15) * S * 0.18);
+        g.stroke();
+      }
+    }
+    const body = g.createRadialGradient(cx - S * 0.1, cy - S * 0.18, S * 0.02, cx, cy, S * 0.37);
+    body.addColorStop(0, '#514038');
+    body.addColorStop(0.45, '#171313');
+    body.addColorStop(1, '#070707');
+    g.beginPath();
+    g.ellipse(cx, cy, S * 0.29, S * 0.37, 0, 0, Math.PI * 2);
+    g.fillStyle = body;
+    g.fill();
+    g.strokeStyle = '#050505';
+    g.lineWidth = S * 0.038;
+    g.stroke();
+    g.beginPath();
+    g.moveTo(cx, S * 0.18);
+    g.lineTo(cx, S * 0.7);
+    g.strokeStyle = '#ff5b0b';
+    g.lineWidth = S * 0.025;
+    g.stroke();
+    g.beginPath();
+    g.moveTo(cx - S * 0.21, S * 0.32);
+    g.lineTo(cx + S * 0.18, S * 0.55);
+    g.moveTo(cx + S * 0.21, S * 0.32);
+    g.lineTo(cx - S * 0.18, S * 0.55);
+    g.strokeStyle = 'rgba(255,105,18,.72)';
+    g.lineWidth = S * 0.014;
+    g.stroke();
+    for (const dx of [-0.09, 0.09]) {
+      g.beginPath();
+      g.arc(cx + S * dx, S * 0.8, S * 0.035, 0, Math.PI * 2);
+      g.fillStyle = '#ffbc3b';
+      g.fill();
+    }
+  }
+
+  function drawEmberWisp(g, S) {
+    const cx = S / 2, cy = S * 0.57;
+    g.clearRect(0, 0, S, S);
+    const aura = g.createRadialGradient(cx, cy, S * 0.04, cx, cy, S * 0.43);
+    aura.addColorStop(0, 'rgba(255,183,57,.8)');
+    aura.addColorStop(0.48, 'rgba(218,67,12,.38)');
+    aura.addColorStop(1, 'rgba(80,8,3,0)');
+    g.fillStyle = aura;
+    g.beginPath();
+    g.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.moveTo(cx - S * 0.23, S * 0.72);
+    g.bezierCurveTo(S * 0.23, S * 0.88, S * 0.18, S * 0.28, cx, S * 0.16);
+    g.bezierCurveTo(S * 0.8, S * 0.29, S * 0.77, S * 0.87, cx + S * 0.23, S * 0.72);
+    g.closePath();
+    g.fillStyle = '#140c0d';
+    g.fill();
+    g.strokeStyle = '#fa6817';
+    g.lineWidth = S * 0.018;
+    g.stroke();
+    g.beginPath();
+    g.moveTo(cx - S * 0.17, S * 0.44);
+    g.bezierCurveTo(cx - S * 0.08, S * 0.6, cx + S * 0.09, S * 0.34, cx + S * 0.16, S * 0.55);
+    g.strokeStyle = '#ff7a1b';
+    g.lineWidth = S * 0.06;
+    g.stroke();
+    for (const dx of [-0.09, 0.09]) {
+      g.beginPath();
+      g.arc(cx + S * dx, S * 0.52, S * 0.035, 0, Math.PI * 2);
+      g.fillStyle = '#ffb82e';
+      g.fill();
+    }
+    g.strokeStyle = 'rgba(112,89,80,.65)';
+    g.lineWidth = S * 0.02;
+    g.beginPath();
+    g.moveTo(cx, S * 0.2);
+    g.bezierCurveTo(cx + S * 0.05, S * 0.06, cx - S * 0.12, S * 0.02, cx - S * 0.03, -S * 0.04);
+    g.stroke();
+  }
+
+  function drawMagmaColossus(g, S) {
+    const cx = S / 2, cy = S * 0.53;
+    g.clearRect(0, 0, S, S);
+    const glow = g.createRadialGradient(cx, cy, S * 0.05, cx, cy, S * 0.48);
+    glow.addColorStop(0, 'rgba(255,132,31,.66)');
+    glow.addColorStop(0.55, 'rgba(125,30,7,.25)');
+    glow.addColorStop(1, 'rgba(20,4,2,0)');
+    g.fillStyle = glow;
+    g.beginPath();
+    g.arc(cx, cy, S * 0.48, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#070707';
+    g.lineWidth = S * 0.055;
+    g.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(cx + side * S * 0.18, S * 0.35);
+      g.lineTo(cx + side * S * 0.4, S * 0.52);
+      g.lineTo(cx + side * S * 0.33, S * 0.74);
+      g.stroke();
+    }
+    g.beginPath();
+    g.ellipse(cx, cy, S * 0.24, S * 0.32, 0, 0, Math.PI * 2);
+    g.fillStyle = '#1a1210';
+    g.fill();
+    g.strokeStyle = '#060606';
+    g.lineWidth = S * 0.045;
+    g.stroke();
+    g.strokeStyle = '#ff5b0b';
+    g.lineWidth = S * 0.022;
+    g.beginPath();
+    g.moveTo(cx, S * 0.23);
+    g.lineTo(cx - S * 0.04, S * 0.5);
+    g.lineTo(cx + S * 0.02, S * 0.69);
+    g.moveTo(cx - S * 0.16, S * 0.38);
+    g.lineTo(cx - S * 0.02, S * 0.5);
+    g.lineTo(cx + S * 0.15, S * 0.72);
+    g.stroke();
+    g.beginPath();
+    g.ellipse(cx, S * 0.58, S * 0.09, S * 0.12, 0, 0, Math.PI * 2);
+    g.fillStyle = '#ff8e1e';
+    g.fill();
+    g.shadowColor = '#ff5c0c';
+    g.shadowBlur = S * 0.1;
+    g.fill();
+    g.shadowBlur = 0;
+    for (const dx of [-0.085, 0.085]) {
+      g.beginPath();
+      g.arc(cx + S * dx, S * 0.29, S * 0.032, 0, Math.PI * 2);
+      g.fillStyle = '#ffd65a';
+      g.fill();
+    }
+    g.beginPath();
+    g.moveTo(cx - S * 0.13, S * 0.2);
+    g.quadraticCurveTo(cx, S * 0.02, cx + S * 0.13, S * 0.2);
+    g.fillStyle = '#ff7b17';
+    g.fill();
+  }
+
   const headTex = spriteTexture(256, drawSnakeHead);
   const TEX = {
     spore: spriteTexture(192, drawSpore),
@@ -912,6 +1130,9 @@
     scarabBroken: spriteTexture(192, (g, S) => drawScarab(g, S, true)),
     mummy: spriteTexture(192, drawMummy),
     anubis: spriteTexture(192, drawAnubis),
+    magmaSlime: spriteTexture(192, drawMagmaSlime),
+    obsidianBeetle: spriteTexture(192, drawObsidianBeetle),
+    emberWisp: spriteTexture(192, drawEmberWisp),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
@@ -922,6 +1143,7 @@
   const BOSS_TEX = {
     rootcoil: spriteTexture(512, drawBoss),
     pharaoh: spriteTexture(512, drawPharaoh),
+    magma_colossus: spriteTexture(512, drawMagmaColossus),
   };
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
@@ -929,6 +1151,9 @@
   const stumpPlanes = [];
   const STUMP_TEX = spriteTexture(256, drawStump);
   const COLUMN_TEX = spriteTexture(256, drawColumn);
+  const LAVA_PIT_TEX = typeof THREE.TextureLoader === 'function'
+    ? new THREE.TextureLoader().load('assets/lava-pit.png')
+    : null;
   {
     const geo = new THREE.PlaneGeometry(2.05, 2.05);
     for (let k = 0; k < OBSTACLE_PLANES; k++) {
@@ -1022,6 +1247,29 @@
       seeds.push([i, j]);
     }
     placeObstacles(seeds, COLUMN_TEX);
+  }
+
+  /** 火山：2x2 熔岩坑，避开出生点、传送门和 Boss 中心 */
+  function layoutVolcano() {
+    const seeds = [];
+    const fits = (i, j) => {
+      if (i < 4 || j < 4 || i > N - 6 || j > N - 6) return false;
+      if (Math.abs(i - 22) < 6 && j < 9) return false;
+      if (Math.abs(i - 22) < 7 && j > 32) return false;
+      if (Math.abs(i - 22) < 9 && Math.abs(j - 22) < 9) return false;
+      for (const [si, sj] of seeds) {
+        if (Math.abs(si - i) < 8 && Math.abs(sj - j) < 8) return false;
+      }
+      return true;
+    };
+    let attempts = 0;
+    while (seeds.length < 9 && attempts++ < 600) {
+      const i = 4 + randInt(N - 11);
+      const j = 4 + randInt(N - 11);
+      if (!fits(i, j)) continue;
+      seeds.push([i, j]);
+    }
+    placeObstacles(seeds, LAVA_PIT_TEX);
   }
 
   // ---------- 蛇：一条连续的带状身体 ----------
@@ -1147,6 +1395,40 @@
     podPool.push(mesh);
   }
 
+  const ghostBulletPool = [];
+  for (let i = 0; i < 80; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 10, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0x9bdfff,
+        emissive: 0x349fe8,
+        emissiveIntensity: 1.8,
+      })
+    );
+    mesh.visible = false;
+    scene.add(mesh);
+    ghostBulletPool.push(mesh);
+  }
+
+  const hazardPool = [];
+  for (let i = 0; i < 60; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.CircleGeometry(0.58, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0xff5a12,
+        transparent: true,
+        opacity: 0.76,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.09;
+    mesh.visible = false;
+    scene.add(mesh);
+    hazardPool.push(mesh);
+  }
+
   // ---------- 大招：巨型能量球（2×2）+ 3×3 爆炸 ----------
   const orbPool = [];
   for (let i = 0; i < 3; i++) {
@@ -1243,6 +1525,8 @@
     bullets: [],
     enemyBullets: [],
     pods: [],
+    ghostBullets: [],
+    hazards: [],
     orbs: [],
     booms: [],
     energyCd: 0,
@@ -1357,7 +1641,14 @@
       Object.assign(slot, {
         alive: true, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
         shootTimer: 0.8 + Math.random() * 1.4,
-        hp: slot.type === 'scarab' ? 2 : 1,
+        jumpTimer: 4,
+        jumpElapsed: 0,
+        jumpFrom: null,
+        jumpTo: null,
+        trailTimer: 0.2,
+        hidden: false,
+        revealTimer: 0,
+        hp: slot.type === 'scarab' || slot.type === 'obsidianBeetle' ? 2 : 1,
       });
       // 复活时恢复原色/原贴图（甲虫被打灰后）
       const idx = state.enemies.indexOf(slot);
@@ -1401,8 +1692,9 @@
 
   // ---------- 关卡 ----------
   const THEMES = {
-    green: { fog: 0x06110b, a: 0x12231a, b: 0x1a3024, hemi: 0x9cebd2 },
-    temple: { fog: 0x1b1206, a: 0x3b2a17, b: 0x4a351e, hemi: 0xf0cf91 },
+    green: { fog: 0x06110b, a: 0x12231a, b: 0x1a3024, hemi: 0x9cebd2, wall: 0x352d20, ea: 0x000000, eb: 0x000000 },
+    temple: { fog: 0x1b1206, a: 0x3b2a17, b: 0x4a351e, hemi: 0xf0cf91, wall: 0x4a3b28, ea: 0x0a0501, eb: 0x0c0702 },
+    volcano: { fog: 0x160705, a: 0x12100f, b: 0x1a1512, hemi: 0xff9a58, wall: 0x221814, ea: 0x4a1605, eb: 0x621d06 },
   };
 
   function startLevel(idx) {
@@ -1413,6 +1705,7 @@
     state.boss = null;
     bossMesh.visible = false;
     if (room.theme === 'temple') layoutTemple(idx);
+    else if (room.theme === 'volcano') layoutVolcano(idx);
     else layoutStumps(idx);
 
     state.enemies.forEach((e) => { e.alive = false; });
@@ -1422,6 +1715,10 @@
     state.enemyBullets.length = 0;
     (state.pods || []).forEach((b) => { b.mesh.visible = false; });
     state.pods = [];
+    (state.ghostBullets || []).forEach((b) => { b.mesh.visible = false; });
+    state.ghostBullets = [];
+    (state.hazards || []).forEach((h) => { h.mesh.visible = false; });
+    state.hazards = [];
     (state.orbs || []).forEach((o) => { o.mesh.visible = false; });
     state.orbs = [];
     (state.booms || []).forEach((b) => { b.mesh.visible = false; });
@@ -1473,7 +1770,14 @@
     scene.background.setHex(tint.fog);
     matA.color.setHex(tint.a);
     matB.color.setHex(tint.b);
+    matA.emissive.setHex(tint.ea);
+    matB.emissive.setHex(tint.eb);
+    matA.emissiveIntensity = room.theme === 'volcano' ? 0.72 : 0.16;
+    matB.emissiveIntensity = room.theme === 'volcano' ? 0.72 : 0.16;
+    wallMat.color.setHex(tint.wall);
     hemi.color.setHex(tint.hemi);
+    lavaUnderlay.visible = room.theme === 'volcano';
+    if (document.body && document.body.dataset) document.body.dataset.gameTheme = room.theme;
 
     // 敌人外观 / 类型按关卡轮换
     const types = room.types || ['spore'];
@@ -1482,7 +1786,7 @@
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
       state.enemies[k].type = type;
-      state.enemies[k].hp = type === 'scarab' ? 2 : 1;
+      state.enemies[k].hp = type === 'scarab' || type === 'obsidianBeetle' ? 2 : 1;
     }
 
     if (room.kind === 'clear') {
@@ -1502,7 +1806,8 @@
 
   function spawnBoss(kind = 'rootcoil') {
     const isPharaoh = kind === 'pharaoh';
-    const hp = isPharaoh ? 380 : BOSS_HP;
+    const isColossus = kind === 'magma_colossus';
+    const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
     state.boss = {
       alive: true,
       kind,
@@ -1511,6 +1816,10 @@
       x: cellX(BOSS_CELL.i),
       z: cellZ(BOSS_CELL.j),
       shootTimer: isPharaoh ? 2.4 : 3,
+      jumpTimer: isColossus ? 1.8 : 0,
+      jumpElapsed: 0,
+      jumpFrom: null,
+      jumpTo: null,
       cool: 0,
     };
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -1518,8 +1827,10 @@
     bossPlaneMat.needsUpdate = true;
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
-    bossMesh.scale.setScalar(isPharaoh ? 0.95 : 1);
-    el.bname.textContent = isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL';
+    bossMesh.scale.setScalar(isColossus ? 1.08 : (isPharaoh ? 0.95 : 1));
+    el.bname.textContent = isColossus
+      ? '熔岩巨像 · MAGMA COLOSSUS'
+      : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL');
   }
 
   function bossDie() {
@@ -1916,6 +2227,113 @@
     }
   }
 
+  function chooseSlimeJump(e, hp) {
+    const dx = hp.x - e.x;
+    const dz = hp.z - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const base = Math.atan2(dz, dx);
+    const angles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
+    for (const off of angles) {
+      const a = base + off;
+      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * 3));
+      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * 3));
+      if (!isObstacle(Math.round(tx + HALF), Math.round(tz + HALF))) {
+        return { x: tx, z: tz };
+      }
+    }
+    return { x: e.x, z: e.z };
+  }
+
+  function updateMagmaSlime(e, mesh, hp, dt) {
+    if (e.jumpTimer === undefined) e.jumpTimer = 4;
+    if (e.jumpElapsed > 0) {
+      e.jumpElapsed += dt;
+      const t = Math.min(1, e.jumpElapsed / 0.55);
+      const ease = t * t * (3 - 2 * t);
+      e.x = e.jumpFrom.x + (e.jumpTo.x - e.jumpFrom.x) * ease;
+      e.z = e.jumpFrom.z + (e.jumpTo.z - e.jumpFrom.z) * ease;
+      e.i = Math.round(e.x + HALF);
+      e.j = Math.round(e.z + HALF);
+      mesh.position.set(e.x, 0.5 + Math.sin(Math.PI * t) * 1.15, e.z);
+      mesh.scale.setScalar(1 + Math.sin(Math.PI * t) * 0.18);
+      if (t >= 1) {
+        e.jumpElapsed = 0;
+        e.jumpTimer = 4;
+        mesh.scale.setScalar(1);
+      }
+    } else {
+      e.jumpTimer -= dt;
+      mesh.position.set(e.x, 0.5 + Math.sin(state.time * 3 + e.bob) * 0.04, e.z);
+      mesh.scale.setScalar(1 + Math.max(0, 0.09 - e.jumpTimer * 0.02));
+      if (e.jumpTimer <= 0) {
+        e.jumpFrom = { x: e.x, z: e.z };
+        e.jumpTo = chooseSlimeJump(e, hp);
+        e.jumpElapsed = 0.0001;
+      }
+    }
+  }
+
+  function updateObsidianBeetle(e, mesh, nx, nz, dt) {
+    e.trailTimer = (e.trailTimer === undefined ? 0.2 : e.trailTimer) - dt;
+    if (e.trailTimer <= 0) {
+      spawnLavaHazard(e.x, e.z);
+      e.trailTimer = 0.6;
+    }
+    mesh.position.set(nx, 0.5 + Math.sin(state.time * 7 + e.bob) * 0.035, nz);
+    mesh.rotation.z = Math.sin(state.time * 5 + e.bob) * 0.1;
+  }
+
+  function updateEmberWisp(e, mesh, hp, dt) {
+    const dx = hp.x - e.x;
+    const dz = hp.z - e.z;
+    const inRange = Math.abs(dx) <= 3.5 && Math.abs(dz) <= 3.5;
+    if (e.hidden) {
+      mesh.visible = false;
+      if (!inRange) {
+        e.revealTimer = (e.revealTimer || 0) + dt;
+        if (e.revealTimer >= 0.35) {
+          e.hidden = false;
+          e.revealTimer = 0;
+        }
+      } else {
+        e.revealTimer = 0;
+      }
+      return;
+    }
+    if (inRange) {
+      e.hidden = true;
+      e.revealTimer = 0;
+      mesh.visible = false;
+      return;
+    }
+
+    const len = Math.hypot(dx, dz) || 1;
+    const speed = ENEMY_SPEED * 0.2;
+    let nx = e.x + (dx / len) * speed * dt;
+    let nz = e.z + (dz / len) * speed * dt;
+    const ci = Math.round(nx + HALF);
+    const cj = Math.round(nz + HALF);
+    if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+      nx = e.x;
+      nz = e.z;
+    }
+    e.x = nx;
+    e.z = nz;
+    e.i = Math.round(nx + HALF);
+    e.j = Math.round(nz + HALF);
+    mesh.visible = true;
+    mesh.position.set(nx, 0.58 + Math.sin(state.time * 2.4 + e.bob) * 0.11, nz);
+    mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.12;
+    mesh.scale.setScalar(1 + Math.sin(state.time * 3 + e.bob) * 0.04);
+
+    if (e.shootTimer === undefined) e.shootTimer = 2.4;
+    e.shootTimer -= dt;
+    if (e.shootTimer <= 0) {
+      e.shootTimer = 3.6;
+      spawnGhostBullet(nx, nz, hp.x, hp.z);
+    }
+  }
+
   function updateEnemies(dt) {
     const hp = headPosition(_tmpA).clone();
     const spawnLocked = state.spawnGrace > 0;
@@ -1935,7 +2353,22 @@
       const dz = hp.z - e.z;
       const len = Math.hypot(dx, dz) || 1;
       if (e.cool > 0) e.cool -= dt;
-      const typeMul = e.type === 'scarab' ? 1.2 : e.type === 'mummy' ? 1.5 : e.type === 'anubis' ? 0.9 : 1;
+      if (e.type === 'emberWisp') {
+        updateEmberWisp(e, mesh, hp, dt);
+        continue;
+      }
+      if (e.type === 'magmaSlime') {
+        updateMagmaSlime(e, mesh, hp, dt);
+        if (bodyDistanceSq(e.x, e.z) < 0.8 * 0.8 && e.cool <= 0) {
+          e.cool = 1.4;
+          damage(2);
+          if (state.over) return;
+        }
+        continue;
+      }
+
+      const typeMul = e.type === 'scarab' ? 1.2 : e.type === 'mummy' ? 1.5 : e.type === 'anubis' ? 0.9
+        : e.type === 'obsidianBeetle' ? 2.6 : 1;
       const speed = (e.cool > 0 ? ENEMY_COOL_SPEED : ENEMY_SPEED) * state.enemySpeedMul * typeMul;
       let nx = e.x + (dx / len) * speed * dt;
       let nz = e.z + (dz / len) * speed * dt;
@@ -1949,8 +2382,12 @@
       e.x = nx; e.z = nz;
       e.i = Math.round(nx + HALF); e.j = Math.round(nz + HALF);
 
-      mesh.position.set(nx, 0.5 + Math.sin(state.time * 4 + e.bob) * 0.04, nz);
-      mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
+      if (e.type === 'obsidianBeetle') {
+        updateObsidianBeetle(e, mesh, nx, nz, dt);
+      } else {
+        mesh.position.set(nx, 0.5 + Math.sin(state.time * 4 + e.bob) * 0.04, nz);
+        mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
+      }
 
       if (bodyDistanceSq(nx, nz) < 0.75 * 0.75 && e.cool <= 0) {
         e.cool = 1.2;
@@ -1985,10 +2422,68 @@
     }
   }
 
+  function updateMagmaColossus(b, hp, dt) {
+    if (b.cool > 0) b.cool -= dt;
+    if (b.jumpElapsed > 0) {
+      b.jumpElapsed += dt;
+      const t = Math.min(1, b.jumpElapsed / 0.7);
+      const ease = t * t * (3 - 2 * t);
+      b.x = b.jumpFrom.x + (b.jumpTo.x - b.jumpFrom.x) * ease;
+      b.z = b.jumpFrom.z + (b.jumpTo.z - b.jumpFrom.z) * ease;
+      bossMesh.position.set(b.x, Math.sin(Math.PI * t) * 2.2, b.z);
+      bossMesh.scale.setScalar(1.08 + Math.sin(Math.PI * t) * 0.15);
+      if (t >= 1) {
+        b.jumpElapsed = 0;
+        b.jumpTimer = 4;
+        bossMesh.position.y = 0;
+        const count = 12;
+        for (let k = 0; k < count; k++) {
+          const ang = (k / count) * Math.PI * 2 + state.time * 0.35;
+          spawnBossBullet(b.x, b.z, Math.cos(ang) * 5.4, Math.sin(ang) * 5.4);
+        }
+      }
+    } else {
+      b.jumpTimer -= dt;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.scale.setScalar(1.08 + Math.sin(state.time * 2.2) * 0.025);
+      if (b.jumpTimer <= 0) {
+        const dx = hp.x - b.x;
+        const dz = hp.z - b.z;
+        const len = Math.hypot(dx, dz) || 1;
+        b.jumpFrom = { x: b.x, z: b.z };
+        b.jumpTo = {
+          x: Math.max(-HALF + 3, Math.min(HALF - 3, b.x + (dx / len) * 4)),
+          z: Math.max(-HALF + 3, Math.min(HALF - 3, b.z + (dz / len) * 4)),
+        };
+        b.jumpElapsed = 0.0001;
+      }
+    }
+
+    if (bodyDistanceSq(b.x, b.z) < 2.5 * 2.5 && b.cool <= 0) {
+      b.cool = 1.6;
+      damage(2);
+      if (state.over) return;
+    }
+
+    b.shootTimer -= dt;
+    if (b.shootTimer <= 0) {
+      b.shootTimer = 2.8;
+      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+      for (const off of [-0.24, 0, 0.24]) {
+        const a = base + off;
+        spawnBossBullet(b.x, b.z, Math.cos(a) * 6.2, Math.sin(a) * 6.2);
+      }
+    }
+  }
+
   function updateBoss(dt) {
     const b = state.boss;
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
+    if (b.kind === 'magma_colossus') {
+      updateMagmaColossus(b, hp, dt);
+      return;
+    }
     const dx = hp.x - b.x;
     const dz = hp.z - b.z;
     const len = Math.hypot(dx, dz) || 1;
@@ -2215,6 +2710,72 @@
       if (dead) {
         b.mesh.visible = false;
         state.pods.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnLavaHazard(x, z) {
+    const mesh = hazardPool.find((m) => !m.visible);
+    if (!mesh) return;
+    mesh.visible = true;
+    mesh.material.opacity = 0.76;
+    mesh.scale.setScalar(1);
+    mesh.position.set(x, 0.09, z);
+    state.hazards.push({ mesh, x, z, life: 3, hit: false });
+  }
+
+  function updateHazards(dt) {
+    for (let k = state.hazards.length - 1; k >= 0; k--) {
+      const h = state.hazards[k];
+      h.life -= dt;
+      h.mesh.material.opacity = Math.max(0, Math.min(0.8, h.life * 0.3));
+      h.mesh.scale.setScalar(1 + Math.sin(state.time * 5 + k) * 0.08);
+      if (!h.hit && bodyDistanceSq(h.x, h.z) < 0.62 * 0.62) {
+        h.hit = true;
+        damage(1);
+        if (state.over) return;
+      }
+      if (h.life <= 0) {
+        h.mesh.visible = false;
+        state.hazards.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnGhostBullet(x, z, tx, tz) {
+    const mesh = ghostBulletPool.find((m) => !m.visible);
+    if (!mesh) return;
+    const dx = tx - x;
+    const dz = tz - z;
+    const len = Math.hypot(dx, dz) || 1;
+    mesh.visible = true;
+    mesh.position.set(x, 0.55, z);
+    state.ghostBullets.push({
+      mesh,
+      x,
+      z,
+      vx: (dx / len) * 4,
+      vz: (dz / len) * 4,
+      life: 4.5,
+    });
+  }
+
+  function updateGhostBullets(dt) {
+    for (let k = state.ghostBullets.length - 1; k >= 0; k--) {
+      const b = state.ghostBullets[k];
+      b.life -= dt;
+      b.x += b.vx * dt;
+      b.z += b.vz * dt;
+      b.mesh.position.set(b.x, 0.55, b.z);
+      let dead = b.life <= 0 || Math.abs(b.x) > HALF + 1 || Math.abs(b.z) > HALF + 1 ||
+        isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF));
+      if (!dead && bodyDistanceSq(b.x, b.z) < 0.62 * 0.62) {
+        dead = true;
+        damage(1);
+      }
+      if (dead) {
+        b.mesh.visible = false;
+        state.ghostBullets.splice(k, 1);
       }
     }
   }
@@ -2452,7 +3013,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了根须巨蛇与黄金法老，整座神庙都成了你的巢。';
+    el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老与熔岩巨像，三座遗迹都成了你的巢。';
     el.ovscore.textContent = `${state.score} 分`;
     el.ovtime.textContent = `存活 ${formatDuration(state.time)}`;
     el.ovdetail.textContent = `体长 ${state.cells.length} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
@@ -2465,6 +3026,9 @@
   function tick() {
     const dt = Math.min(0.05, clock.getDelta());
     state.time += dt;
+    if (lavaUnderlay.visible) {
+      lavaUnderlay.material.opacity = 0.78 + Math.sin(state.time * 2.4) * 0.1;
+    }
 
     if (toastTimer > 0) {
       toastTimer -= dt;
@@ -2489,6 +3053,8 @@
       if (state.phase === 'clear') {
         updateEnemies(dt);
         updatePods(dt);
+        updateGhostBullets(dt);
+        updateHazards(dt);
       }
       if (state.phase === 'boss') {
         updateBoss(dt);

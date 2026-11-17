@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>吞噬之蛇 — 温室与神庙</title>
+<title>吞噬之蛇 — 温室、神庙与火山</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307110c'/%3E%3Cpath d='M13 37c8 0 8-13 17-13s8 13 17 13 7-8 7-8' fill='none' stroke='%2362e2b3' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='51' cy='29' r='7' fill='%2362e2b3'/%3E%3Ccircle cx='53' cy='27' r='1.6' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -26,6 +26,37 @@
     color: var(--paper);
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
+  }
+  body[data-game-theme="volcano"] {
+    --jade: #ff9238;
+    --jade-deep: #b63b0d;
+    --gold: #ffd077;
+    --bronze: #bd5a27;
+    --crimson: #ff5c32;
+    --paper: #f5dfbd;
+    --ink: #090301;
+  }
+  body[data-game-theme="volcano"] .panel {
+    background:
+      linear-gradient(135deg, rgba(255,132,42,.09), transparent 36%),
+      rgba(16, 7, 4, .88);
+    border-color: rgba(210, 91, 32, .58);
+    box-shadow:
+      0 14px 34px rgba(0,0,0,.55),
+      inset 0 0 26px rgba(255,82,16,.035);
+  }
+  body[data-game-theme="volcano"] #hpfill {
+    background: linear-gradient(90deg, #aa2c0c, #ff6e1b 72%, #ffd269);
+    box-shadow: 0 0 16px rgba(255,104,24,.5);
+  }
+  body[data-game-theme="volcano"] .touch-action,
+  body[data-game-theme="volcano"] .touch-fire {
+    border-color: rgba(255,118,32,.7);
+    color: #ffe8c3;
+    box-shadow:
+      0 0 0 5px rgba(255,104,24,.04),
+      0 0 24px rgba(255,82,18,.16),
+      inset 0 0 22px rgba(255,93,20,.1);
   }
   #stage { position: fixed; inset: 0; }
   #stage::before {
@@ -764,7 +795,7 @@
   <div class="st-inner">
     <h1 class="st-title">吞噬之蛇</h1>
     <div class="st-en">D E V O U R</div>
-    <p class="st-sub">一条蛇，吃掉整座温室</p>
+    <p class="st-sub">一条蛇，吞穿三座遗迹</p>
     <button class="st-start" id="btnStart">开始游戏</button>
     <div class="st-subs">
       <button class="st-sub-btn" id="btnContinue" disabled>继续游戏</button>
