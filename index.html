@@ -180,6 +180,35 @@
     letter-spacing: .12em;
     color: rgba(190,187,168,.76);
   }
+  #gameMenu {
+    position: fixed;
+    top: 67px;
+    right: 24px;
+    z-index: 13;
+    display: flex;
+    gap: 6px;
+    user-select: none;
+  }
+  .menu-action {
+    min-height: 31px;
+    padding: 0 12px;
+    border: 1px solid rgba(168,124,75,.45);
+    border-radius: 2px;
+    background: rgba(4,11,7,.82);
+    color: #bbb7a3;
+    font-family: var(--ui);
+    font-size: 10px;
+    letter-spacing: .1em;
+    cursor: pointer;
+    backdrop-filter: blur(7px);
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .menu-action:hover,
+  .menu-action:active {
+    color: var(--jade-pale, #c6ffeb);
+    border-color: var(--jade);
+    background: rgba(18,74,56,.8);
+  }
 
   #toast {
     display: none;
@@ -282,6 +311,23 @@
   }
   #overlay #ovtime { font-size: 24px; margin: 0 0 8px; }
   #overlay .hint { margin-top: 14px; font-size: 13px; color: rgba(232,227,211,.65); }
+  .overlay-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .overlay-actions .menu-action {
+    min-width: 126px;
+    min-height: 42px;
+    padding: 0 16px;
+    color: #dfd5b8;
+    font-size: 12px;
+  }
+  .overlay-actions .menu-action:first-child {
+    border-color: rgba(98,226,179,.5);
+    color: #cffff0;
+  }
 
   /* ---------- 启动界面 ---------- */
   #startScreen {
@@ -572,6 +618,19 @@
       line-height: 1.5;
       text-align: right;
     }
+    #gameMenu {
+      top: calc(max(10px, env(safe-area-inset-top)) + 42px);
+      right: max(10px, env(safe-area-inset-right));
+      gap: 5px;
+    }
+    .menu-action { min-height: 28px; padding: 0 9px; font-size: 9px; }
+    .overlay-actions { gap: 8px; margin-top: 15px; }
+    .overlay-actions .menu-action {
+      min-width: 108px;
+      min-height: 40px;
+      padding: 0 10px;
+      font-size: 11px;
+    }
     #bossbar { top: 132px; width: calc(100vw - 20px); padding: 8px 10px 10px; }
     #bossbar .bname { margin-bottom: 5px; font-size: 11px; }
     #help { display: none; }
@@ -680,6 +739,11 @@
   </div>
 </div>
 
+<div id="gameMenu">
+  <button class="menu-action" id="btnRestartGame" type="button">重新开始</button>
+  <button class="menu-action" id="btnMainMenu" type="button">主菜单</button>
+</div>
+
 <div id="overlay">
   <div class="card panel">
     <h1 id="ovtitle">DEVOUR</h1>
@@ -688,6 +752,10 @@
     <div class="big" id="ovtime"></div>
     <p id="ovdetail"></p>
     <p class="hint">按 <b>R</b> 重新开始</p>
+    <div class="overlay-actions">
+      <button class="menu-action" id="btnOverlayRestart" type="button">重新开始</button>
+      <button class="menu-action" id="btnOverlayMenu" type="button">回到主菜单</button>
+    </div>
   </div>
 </div>
 

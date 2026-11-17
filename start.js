@@ -205,7 +205,39 @@
     if (typeof window.startDevour === 'function') window.startDevour();
   }
 
+  function refreshBest() {
+    try {
+      const best = Number(window.localStorage.getItem('devour-best') || 0);
+      document.getElementById('stBest').textContent = String(best);
+    } catch (err) {
+      /* localStorage may be unavailable when opened as a local file. */
+    }
+  }
+
+  function restartGame() {
+    if (window.__devourApi && typeof window.__devourApi.resetGame === 'function') {
+      window.__devourApi.resetGame();
+      return;
+    }
+    sendKey('keydown', 'r');
+  }
+
+  function returnToMenu() {
+    if (window.__devour) window.__devour.paused = true;
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.classList.remove('show');
+    panel.innerHTML = '';
+    panel.classList.remove('show');
+    screen.style.display = 'grid';
+    requestAnimationFrame(() => screen.classList.remove('gone'));
+    refreshBest();
+  }
+
   document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnRestartGame').addEventListener('click', restartGame);
+  document.getElementById('btnMainMenu').addEventListener('click', returnToMenu);
+  document.getElementById('btnOverlayRestart').addEventListener('click', restartGame);
+  document.getElementById('btnOverlayMenu').addEventListener('click', returnToMenu);
 
   document.getElementById('btnHelp').addEventListener('click', () => {
     panel.innerHTML = [
