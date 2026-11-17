@@ -19,7 +19,7 @@
   const BOSS_HP = 140;
   const BOSS_SPEED = 1.0;
   // ⚠️ 测试用：直接从第 5 关（神庙·柱厅）开始；恢复正常游戏请改回 0
-  const DEBUG_START_LEVEL = 10;
+  const DEBUG_START_LEVEL = 8;
   const DOOR_CELL = { i: 22, j: 1 };
   const BOSS_CELL = { i: 22, j: 22 };
 
