@@ -1634,7 +1634,7 @@
     state.pellets.push({ i: c.i, j: c.j, phase: Math.random() * Math.PI * 2 });
   }
 
-  function spawnEnemy(distFromHead = 10) {
+  function spawnEnemy(distFromHead = 10, isRespawn = false) {
     const h = state.cells[0] || { i: HALF, j: HALF };
     const slot = state.enemies.find((e) => !e.alive);
     if (!slot) return;
@@ -1661,6 +1661,9 @@
         enemyPool[idx].material.map = TEX[slot.type] || null;
         enemyPool[idx].material.color.setHex(0xffffff);
         enemyPool[idx].material.needsUpdate = true;
+      }
+      if (isRespawn && slot.type === 'obsidianBeetle') {
+        spawnLavaHazard(cellX(i), cellZ(j));
       }
       return;
     }
@@ -1960,7 +1963,7 @@
       return;
     }
     // 掉血立刻补一只怪（清怪压力）
-    if (state.phase === 'clear' && state.enemies.filter((e) => e.alive).length < 16) spawnEnemy(8);
+    if (state.phase === 'clear' && state.enemies.filter((e) => e.alive).length < 16) spawnEnemy(8, true);
   }
 
   function growBy(n) {
