@@ -1082,9 +1082,9 @@
   scene.add(headPivot);
 
   // ---------- 豆子 ----------
-  const pelletGeo = new THREE.IcosahedronGeometry(0.18, 0);
+  const pelletGeo = new THREE.IcosahedronGeometry(0.28, 1);
   const pelletMat = new THREE.MeshStandardMaterial({
-    color: 0xf2c14e, emissive: 0xc98b12, emissiveIntensity: 1.2, roughness: 0.35,
+    color: 0xffd66b, emissive: 0xd28a12, emissiveIntensity: 1.65, roughness: 0.28,
   });
   const pelletPool = [];
   for (let i = 0; i < 40; i++) {
