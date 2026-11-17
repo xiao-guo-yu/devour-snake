@@ -1029,9 +1029,9 @@
     const cx = S / 2, cy = S * 0.57;
     g.clearRect(0, 0, S, S);
     const aura = g.createRadialGradient(cx, cy, S * 0.04, cx, cy, S * 0.43);
-    aura.addColorStop(0, 'rgba(255,183,57,.8)');
-    aura.addColorStop(0.48, 'rgba(218,67,12,.38)');
-    aura.addColorStop(1, 'rgba(80,8,3,0)');
+    aura.addColorStop(0, 'rgba(157,231,255,.82)');
+    aura.addColorStop(0.48, 'rgba(63,146,216,.4)');
+    aura.addColorStop(1, 'rgba(14,34,68,0)');
     g.fillStyle = aura;
     g.beginPath();
     g.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
@@ -1041,24 +1041,28 @@
     g.bezierCurveTo(S * 0.23, S * 0.88, S * 0.18, S * 0.28, cx, S * 0.16);
     g.bezierCurveTo(S * 0.8, S * 0.29, S * 0.77, S * 0.87, cx + S * 0.23, S * 0.72);
     g.closePath();
-    g.fillStyle = '#140c0d';
+    g.fillStyle = '#14232f';
     g.fill();
-    g.strokeStyle = '#fa6817';
+    g.strokeStyle = '#72d4ff';
     g.lineWidth = S * 0.018;
     g.stroke();
     g.beginPath();
     g.moveTo(cx - S * 0.17, S * 0.44);
     g.bezierCurveTo(cx - S * 0.08, S * 0.6, cx + S * 0.09, S * 0.34, cx + S * 0.16, S * 0.55);
-    g.strokeStyle = '#ff7a1b';
+    g.strokeStyle = '#63c8ff';
     g.lineWidth = S * 0.06;
     g.stroke();
     for (const dx of [-0.09, 0.09]) {
       g.beginPath();
       g.arc(cx + S * dx, S * 0.52, S * 0.035, 0, Math.PI * 2);
-      g.fillStyle = '#ffb82e';
+      g.fillStyle = '#c8f5ff';
       g.fill();
+      g.shadowColor = '#58c8ff';
+      g.shadowBlur = S * 0.06;
+      g.fill();
+      g.shadowBlur = 0;
     }
-    g.strokeStyle = 'rgba(112,89,80,.65)';
+    g.strokeStyle = 'rgba(103,145,174,.7)';
     g.lineWidth = S * 0.02;
     g.beginPath();
     g.moveTo(cx, S * 0.2);
