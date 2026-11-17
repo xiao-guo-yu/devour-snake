@@ -1149,7 +1149,7 @@
       : new THREE.MeshBasicMaterial({ color: 0x8a7b86 });
   }
   const magmaColossusTex = typeof THREE.TextureLoader === 'function'
-    ? new THREE.TextureLoader().load('assets/magma-colossus.png?v=20261117')
+    ? new THREE.TextureLoader().load('assets/magma-colossus.png?v=20261117-bright2')
     : spriteTexture(512, drawMagmaColossus);
   const BOSS_TEX = {
     rootcoil: spriteTexture(512, drawBoss),
