@@ -77,36 +77,118 @@
       right.push([p[0] - nx * half, p[1] - ny * half]);
     }
 
-    ctx.beginPath();
-    ctx.moveTo(left[0][0], left[0][1]);
-    for (let i = 1; i < left.length; i++) ctx.lineTo(left[i][0], left[i][1]);
-    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(46, 210, 178, 0.9)';
+    const traceBody = () => {
+      ctx.beginPath();
+      ctx.moveTo(left[0][0], left[0][1]);
+      for (let i = 1; i < left.length; i++) ctx.lineTo(left[i][0], left[i][1]);
+      for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+      ctx.closePath();
+    };
+
+    ctx.save();
+    ctx.translate(0, Math.max(12, H * 0.018));
+    ctx.globalAlpha = 0.38;
+    ctx.fillStyle = '#00120d';
+    ctx.shadowColor = 'rgba(0,0,0,.65)';
+    ctx.shadowBlur = 22;
+    traceBody();
     ctx.fill();
+    ctx.restore();
+
+    const bodyGradient = ctx.createLinearGradient(0, 0, W * 0.76, 0);
+    bodyGradient.addColorStop(0, '#116249');
+    bodyGradient.addColorStop(0.42, '#2dbb8e');
+    bodyGradient.addColorStop(0.72, '#68e9bb');
+    bodyGradient.addColorStop(1, '#2aa77f');
+    traceBody();
+    ctx.fillStyle = bodyGradient;
+    ctx.shadowColor = 'rgba(71,232,183,.24)';
+    ctx.shadowBlur = 24;
+    ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(8, 22, 17, 0.85)';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(3, 19, 13, 0.94)';
+    ctx.lineWidth = Math.max(5, W * 0.0042);
     ctx.stroke();
+
+    ctx.save();
+    traceBody();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(5, 66, 49, .42)';
+    ctx.lineWidth = 1.15;
+    for (let i = 7; i < pts.length - 4; i += 7) {
+      const p = pts[i];
+      const a = pts[i - 2];
+      const b = pts[i + 2];
+      const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      ctx.beginPath();
+      ctx.ellipse(p[0], p[1] + 4, 9, 5, angle, 0, Math.PI);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    for (let i = 5; i < pts.length - 4; i++) {
+      const p = pts[i];
+      if (i === 5) ctx.moveTo(p[0], p[1] - 13);
+      else ctx.lineTo(p[0], p[1] - 13);
+    }
+    ctx.strokeStyle = 'rgba(210, 255, 238, .2)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
 
     // 头部：圆头 + 深色描边 + 两只白点眼
     const head = pts[pts.length - 1];
-    ctx.beginPath();
-    ctx.arc(head[0], head[1], 30, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(64, 224, 190, 0.95)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(8, 22, 17, 0.9)';
-    ctx.lineWidth = 6;
-    ctx.stroke();
+    const headGlow = ctx.createRadialGradient(
+      head[0] - 10, head[1] - 12, 5,
+      head[0], head[1], 36
+    );
+    headGlow.addColorStop(0, '#a9ffe2');
+    headGlow.addColorStop(0.4, '#61e5b7');
+    headGlow.addColorStop(1, '#208a68');
 
-    ctx.fillStyle = '#f2fffb';
+    ctx.save();
+    ctx.shadowColor = 'rgba(76,231,181,.35)';
+    ctx.shadowBlur = 24;
     ctx.beginPath();
-    ctx.arc(head[0] - 11, head[1] - 9, 5.4, 0, Math.PI * 2);
+    ctx.arc(head[0], head[1], 31, 0, Math.PI * 2);
+    ctx.fillStyle = headGlow;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(4, 19, 13, 0.95)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#f2fff9';
+    ctx.beginPath();
+    ctx.ellipse(head[0] - 10, head[1] - 9, 6.2, 7.4, -0.12, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(head[0] + 11, head[1] - 9, 5.4, 0, Math.PI * 2);
+    ctx.ellipse(head[0] + 11, head[1] - 8, 6.2, 7.4, 0.12, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = '#08150f';
+    ctx.beginPath();
+    ctx.ellipse(head[0] - 8.8, head[1] - 7.4, 2.1, 3.1, -0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(head[0] + 9.4, head[1] - 6.4, 2.1, 3.1, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    const tongueWave = Math.sin(t * 4.2) * 3;
+    ctx.strokeStyle = '#ef6a59';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(head[0] + 27, head[1] + 5);
+    ctx.quadraticCurveTo(head[0] + 42, head[1] + 5 + tongueWave, head[0] + 52, head[1] + 1 + tongueWave);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(head[0] + 52, head[1] + 1 + tongueWave);
+    ctx.lineTo(head[0] + 61, head[1] - 5 + tongueWave);
+    ctx.moveTo(head[0] + 52, head[1] + 1 + tongueWave);
+    ctx.lineTo(head[0] + 61, head[1] + 6 + tongueWave);
+    ctx.stroke();
   }
 
   function frame(ts) {
@@ -160,6 +242,34 @@
   } catch (err) {
     /* file:// 下可能禁用 localStorage，忽略 */
   }
+
+  const sendKey = (type, key) => {
+    window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
+  };
+
+  document.querySelectorAll('[data-key]').forEach((button) => {
+    const key = button.getAttribute('data-key');
+    let repeat = 0;
+    const release = () => {
+      if (repeat) window.clearInterval(repeat);
+      repeat = 0;
+      sendKey('keyup', key);
+    };
+    button.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      try {
+        if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+      } catch (err) {
+        /* Synthetic test events do not own a pointer capture. */
+      }
+      sendKey('keydown', key);
+      if (key !== ' ' && key !== 'e') return;
+      repeat = window.setInterval(() => sendKey('keydown', key), 150);
+    });
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointercancel', release);
+    button.addEventListener('contextmenu', (event) => event.preventDefault());
+  });
 
   resize();
   window.addEventListener('resize', resize);

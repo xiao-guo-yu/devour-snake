@@ -44,17 +44,17 @@
   stage.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x070b0a);
-  scene.fog = new THREE.Fog(0x070b0a, 55, 110);
+  scene.background = new THREE.Color(0x050906);
+  scene.fog = new THREE.Fog(0x06110b, 52, 105);
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
   camera.up.set(0, 0, -1);
   camera.position.set(0, 80, 0);
   camera.lookAt(0, 0, 0);
 
-  const hemi = new THREE.HemisphereLight(0xa8e6cf, 0x0a1411, 0.75);
+  const hemi = new THREE.HemisphereLight(0x9cebd2, 0x07100b, 0.82);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffe3b3, 0.95);
+  const sun = new THREE.DirectionalLight(0xffd99b, 1.05);
   sun.position.set(20, 40, 14);
   scene.add(sun);
 
@@ -64,8 +64,8 @@
 
   // ---------- 地板 ----------
   const floorGeo = new THREE.BoxGeometry(0.96, 0.12, 0.96);
-  const matA = new THREE.MeshStandardMaterial({ color: 0x1b2a25, roughness: 0.95 });
-  const matB = new THREE.MeshStandardMaterial({ color: 0x22352e, roughness: 0.95 });
+  const matA = new THREE.MeshStandardMaterial({ color: 0x12231a, roughness: 0.96 });
+  const matB = new THREE.MeshStandardMaterial({ color: 0x1a3024, roughness: 0.96 });
   const tilesA = new THREE.InstancedMesh(floorGeo, matA, Math.ceil((N * N) / 2));
   const tilesB = new THREE.InstancedMesh(floorGeo, matB, Math.ceil((N * N) / 2));
   {
@@ -86,7 +86,7 @@
   scene.add(tilesA, tilesB);
 
   // ---------- 外墙 ----------
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c3d36, roughness: 0.9 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x352d20, roughness: 0.88 });
   const wallGeo = new THREE.BoxGeometry(1, 1.1, 1);
   {
     const walls = new THREE.InstancedMesh(wallGeo, wallMat, (N + 2) * 4);
@@ -114,8 +114,8 @@
   const startRoom = new THREE.Group();
   let startRoomGate = null;
   {
-    const roomWallMat = new THREE.MeshStandardMaterial({ color: 0x2c3d36, roughness: 0.9 });
-    const roomFloorMat = new THREE.MeshBasicMaterial({ color: 0x26342b, fog: false });
+    const roomWallMat = new THREE.MeshStandardMaterial({ color: 0x352d20, roughness: 0.88 });
+    const roomFloorMat = new THREE.MeshBasicMaterial({ color: 0x14251b, fog: false });
     const rw = START_ROOM.i1 - START_ROOM.i0 + 1;
     const rh = START_ROOM.j1 - START_ROOM.j0 + 1;
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(rw, rh), roomFloorMat);
@@ -151,7 +151,7 @@
   // 房间消失后补上的墙块（把外墙门洞封死）
   const doorPlug = new THREE.Mesh(
     wallGeo,
-    new THREE.MeshStandardMaterial({ color: 0x2c3d36, roughness: 0.9 })
+    new THREE.MeshStandardMaterial({ color: 0x352d20, roughness: 0.88 })
   );
   doorPlug.position.set(cellX(START_ROOM.doorI), 0.55, cellZ(START_ROOM.doorJ));
   doorPlug.visible = false;
@@ -204,11 +204,32 @@
     // 头
     g.beginPath();
     g.ellipse(cx, cy, w, h, 0, 0, Math.PI * 2);
-    g.fillStyle = '#35e0c4';
+    const headGrad = g.createRadialGradient(
+      cx - w * 0.36, cy - h * 0.4, S * 0.025,
+      cx, cy, h * 1.18
+    );
+    headGrad.addColorStop(0, '#b9ffe8');
+    headGrad.addColorStop(0.34, '#64e6b9');
+    headGrad.addColorStop(1, '#17775d');
+    g.fillStyle = headGrad;
     g.fill();
     g.lineWidth = S * 0.038;
     g.strokeStyle = INK;
     g.stroke();
+    g.save();
+    g.beginPath();
+    g.ellipse(cx, cy, w * 0.94, h * 0.9, 0, 0, Math.PI * 2);
+    g.clip();
+    g.strokeStyle = 'rgba(5, 75, 57, .42)';
+    g.lineWidth = Math.max(1, S * 0.009);
+    for (let row = -3; row <= 3; row++) {
+      for (let col = -2; col <= 2; col++) {
+        g.beginPath();
+        g.arc(cx + col * S * 0.065 + (row % 2) * S * 0.032, cy + row * S * 0.062, S * 0.036, 0, Math.PI);
+        g.stroke();
+      }
+    }
+    g.restore();
     // 头顶高光
     g.beginPath();
     g.ellipse(cx - w * 0.18, cy - h * 0.3, w * 0.5, h * 0.32, -0.2, 0, Math.PI * 2);
@@ -223,6 +244,10 @@
       g.lineWidth = S * 0.012;
       g.strokeStyle = 'rgba(8,22,15,0.7)';
       g.stroke();
+      g.beginPath();
+      g.arc(cx + w * dx, cy - h * 0.405, S * 0.017, 0, Math.PI * 2);
+      g.fillStyle = INK;
+      g.fill();
     }
     // 鼻孔
     for (const dx of [-0.12, 0.12]) {
@@ -952,6 +977,8 @@
       if (i < 3 || j < 3 || i > N - 4 || j > N - 4) return false;
       if (Math.abs(i - 22) < 7 && Math.abs(j - startJ) < 8) return false;
       if (Math.abs(i - 22) < 6 && j < 8) return false;
+      // Keep the opening corridor readable before the player takes control.
+      if (level === 0 && i < 23 && Math.abs(j - START_ROOM.doorJ) < 5) return false;
       const bossRoom = ROOMS[level] && ROOMS[level].kind === 'boss';
       if (bossRoom && Math.abs(i - 22) < 7 && Math.abs(j - 22) < 7) return false;
       for (const [si, sj] of seeds) {
@@ -1234,6 +1261,7 @@
     shootCdMul: 1,
     enemySpeedMul: 1,
     enemyShoot: false,
+    spawnGrace: 0,
   };
 
   let viewMode = 'full';
@@ -1254,6 +1282,10 @@
     toast: document.getElementById('toast'),
     toasttext: document.getElementById('toasttext'),
     toastbig: document.getElementById('toastbig'),
+    levelIntro: document.getElementById('levelIntro'),
+    levelIntroKicker: document.getElementById('levelIntroKicker'),
+    levelIntroTitle: document.getElementById('levelIntroTitle'),
+    levelIntroMeta: document.getElementById('levelIntroMeta'),
     overlay: document.getElementById('overlay'),
     ovtitle: document.getElementById('ovtitle'),
     ovsub: document.getElementById('ovsub'),
@@ -1273,6 +1305,7 @@
   }
 
   let toastTimer = 0;
+  let levelIntroTimer = 0;
 
   // ---------- 工具 ----------
   const randInt = (n) => Math.floor(Math.random() * n);
@@ -1282,6 +1315,16 @@
     el.toastbig.textContent = big || '';
     el.toast.style.display = 'block';
     toastTimer = 2.2;
+  }
+
+  function showLevelIntro(kicker, title, meta) {
+    if (!el.levelIntro) return;
+    el.levelIntroKicker.textContent = kicker || '';
+    el.levelIntroTitle.textContent = title || '';
+    el.levelIntroMeta.textContent = meta || '';
+    el.levelIntro.classList.add('show');
+    if (levelIntroTimer) window.clearTimeout(levelIntroTimer);
+    levelIntroTimer = window.setTimeout(() => el.levelIntro.classList.remove('show'), 3200);
   }
 
   function randomFreeCell() {
@@ -1358,8 +1401,8 @@
 
   // ---------- 关卡 ----------
   const THEMES = {
-    green: { fog: 0x08120e, a: 0x1b2a25, b: 0x22352e, hemi: 0xa8e6cf },
-    temple: { fog: 0x1c1306, a: 0x3b2c19, b: 0x4a3720, hemi: 0xf5d9a0 },
+    green: { fog: 0x06110b, a: 0x12231a, b: 0x1a3024, hemi: 0x9cebd2 },
+    temple: { fog: 0x1b1206, a: 0x3b2a17, b: 0x4a351e, hemi: 0xf0cf91 },
   };
 
   function startLevel(idx) {
@@ -1394,6 +1437,7 @@
     // 第一关：从左侧 4×4 出生小房间钻出来；其余关卡仍在底部重生
     state.roomActive = false;
     state.roomTimer = 0;
+    state.spawnGrace = idx === 0 ? 2.2 : 0;
     // 只有第一关开局时门洞是开的；其余关卡外墙保持完整
     doorPlug.visible = idx !== 0;
     if (idx === 0) {
@@ -1442,11 +1486,16 @@
     }
 
     if (room.kind === 'clear') {
-      for (let k = 0; k < room.enemies; k++) spawnEnemy(9);
-      toast(room.name, `敌人 ${room.enemies}`);
+      const safeDistance = idx === 0 ? 14 : 9;
+      for (let k = 0; k < room.enemies; k++) spawnEnemy(safeDistance);
+      showLevelIntro(
+        `LEVEL ${String(idx + 1).padStart(2, '0')} / ${String(ROOM_COUNT).padStart(2, '0')}`,
+        room.name,
+        `敌人 ${room.enemies} · 清除后开启传送门`
+      );
     } else {
       spawnBoss(room.boss);
-      toast('BOSS', room.name);
+      showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败法老 · 完成试炼' : '击败首领 · 进入下一层');
     }
     updateHud();
   }
@@ -1833,9 +1882,9 @@
 
       // 深浅相间的横纹
       const band = Math.floor(s / 1.5) % 2;
-      const r = band ? 0.10 : 0.18;
-      const g = band ? 0.66 : 0.90;
-      const b = band ? 0.58 : 0.80;
+      const r = band ? 0.06 : 0.13;
+      const g = band ? 0.68 : 0.94;
+      const b = band ? 0.54 : 0.78;
       ribbonCol[base] = r; ribbonCol[base + 1] = g; ribbonCol[base + 2] = b;
       ribbonCol[base + 3] = r; ribbonCol[base + 4] = g; ribbonCol[base + 5] = b;
 
@@ -1869,11 +1918,18 @@
 
   function updateEnemies(dt) {
     const hp = headPosition(_tmpA).clone();
+    const spawnLocked = state.spawnGrace > 0;
+    if (spawnLocked) state.spawnGrace = Math.max(0, state.spawnGrace - dt);
     for (let k = 0; k < enemyPool.length; k++) {
       const mesh = enemyPool[k];
       const e = state.enemies[k];
       if (!e || !e.alive) { mesh.visible = false; continue; }
       mesh.visible = true;
+      if (spawnLocked) {
+        mesh.position.set(e.x, 0.5 + Math.sin(state.time * 4 + e.bob) * 0.04, e.z);
+        mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
+        continue;
+      }
 
       const dx = hp.x - e.x;
       const dz = hp.z - e.z;
