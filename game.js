@@ -2240,8 +2240,8 @@
     const angles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
     for (const off of angles) {
       const a = base + off;
-      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * 3));
-      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * 3));
+      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * 4));
+      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * 4));
       if (!isObstacle(Math.round(tx + HALF), Math.round(tz + HALF))) {
         return { x: tx, z: tz };
       }
@@ -2373,7 +2373,7 @@
       }
 
       const typeMul = e.type === 'scarab' ? 1.2 : e.type === 'mummy' ? 1.5 : e.type === 'anubis' ? 0.9
-        : e.type === 'obsidianBeetle' ? 2.6 : 1;
+        : e.type === 'obsidianBeetle' ? 2.34 : 1;
       const speed = (e.cool > 0 ? ENEMY_COOL_SPEED : ENEMY_SPEED) * state.enemySpeedMul * typeMul;
       let nx = e.x + (dx / len) * speed * dt;
       let nz = e.z + (dz / len) * speed * dt;
