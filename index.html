@@ -20,44 +20,85 @@
 
   .hud { position: fixed; pointer-events: none; user-select: none; }
   .panel {
-    background: rgba(10, 16, 14, 0.74);
-    border: 1px solid rgba(232, 227, 211, 0.16);
-    border-radius: 10px;
-    padding: 10px 14px;
-    backdrop-filter: blur(6px);
+    background: linear-gradient(180deg, rgba(12, 20, 17, 0.92), rgba(8, 14, 12, 0.86));
+    border: 1px solid rgba(242, 193, 78, 0.22);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
   }
-  #stats { top: 18px; left: 18px; min-width: 220px; }
-  #stats .row { display: flex; justify-content: space-between; gap: 18px; font-size: 13px; letter-spacing: .04em; }
-  #stats .row b { font-size: 17px; font-variant-numeric: tabular-nums; }
-  #hpbar { margin-top: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
-  #hpfill { height: 100%; width: 100%; background: linear-gradient(90deg, #2f9e7a, #6ee7b7); transition: width .12s linear; }
-  #objective { margin-top: 8px; font-size: 12px; letter-spacing: .05em; color: rgba(242,193,78,.92); }
+  #stats { top: 18px; left: 18px; min-width: 236px; }
+  #stats .row { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; font-size: 12px; letter-spacing: .12em; color: rgba(232,227,211,.62); }
+  #stats .row b { font-size: 22px; font-weight: 800; letter-spacing: .02em; color: #f6f1e0; font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
+  #hpbar {
+    margin-top: 10px; height: 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(0, 0, 0, .55);
+    border: 1px solid rgba(120, 255, 210, .25);
+    box-shadow: inset 0 0 10px rgba(0,0,0,.7);
+    position: relative;
+  }
+  #hpfill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #2aa27c, #6ee7b7 55%, #b8ffe4);
+    box-shadow: 0 0 12px rgba(110, 231, 183, .65);
+    transition: width .12s linear;
+  }
+  /* 分段刻度：让血条像一节一节的蛇身 */
+  #hpbar::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(90deg, transparent 0 13px, rgba(0, 0, 0, .75) 13px 15px);
+  }
+  #objective { margin-top: 10px; font-size: 12px; letter-spacing: .06em; color: rgba(242,193,78,.95); }
 
   #bossbar {
     display: none; top: 16px; left: 50%; transform: translateX(-50%);
-    width: min(560px, 62vw); text-align: center;
+    width: min(600px, 64vw); text-align: center;
+    padding: 10px 22px 12px;
+    background: linear-gradient(180deg, rgba(26, 14, 10, .95), rgba(12, 8, 7, .9));
+    border: 1px solid rgba(242, 193, 78, .55);
+    border-radius: 16px;
+    box-shadow: 0 0 0 3px rgba(242, 193, 78, .12), 0 14px 34px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,225,160,.18);
   }
-  #bossbar .bname { font-size: 12px; letter-spacing: .18em; color: #f0b7a4; margin-bottom: 6px; }
-  #bossbar .bbar { height: 12px; border-radius: 999px; background: rgba(255,255,255,.10); overflow: hidden; }
-  #bfill { height: 100%; width: 100%; background: linear-gradient(90deg, #8d2b16, #e4572e, #f2c14e); transition: width .15s linear; }
+  #bossbar .bname { font-size: 13px; letter-spacing: .26em; color: #f2c14e; margin-bottom: 8px; text-shadow: 0 0 14px rgba(242,193,78,.45); }
+  #bossbar .bbar {
+    height: 16px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,.65);
+    border: 1px solid rgba(242, 193, 78, .35);
+    box-shadow: inset 0 0 12px rgba(0,0,0,.8);
+  }
+  #bfill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #8d2b16, #e4572e 55%, #ffd66b);
+    box-shadow: 0 0 16px rgba(228, 87, 46, .75);
+    transition: width .15s linear;
+  }
 
   #help {
     bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 12.5px; letter-spacing: .05em;
-    color: rgba(232,227,211,.82);
+    color: rgba(232,227,211,.85);
+    background: linear-gradient(180deg, rgba(12,20,17,.92), rgba(8,14,12,.88));
+    border: 1px solid rgba(242,193,78,.22);
+    border-radius: 999px;
+    padding: 8px 18px;
+    box-shadow: 0 10px 26px rgba(0,0,0,.45);
+    backdrop-filter: blur(8px);
     transition: opacity .45s ease;
+    white-space: nowrap;
   }
   #help.hide { opacity: 0; pointer-events: none; }
   #help kbd {
-    display: inline-block; min-width: 20px; text-align: center;
-    padding: 2px 6px; margin: 0 2px; border-radius: 5px;
-    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
-    font-family: inherit; font-size: 11.5px;
+    display: inline-block; min-width: 22px; text-align: center;
+    padding: 2px 7px; margin: 0 2px; border-radius: 6px;
+    background: rgba(242,193,78,.16); border: 1px solid rgba(242,193,78,.42);
+    color: #ffd977; font-family: inherit; font-size: 11.5px; font-weight: 700;
   }
   #mode { top: 18px; right: 18px; font-size: 12px; letter-spacing: .08em; color: rgba(232,227,211,.7); }
 
   #toast {
     display: none; top: 46%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; font-size: 15px; letter-spacing: .08em; padding: 14px 26px;
+    border-color: rgba(242,193,78,.35);
+    box-shadow: 0 16px 40px rgba(0,0,0,.55), 0 0 30px rgba(242,193,78,.12);
   }
   #toast b { color: var(--gold); font-size: 20px; display: block; margin-top: 4px; }
 
