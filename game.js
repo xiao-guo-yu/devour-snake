@@ -1148,10 +1148,13 @@
       ? new THREE.MeshBasicMaterial({ map: TEX[key], transparent: true, depthWrite: false })
       : new THREE.MeshBasicMaterial({ color: 0x8a7b86 });
   }
+  const magmaColossusTex = typeof THREE.TextureLoader === 'function'
+    ? new THREE.TextureLoader().load('assets/magma-colossus.png?v=20261117')
+    : spriteTexture(512, drawMagmaColossus);
   const BOSS_TEX = {
     rootcoil: spriteTexture(512, drawBoss),
     pharaoh: spriteTexture(512, drawPharaoh),
-    magma_colossus: spriteTexture(512, drawMagmaColossus),
+    magma_colossus: magmaColossusTex,
   };
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
@@ -1841,7 +1844,7 @@
     bossPlaneMat.needsUpdate = true;
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
-    bossMesh.scale.setScalar(isColossus ? 1.08 : (isPharaoh ? 0.95 : 1));
+    bossMesh.scale.setScalar(isColossus ? 1.6 : (isPharaoh ? 0.95 : 1));
     el.bname.textContent = isColossus
       ? '熔岩巨像 · MAGMA COLOSSUS'
       : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL');
@@ -2446,7 +2449,7 @@
       b.x = b.jumpFrom.x + (b.jumpTo.x - b.jumpFrom.x) * ease;
       b.z = b.jumpFrom.z + (b.jumpTo.z - b.jumpFrom.z) * ease;
       bossMesh.position.set(b.x, Math.sin(Math.PI * t) * 2.2, b.z);
-      bossMesh.scale.setScalar(1.08 + Math.sin(Math.PI * t) * 0.15);
+      bossMesh.scale.setScalar(1.6 + Math.sin(Math.PI * t) * 0.15);
       if (t >= 1) {
         b.jumpElapsed = 0;
         b.jumpTimer = 4;
@@ -2460,7 +2463,7 @@
     } else {
       b.jumpTimer -= dt;
       bossMesh.position.set(b.x, 0, b.z);
-      bossMesh.scale.setScalar(1.08 + Math.sin(state.time * 2.2) * 0.025);
+      bossMesh.scale.setScalar(1.6 + Math.sin(state.time * 2.2) * 0.025);
       if (b.jumpTimer <= 0) {
         const dx = hp.x - b.x;
         const dz = hp.z - b.z;
@@ -2474,7 +2477,8 @@
       }
     }
 
-    if (bodyDistanceSq(b.x, b.z) < 2.5 * 2.5 && b.cool <= 0) {
+    const bossRadius = 3.3;
+    if (bodyDistanceSq(b.x, b.z) < bossRadius * bossRadius && b.cool <= 0) {
       b.cool = 1.6;
       damage(2);
       if (state.over) return;
