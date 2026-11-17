@@ -1813,7 +1813,7 @@
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
-      enemyPool[k].scale.setScalar(1);
+      enemyPool[k].scale.setScalar(type === 'emberWisp' ? 1.45 : 1);
       state.enemies[k].type = type;
       state.enemies[k].hp = type === 'scarab' || type === 'obsidianBeetle' ? 2 : 1;
     }
@@ -2354,7 +2354,7 @@
     mesh.visible = true;
     mesh.position.set(nx, 0.58 + Math.sin(state.time * 2.4 + e.bob) * 0.11, nz);
     mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.12;
-    mesh.scale.setScalar(1 + Math.sin(state.time * 3 + e.bob) * 0.04);
+    mesh.scale.setScalar(1.45 + Math.sin(state.time * 3 + e.bob) * 0.05);
 
     if (e.shootTimer === undefined) e.shootTimer = 2.4;
     e.shootTimer -= dt;
