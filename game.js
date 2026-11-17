@@ -1135,7 +1135,7 @@
     : null;
   const loadCharacterTexture = (file, fallback) => (
     imageTextureLoader
-      ? imageTextureLoader.load(`assets/${file}?v=20261117-original-monsters3`)
+      ? imageTextureLoader.load(`assets/${file}?v=20261117-volcano-light2`)
       : fallback
   );
   const TEX = {
