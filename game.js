@@ -925,9 +925,9 @@
     const cx = S * 0.5, cy = S * 0.53;
     g.clearRect(0, 0, S, S);
     const glow = g.createRadialGradient(cx, cy, S * 0.05, cx, cy, S * 0.44);
-    glow.addColorStop(0, '#ff8b22');
-    glow.addColorStop(0.45, '#c83f0c');
-    glow.addColorStop(1, 'rgba(87,18,4,.1)');
+    glow.addColorStop(0, '#ffe3a6');
+    glow.addColorStop(0.45, '#f28a4d');
+    glow.addColorStop(1, 'rgba(119,35,11,.08)');
     g.fillStyle = glow;
     g.beginPath();
     g.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
@@ -940,13 +940,17 @@
     g.bezierCurveTo(S * 0.57, S * 0.79, S * 0.48, S * 0.84, S * 0.42, S * 0.77);
     g.bezierCurveTo(S * 0.34, S * 0.84, S * 0.22, S * 0.79, S * 0.16, S * 0.57);
     g.closePath();
-    g.fillStyle = '#24100c';
+    g.fillStyle = '#8b4b37';
     g.fill();
-    g.strokeStyle = '#ff6b17';
+    g.strokeStyle = '#ffd28a';
     g.lineWidth = S * 0.025;
     g.stroke();
+    g.beginPath();
+    g.ellipse(S * 0.4, S * 0.33, S * 0.16, S * 0.09, -0.28, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255, 237, 195, .32)';
+    g.fill();
 
-    g.strokeStyle = '#ff8b25';
+    g.strokeStyle = '#ffc65f';
     g.lineWidth = S * 0.018;
     g.lineCap = 'round';
     const cracks = [
@@ -965,9 +969,9 @@
     for (const dx of [-0.12, 0.12]) {
       g.beginPath();
       g.ellipse(cx + S * dx, cy - S * 0.02, S * 0.047, S * 0.06, 0, 0, Math.PI * 2);
-      g.fillStyle = '#ffd867';
+      g.fillStyle = '#fff3b0';
       g.fill();
-      g.shadowColor = '#ff9b22';
+      g.shadowColor = '#ffc15a';
       g.shadowBlur = S * 0.08;
       g.fill();
       g.shadowBlur = 0;
