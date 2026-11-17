@@ -1130,17 +1130,28 @@
   }
 
   const headTex = spriteTexture(256, drawSnakeHead);
+  const imageTextureLoader = typeof THREE.TextureLoader === 'function'
+    ? new THREE.TextureLoader()
+    : null;
+  const loadCharacterTexture = (file, fallback) => (
+    imageTextureLoader
+      ? imageTextureLoader.load(`assets/${file}?v=20261117-original-monsters`)
+      : fallback
+  );
   const TEX = {
-    spore: spriteTexture(192, drawSpore),
-    vine: spriteTexture(192, drawVine),
-    trap: spriteTexture(192, drawTrap),
-    scarab: spriteTexture(192, drawScarab),
-    scarabBroken: spriteTexture(192, (g, S) => drawScarab(g, S, true)),
-    mummy: spriteTexture(192, drawMummy),
-    anubis: spriteTexture(192, drawAnubis),
-    magmaSlime: spriteTexture(192, drawMagmaSlime),
-    obsidianBeetle: spriteTexture(192, drawObsidianBeetle),
-    emberWisp: spriteTexture(192, drawEmberWisp),
+    spore: loadCharacterTexture('spore.png', spriteTexture(192, drawSpore)),
+    vine: loadCharacterTexture('vine.png', spriteTexture(192, drawVine)),
+    trap: loadCharacterTexture('trap.png', spriteTexture(192, drawTrap)),
+    scarab: loadCharacterTexture('scarab.png', spriteTexture(192, drawScarab)),
+    scarabBroken: loadCharacterTexture(
+      'scarab-broken.png',
+      spriteTexture(192, (g, S) => drawScarab(g, S, true))
+    ),
+    mummy: loadCharacterTexture('mummy.png', spriteTexture(192, drawMummy)),
+    anubis: loadCharacterTexture('anubis.png', spriteTexture(192, drawAnubis)),
+    magmaSlime: loadCharacterTexture('magma-slime.png', spriteTexture(192, drawMagmaSlime)),
+    obsidianBeetle: loadCharacterTexture('obsidian-beetle.png', spriteTexture(192, drawObsidianBeetle)),
+    emberWisp: loadCharacterTexture('ember-wisp.png', spriteTexture(192, drawEmberWisp)),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
@@ -1148,12 +1159,13 @@
       ? new THREE.MeshBasicMaterial({ map: TEX[key], transparent: true, depthWrite: false })
       : new THREE.MeshBasicMaterial({ color: 0x8a7b86 });
   }
-  const magmaColossusTex = typeof THREE.TextureLoader === 'function'
-    ? new THREE.TextureLoader().load('assets/magma-colossus.png?v=20261117-bright2')
-    : spriteTexture(512, drawMagmaColossus);
+  const magmaColossusTex = loadCharacterTexture(
+    'magma-colossus.png',
+    spriteTexture(512, drawMagmaColossus)
+  );
   const BOSS_TEX = {
-    rootcoil: spriteTexture(512, drawBoss),
-    pharaoh: spriteTexture(512, drawPharaoh),
+    rootcoil: loadCharacterTexture('rootcoil.png', spriteTexture(512, drawBoss)),
+    pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
     magma_colossus: magmaColossusTex,
   };
 
@@ -1360,7 +1372,7 @@
     { c: 0x6b7a4a, e: 0x2a3318 }, // 食蝇草：橄榄绿
     { c: 0x8a7b86, e: 0x3a2f38 },
   ];
-  const enemyGeo = new THREE.PlaneGeometry(1.75, 1.75);
+  const enemyGeo = new THREE.PlaneGeometry(2.2, 2.2);
   const enemyPool = [];
   for (let i = 0; i < 24; i++) {
     const mesh = new THREE.Mesh(enemyGeo, ENEMY_MATS.spore);
@@ -1801,7 +1813,7 @@
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
-      enemyPool[k].scale.setScalar(type === 'emberWisp' ? 1.65 : 1);
+      enemyPool[k].scale.setScalar(1);
       state.enemies[k].type = type;
       state.enemies[k].hp = type === 'scarab' || type === 'obsidianBeetle' ? 2 : 1;
     }
@@ -2342,7 +2354,7 @@
     mesh.visible = true;
     mesh.position.set(nx, 0.58 + Math.sin(state.time * 2.4 + e.bob) * 0.11, nz);
     mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.12;
-    mesh.scale.setScalar(1.65 + Math.sin(state.time * 3 + e.bob) * 0.06);
+    mesh.scale.setScalar(1 + Math.sin(state.time * 3 + e.bob) * 0.04);
 
     if (e.shootTimer === undefined) e.shootTimer = 2.4;
     e.shootTimer -= dt;
