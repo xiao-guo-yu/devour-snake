@@ -1192,7 +1192,7 @@
   const doorGroup = new THREE.Group();
   const PORTAL_TEX = spriteTexture(256, drawPortal);
   const doorPad = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.5, 1.5),
+    new THREE.PlaneGeometry(3, 3),
     new THREE.MeshBasicMaterial({
       map: PORTAL_TEX || null,
       color: PORTAL_TEX ? 0xffffff : 0x6ee7b7,
@@ -2297,7 +2297,7 @@
   }
 
   function updateDoor(dt) {
-    const target = state.doorOpen ? 0.75 : 0.0;
+    const target = state.doorOpen ? 0.86 : 0.0;
     doorPad.material.opacity += (target - doorPad.material.opacity) * Math.min(1, dt * 6);
     doorPad.visible = doorPad.material.opacity > 0.02;
     doorGroup.rotation.y += dt * 0.4;
