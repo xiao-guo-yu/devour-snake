@@ -183,28 +183,13 @@
   const isObstacle = (i, j) => obstacles.has(`${i},${j}`);
 
   // ---------- 手绘 sprite（canvas 2D 贴图） ----------
-  function spriteTexture(size, draw, glowColor) {
+  function spriteTexture(size, draw) {
     if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = size;
     const g = canvas.getContext && canvas.getContext('2d');
     if (!g) return null;
     draw(g, size);
-    // 外发光：把贴图带阴影再画一遍，垫在透明区域下面
-    if (glowColor) {
-      const tmp = document.createElement('canvas');
-      tmp.width = tmp.height = size;
-      const tg = tmp.getContext && tmp.getContext('2d');
-      if (tg) {
-        tg.shadowColor = glowColor;
-        tg.shadowBlur = size * 0.075;
-        tg.drawImage(canvas, 0, 0);
-        tg.drawImage(canvas, 0, 0);
-        g.globalCompositeOperation = 'destination-over';
-        g.drawImage(tmp, 0, 0);
-        g.globalCompositeOperation = 'source-over';
-      }
-    }
     const tex = new THREE.CanvasTexture(canvas);
     tex.anisotropy = 4;
     return tex;
@@ -368,14 +353,9 @@
   function drawSpore(g, S) {
     const cx = S / 2, cy = S / 2, r = S * 0.36;
     g.clearRect(0, 0, S, S);
-    // 球体渐变
-    const grad = g.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.15, cx, cy, r);
-    grad.addColorStop(0, '#b9a8bd');
-    grad.addColorStop(0.55, '#8a7b86');
-    grad.addColorStop(1, '#4b3f4c');
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
-    g.fillStyle = grad;
+    g.fillStyle = '#8a7b86';
     g.fill();
     g.lineWidth = S * 0.04;
     g.strokeStyle = INK;
@@ -387,11 +367,6 @@
       g.ellipse(cx + r * dx, cy + r * dy, r * rr, r * rr * 0.8, 0.4, 0, Math.PI * 2);
       g.fill();
     }
-    // 高光
-    g.beginPath();
-    g.ellipse(cx - r * 0.38, cy - r * 0.42, r * 0.22, r * 0.14, -0.7, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(255,255,255,0.42)';
-    g.fill();
     // 小柄
     g.fillStyle = '#5b4f59';
     g.fillRect(cx - S * 0.05, cy + r * 0.85, S * 0.1, S * 0.1);
@@ -903,15 +878,15 @@
     g.fill();
   }
 
-  const headTex = spriteTexture(256, drawSnakeHead, '#3fe0c4');
+  const headTex = spriteTexture(256, drawSnakeHead);
   const TEX = {
-    spore: spriteTexture(192, drawSpore, '#a06cf0'),
-    vine: spriteTexture(192, drawVine, '#f0d060'),
-    trap: spriteTexture(192, drawTrap, '#8fbf4a'),
-    scarab: spriteTexture(192, drawScarab, '#ffc95a'),
-    scarabBroken: spriteTexture(192, (g, S) => drawScarab(g, S, true), '#9a9a9a'),
-    mummy: spriteTexture(192, drawMummy, '#ffe9c0'),
-    anubis: spriteTexture(192, drawAnubis, '#e6c15a'),
+    spore: spriteTexture(192, drawSpore),
+    vine: spriteTexture(192, drawVine),
+    trap: spriteTexture(192, drawTrap),
+    scarab: spriteTexture(192, drawScarab),
+    scarabBroken: spriteTexture(192, (g, S) => drawScarab(g, S, true)),
+    mummy: spriteTexture(192, drawMummy),
+    anubis: spriteTexture(192, drawAnubis),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
@@ -920,8 +895,8 @@
       : new THREE.MeshBasicMaterial({ color: 0x8a7b86 });
   }
   const BOSS_TEX = {
-    rootcoil: spriteTexture(512, drawBoss, '#ff8a5c'),
-    pharaoh: spriteTexture(512, drawPharaoh, '#ffd76a'),
+    rootcoil: spriteTexture(512, drawBoss),
+    pharaoh: spriteTexture(512, drawPharaoh),
   };
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
@@ -1056,20 +1031,6 @@
   outline.frustumCulled = false;
   scene.add(outline);
 
-  // 身体外发光（加色混合的宽条，垫在身体下方）
-  const glowPos = new Float32Array(MAX_PTS * 2 * 3);
-  const glowGeo = new THREE.BufferGeometry();
-  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
-  glowGeo.setAttribute('normal', new THREE.BufferAttribute(ribbonNrm.slice(), 3));
-  glowGeo.setIndex(ribIdx.slice());
-  glowGeo.setDrawRange(0, 0);
-  const snakeGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({
-    color: 0x2ee6c8, transparent: true, opacity: 0.28,
-    blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false,
-  }));
-  snakeGlow.frustumCulled = false;
-  scene.add(snakeGlow);
-
   // 尾端封口：实心圆片，保证尾巴是同色而不是透出地板
   const tailCap = new THREE.Mesh(
     new THREE.CircleGeometry(0.24, 18),
@@ -1202,7 +1163,7 @@
 
   // ---------- 传送门：紫青色漩涡 ----------
   const doorGroup = new THREE.Group();
-  const PORTAL_TEX = spriteTexture(256, drawPortal, '#b06cff');
+  const PORTAL_TEX = spriteTexture(256, drawPortal);
   const doorPad = new THREE.Mesh(
     new THREE.PlaneGeometry(1.5, 1.5),
     new THREE.MeshBasicMaterial({
@@ -1828,7 +1789,6 @@
     if (total < 0.05 || _poly.length < 2) {
       ribbonGeo.setDrawRange(0, 0);
       outlineGeo.setDrawRange(0, 0);
-      glowGeo.setDrawRange(0, 0);
       return;
     }
     const spacing = 0.2;
@@ -1871,14 +1831,6 @@
       outlinePos[base + 4] = y - 0.05;
       outlinePos[base + 5] = _p0.z - nz * ow;
 
-      const gw = w + 0.26;
-      glowPos[base] = _p0.x + nx * gw;
-      glowPos[base + 1] = y - 0.03;
-      glowPos[base + 2] = _p0.z + nz * gw;
-      glowPos[base + 3] = _p0.x - nx * gw;
-      glowPos[base + 4] = y - 0.03;
-      glowPos[base + 5] = _p0.z - nz * gw;
-
       // 深浅相间的横纹
       const band = Math.floor(s / 1.5) % 2;
       const r = band ? 0.10 : 0.18;
@@ -1893,10 +1845,8 @@
     ribbonGeo.attributes.position.needsUpdate = true;
     ribbonGeo.attributes.color.needsUpdate = true;
     outlineGeo.attributes.position.needsUpdate = true;
-    glowGeo.attributes.position.needsUpdate = true;
     ribbonGeo.setDrawRange(0, (count - 1) * 6);
     outlineGeo.setDrawRange(0, (count - 1) * 6);
-    glowGeo.setDrawRange(0, (count - 1) * 6);
 
     // 尾端封口，跟到最后一个采样点（颜色跟随最后一节横纹）
     samplePoly(total, _p1);
