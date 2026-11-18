@@ -1398,6 +1398,9 @@
   const pelletMat = new THREE.MeshStandardMaterial({
     color: 0xffd66b, emissive: 0xd28a12, emissiveIntensity: 1.65, roughness: 0.28,
   });
+  const energyPelletMat = new THREE.MeshStandardMaterial({
+    color: 0xff7a1a, emissive: 0xff4d00, emissiveIntensity: 2.1, roughness: 0.25,
+  });
   const pelletPool = [];
   for (let i = 0; i < 40; i++) {
     const mesh = new THREE.Mesh(pelletGeo, pelletMat);
@@ -1787,7 +1790,12 @@
   function spawnPellet() {
     if (state.pelletsOff) return; // 过关后不再生成豆子
     const c = randomFreeCell();
-    state.pellets.push({ i: c.i, j: c.j, phase: Math.random() * Math.PI * 2 });
+    state.pellets.push({
+      i: c.i,
+      j: c.j,
+      phase: Math.random() * Math.PI * 2,
+      energy: Math.random() < 0.05,
+    });
   }
 
   function spawnEnemy(distFromHead = 10, isRespawn = false) {
@@ -2187,10 +2195,14 @@
 
     const pi = state.pellets.findIndex((p) => p.i === ni && p.j === nj);
     if (pi >= 0) {
-      state.pellets.splice(pi, 1);
+      const pellet = state.pellets.splice(pi, 1)[0];
       state.score += 10;
       state.eaten += 1;
       state.prevTail = null; // 生长：尾巴不动
+      if (pellet.energy) {
+        growBy(2);
+        toast('能量豆', '体长 +3');
+      }
       spawnPellet();
       updateHud();
     } else if (state.spawnEmerging && state.spawnPending > 0) {
@@ -2434,6 +2446,8 @@
       const p = state.pellets[k];
       if (!p) { mesh.visible = false; continue; }
       mesh.visible = true;
+      mesh.material = p.energy ? energyPelletMat : pelletMat;
+      mesh.scale.setScalar(p.energy ? 1.25 + Math.sin(state.time * 4 + p.phase) * 0.08 : 1);
       mesh.position.set(cellX(p.i), 0.28 + Math.sin(state.time * 3 + p.phase) * 0.07, cellZ(p.j));
       mesh.rotation.y += 0.02;
     }
@@ -3513,7 +3527,15 @@
   state.paused = true; // 等待开始界面点击后再跑
   showHelp();
   window.__devour = state; // 调试钩子
-  window.__devourApi = { startLevel, bossDie, pickCard, resetGame, isObstacle, clearObstacles: () => obstacles.clear() };
+  window.__devourApi = {
+    startLevel,
+    bossDie,
+    pickCard,
+    resetGame,
+    spawnPellet,
+    isObstacle,
+    clearObstacles: () => obstacles.clear(),
+  };
   window.startDevour = () => {
     resetGame();
     showHelp();
