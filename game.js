@@ -1997,13 +1997,7 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
-    const initialHead = state.cells[0];
-    const start = isColossus
-      ? randomColossusLanding(
-        initialHead ? cellX(initialHead.i) : undefined,
-        initialHead ? cellZ(initialHead.j) : undefined
-      )
-      : { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
+    const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
