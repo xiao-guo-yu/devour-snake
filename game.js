@@ -33,6 +33,16 @@
   const DOOR_CELL = { i: 22, j: 1 };
   const SPAWN_DOOR_CELL = { i: 22, j: N - 1 };
   const BOSS_CELL = { i: 22, j: 22 };
+  const COLOSSUS_LANDING_CELLS = [
+    { i: 4, j: 4 },
+    { i: N - 5, j: 4 },
+    { i: 4, j: N - 5 },
+    { i: N - 5, j: N - 5 },
+    { i: 22, j: 22 },
+  ];
+  const COLOSSUS_JUMP_TIME = 3;
+  const COLOSSUS_JUMP_COOLDOWN = 10;
+  const COLOSSUS_CRUSH_RADIUS = 3.5;
 
   // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
   const ROOMS = [
@@ -1290,7 +1300,9 @@
       if (i < 4 || j < 4 || i > N - 6 || j > N - 6) return false;
       if (Math.abs(i - 22) < 6 && j < 9) return false;
       if (Math.abs(i - 22) < 7 && j > 32) return false;
-      if (Math.abs(i - 22) < 9 && Math.abs(j - 22) < 9) return false;
+      for (const anchor of COLOSSUS_LANDING_CELLS) {
+        if (Math.abs(i - anchor.i) < 3 && Math.abs(j - anchor.j) < 3) return false;
+      }
       for (const [si, sj] of seeds) {
         if (Math.abs(si - i) < 8 && Math.abs(sj - j) < 8) return false;
       }
@@ -1503,6 +1515,36 @@
   }
   bossMesh.visible = false;
   scene.add(bossMesh);
+
+  const colossusShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(4.3, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  colossusShadow.rotation.x = -Math.PI / 2;
+  colossusShadow.position.y = 0.16;
+  colossusShadow.visible = false;
+  scene.add(colossusShadow);
+
+  const colossusImpactRing = new THREE.Mesh(
+    new THREE.RingGeometry(3.1, 4.5, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0xff6a22,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  colossusImpactRing.rotation.x = -Math.PI / 2;
+  colossusImpactRing.position.y = 0.18;
+  colossusImpactRing.visible = false;
+  scene.add(colossusImpactRing);
 
   // ---------- 传送门：项目方提供的像素环 ----------
   const doorGroup = new THREE.Group();
@@ -1889,18 +1931,22 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
+    const start = isColossus ? COLOSSUS_LANDING_CELLS[4] : BOSS_CELL;
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      x: cellX(BOSS_CELL.i),
-      z: cellZ(BOSS_CELL.j),
+      x: cellX(start.i),
+      z: cellZ(start.j),
       shootTimer: isPharaoh ? 2.4 : 3,
-      jumpTimer: isColossus ? 1.8 : 0,
+      jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
       jumpFrom: null,
       jumpTo: null,
+      jumpState: isColossus ? 'idle' : 'none',
+      shadowWarning: 0,
+      recoverTimer: 0,
       cool: 0,
     };
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -1909,6 +1955,9 @@
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
     bossMesh.scale.setScalar(isColossus ? 1.6 : (isPharaoh ? 0.95 : 1));
+    bossMesh.rotation.z = 0;
+    colossusShadow.visible = false;
+    colossusImpactRing.visible = false;
     el.bname.textContent = isColossus
       ? '熔岩巨像 · MAGMA COLOSSUS'
       : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL');
@@ -1917,6 +1966,8 @@
   function bossDie() {
     state.boss.alive = false;
     bossMesh.visible = false;
+    colossusShadow.visible = false;
+    colossusImpactRing.visible = false;
     state.phase = 'pick';
     // Boss 战结束也停止刷豆，场上豆子清空
     state.pelletsOff = true;
@@ -2510,58 +2561,111 @@
     }
   }
 
-  function updateMagmaColossus(b, hp, dt) {
-    if (b.cool > 0) b.cool -= dt;
-    if (b.jumpElapsed > 0) {
+  function chooseColossusLanding(b) {
+    const currentI = Math.round(b.x + HALF);
+    const currentJ = Math.round(b.z + HALF);
+    const choices = COLOSSUS_LANDING_CELLS.filter((c) => c.i !== currentI || c.j !== currentJ);
+    const target = choices[randInt(choices.length)];
+    return { x: cellX(target.i), z: cellZ(target.j) };
+  }
+
+  function fireColossusLandingVolley(b) {
+    // 同一中心发出三圈不同速度与角偏移的弹幕，形成三排扩散攻击
+    const rows = [
+      { count: 12, radius: 4.4, speed: 4.6, offset: 0 },
+      { count: 12, radius: 5.8, speed: 5.8, offset: Math.PI / 12 },
+      { count: 12, radius: 7.2, speed: 7.0, offset: 0 },
+    ];
+    for (const row of rows) {
+      for (let k = 0; k < row.count; k++) {
+        const angle = (k / row.count) * Math.PI * 2 + row.offset;
+        spawnBossBullet(
+          b.x + Math.cos(angle) * row.radius,
+          b.z + Math.sin(angle) * row.radius,
+          Math.cos(angle) * row.speed,
+          Math.sin(angle) * row.speed,
+          6
+        );
+      }
+    }
+  }
+
+  function updateMagmaColossus(b, dt) {
+    if (b.jumpState !== 'airborne' && bodyDistanceSq(b.x, b.z) < COLOSSUS_CRUSH_RADIUS * COLOSSUS_CRUSH_RADIUS) {
+      gameOver('被熔岩巨像踩碎');
+      return;
+    }
+
+    if (b.recoverTimer > 0) {
+      b.recoverTimer = Math.max(0, b.recoverTimer - dt);
+      const p = 1 - b.recoverTimer / 0.45;
+      bossMesh.scale.setScalar(1.6 + Math.cos(Math.PI * p) * 0.28);
+      colossusImpactRing.visible = true;
+      colossusImpactRing.scale.setScalar(0.7 + p * 1.5);
+      colossusImpactRing.material.opacity = 0.85 * (1 - p);
+      if (b.recoverTimer === 0) {
+        bossMesh.scale.setScalar(1.6);
+        colossusImpactRing.visible = false;
+        b.jumpState = 'idle';
+      }
+    }
+
+    if (b.jumpState === 'airborne') {
       b.jumpElapsed += dt;
-      const t = Math.min(1, b.jumpElapsed / 0.7);
+      const t = Math.min(1, b.jumpElapsed / COLOSSUS_JUMP_TIME);
       const ease = t * t * (3 - 2 * t);
       b.x = b.jumpFrom.x + (b.jumpTo.x - b.jumpFrom.x) * ease;
       b.z = b.jumpFrom.z + (b.jumpTo.z - b.jumpFrom.z) * ease;
-      bossMesh.position.set(b.x, Math.sin(Math.PI * t) * 2.2, b.z);
-      bossMesh.scale.setScalar(1.6 + Math.sin(Math.PI * t) * 0.15);
+      b.shadowWarning = Math.max(0, COLOSSUS_JUMP_TIME - b.jumpElapsed);
+      bossMesh.position.set(b.x, Math.sin(Math.PI * t) * 6.5, b.z);
+      bossMesh.rotation.z = Math.sin(t * Math.PI * 4) * 0.055 * (1 - t);
+      bossMesh.scale.setScalar(1.6 + Math.sin(Math.PI * t) * 0.22);
+
+      colossusShadow.visible = true;
+      colossusShadow.position.set(b.jumpTo.x, 0.16, b.jumpTo.z);
+      colossusShadow.material.opacity = 0.22 + t * 0.58 + Math.sin(state.time * 8) * 0.05;
+      colossusShadow.scale.setScalar(0.78 + t * 0.22);
+
       if (t >= 1) {
+        b.x = b.jumpTo.x;
+        b.z = b.jumpTo.z;
         b.jumpElapsed = 0;
-        b.jumpTimer = 4;
-        bossMesh.position.y = 0;
-        const count = 12;
-        for (let k = 0; k < count; k++) {
-          const ang = (k / count) * Math.PI * 2 + state.time * 0.35;
-          spawnBossBullet(b.x, b.z, Math.cos(ang) * 5.4, Math.sin(ang) * 5.4);
+        b.jumpTimer = COLOSSUS_JUMP_COOLDOWN;
+        b.jumpState = 'landed';
+        b.shadowWarning = 0;
+        b.recoverTimer = 0.45;
+        bossMesh.position.set(b.x, 0, b.z);
+        bossMesh.rotation.z = 0;
+        bossMesh.scale.setScalar(1.88);
+        colossusShadow.visible = false;
+        colossusImpactRing.visible = true;
+        colossusImpactRing.position.set(b.x, 0.18, b.z);
+        colossusImpactRing.scale.setScalar(0.7);
+        colossusImpactRing.material.opacity = 0.85;
+        fireColossusLandingVolley(b);
+        if (bodyDistanceSq(b.x, b.z) < COLOSSUS_CRUSH_RADIUS * COLOSSUS_CRUSH_RADIUS) {
+          gameOver('被熔岩巨像砸中');
         }
       }
-    } else {
-      b.jumpTimer -= dt;
-      bossMesh.position.set(b.x, 0, b.z);
+      return;
+    }
+
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = 0;
+    if (b.recoverTimer <= 0) {
       bossMesh.scale.setScalar(1.6 + Math.sin(state.time * 2.2) * 0.025);
-      if (b.jumpTimer <= 0) {
-        const dx = hp.x - b.x;
-        const dz = hp.z - b.z;
-        const len = Math.hypot(dx, dz) || 1;
-        b.jumpFrom = { x: b.x, z: b.z };
-        b.jumpTo = {
-          x: Math.max(-HALF + 3, Math.min(HALF - 3, b.x + (dx / len) * 4)),
-          z: Math.max(-HALF + 3, Math.min(HALF - 3, b.z + (dz / len) * 4)),
-        };
-        b.jumpElapsed = 0.0001;
-      }
     }
-
-    const bossRadius = 3.3;
-    if (bodyDistanceSq(b.x, b.z) < bossRadius * bossRadius && b.cool <= 0) {
-      b.cool = 1.6;
-      damage(2);
-      if (state.over) return;
-    }
-
-    b.shootTimer -= dt;
-    if (b.shootTimer <= 0) {
-      b.shootTimer = 2.8;
-      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
-      for (const off of [-0.24, 0, 0.24]) {
-        const a = base + off;
-        spawnBossBullet(b.x, b.z, Math.cos(a) * 6.2, Math.sin(a) * 6.2);
-      }
+    b.jumpTimer -= dt;
+    if (b.jumpTimer <= 0) {
+      b.jumpFrom = { x: b.x, z: b.z };
+      b.jumpTo = chooseColossusLanding(b);
+      b.jumpElapsed = 0.0001;
+      b.jumpState = 'airborne';
+      b.shadowWarning = COLOSSUS_JUMP_TIME;
+      colossusShadow.visible = true;
+      colossusShadow.position.set(b.jumpTo.x, 0.16, b.jumpTo.z);
+      colossusShadow.material.opacity = 0.22;
+      colossusShadow.scale.setScalar(0.78);
     }
   }
 
@@ -2570,7 +2674,7 @@
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
     if (b.kind === 'magma_colossus') {
-      updateMagmaColossus(b, hp, dt);
+      updateMagmaColossus(b, dt);
       return;
     }
     const dx = hp.x - b.x;
@@ -2632,12 +2736,12 @@
     }
   }
 
-  function spawnBossBullet(x, z, vx, vz) {
+  function spawnBossBullet(x, z, vx, vz, life = 4) {
     const mesh = bossBulletPool.find((m) => !m.visible);
     if (!mesh) return;
     mesh.visible = true;
     mesh.position.set(x, 0.5, z);
-    state.enemyBullets.push({ mesh, x, z, vx, vz, life: 4 });
+    state.enemyBullets.push({ mesh, x, z, vx, vz, life });
   }
 
   function updateBossBullets(dt) {
