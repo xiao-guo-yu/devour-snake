@@ -40,11 +40,14 @@
     { i: N - 5, j: N - 5 },
     { i: 22, j: 22 },
   ];
-  const COLOSSUS_JUMP_TIME = 3;
+  const COLOSSUS_RENDER_SCALE = 2.4;
+  const COLOSSUS_JUMP_TIME = 1;
   const COLOSSUS_JUMP_COOLDOWN = 10;
-  const COLOSSUS_CRUSH_RADIUS = 3.5;
+  const COLOSSUS_CRUSH_RADIUS = 5.25;
+  const COLOSSUS_FIREBALL_SIZE = 7.6;
   const COLOSSUS_FIREBALL_SPEED = 5.2;
-  const COLOSSUS_FIREBALL_HIT_RADIUS = 2.1;
+  const COLOSSUS_FIREBALL_HIT_RADIUS = 4.2;
+  const COLOSSUS_FIREBALL_WALL_RADIUS = 3.6;
   const COLOSSUS_POOL_SIZE = 5;
   const COLOSSUS_POOL_DURATION = 10;
 
@@ -1532,7 +1535,7 @@
   scene.add(bossMesh);
 
   const colossusShadow = new THREE.Mesh(
-    new THREE.CircleGeometry(4.3, 48),
+    new THREE.CircleGeometry(6.45, 48),
     new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
@@ -1547,7 +1550,7 @@
   scene.add(colossusShadow);
 
   const colossusImpactRing = new THREE.Mesh(
-    new THREE.RingGeometry(3.1, 4.5, 48),
+    new THREE.RingGeometry(4.65, 6.75, 48),
     new THREE.MeshBasicMaterial({
       color: 0xff6a22,
       transparent: true,
@@ -1566,7 +1569,7 @@
   const colossusFireballPool = [];
   for (let i = 0; i < 16; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.8, 3.8),
+      new THREE.PlaneGeometry(COLOSSUS_FIREBALL_SIZE, COLOSSUS_FIREBALL_SIZE),
       new THREE.MeshBasicMaterial({
         map: COLOSSUS_FIREBALL_TEX || null,
         color: COLOSSUS_FIREBALL_TEX ? 0xffffff : 0xff6b1a,
@@ -1986,14 +1989,21 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
+    const initialHead = state.cells[0];
     const start = isColossus
-      ? randomColossusLanding()
+      ? randomColossusLanding(
+        initialHead ? cellX(initialHead.i) : undefined,
+        initialHead ? cellZ(initialHead.j) : undefined
+      )
       : { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isPharaoh ? 0.95 : 1),
+      crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
+      jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
       z: start.z,
       shootTimer: isPharaoh ? 2.4 : 3,
@@ -2013,7 +2023,7 @@
     bossPlaneMat.needsUpdate = true;
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
-    bossMesh.scale.setScalar(isColossus ? 1.6 : (isPharaoh ? 0.95 : 1));
+    bossMesh.scale.setScalar(state.boss.renderScale);
     bossMesh.rotation.z = 0;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
@@ -2626,12 +2636,21 @@
 
   function randomColossusLanding(excludeX, excludeZ) {
     for (let tries = 0; tries < 80; tries++) {
-      const i = 5 + randInt(N - 10);
-      const j = 5 + randInt(N - 10);
-      if (isObstacle(i, j)) continue;
+      const i = 7 + randInt(N - 14);
+      const j = 7 + randInt(N - 14);
+      let blocked = false;
+      for (let di = -6; di <= 6 && !blocked; di++) {
+        for (let dj = -6; dj <= 6; dj++) {
+          if (isObstacle(i + di, j + dj)) {
+            blocked = true;
+            break;
+          }
+        }
+      }
+      if (blocked) continue;
       const x = cellX(i);
       const z = cellZ(j);
-      if (excludeX !== undefined && Math.hypot(x - excludeX, z - excludeZ) < 3) continue;
+      if (excludeX !== undefined && Math.hypot(x - excludeX, z - excludeZ) < 8) continue;
       return { x, z };
     }
     return { x: 0, z: 0 };
@@ -2650,8 +2669,8 @@
     const len = Math.hypot(dx, dz) || 1;
     const nx = dx / len;
     const nz = dz / len;
-    const x = b.x + nx * 2;
-    const z = b.z + nz * 2;
+    const x = b.x + nx * 4;
+    const z = b.z + nz * 4;
     mesh.visible = true;
     mesh.position.set(x, 0.48, z);
     state.lavaBalls.push({
@@ -2660,7 +2679,8 @@
       z,
       vx: nx * COLOSSUS_FIREBALL_SPEED,
       vz: nz * COLOSSUS_FIREBALL_SPEED,
-      size: 3.8,
+      size: COLOSSUS_FIREBALL_SIZE,
+      hitRadius: COLOSSUS_FIREBALL_HIT_RADIUS,
       hit: false,
     });
   }
@@ -2704,14 +2724,16 @@
       b.mesh.rotation.z += dt * 2.6;
 
       if (!b.hit && state.invuln <= 0 &&
-        bodyDistanceSq(b.x, b.z) < COLOSSUS_FIREBALL_HIT_RADIUS * COLOSSUS_FIREBALL_HIT_RADIUS) {
+        bodyDistanceSq(b.x, b.z) < b.hitRadius * b.hitRadius) {
         b.hit = true;
         damage(3);
         toast('熔岩火球命中', '体长 -3');
       }
 
-      const ci = Math.round(b.x + HALF);
-      const cj = Math.round(b.z + HALF);
+      const leadX = b.x + (b.vx > 0 ? COLOSSUS_FIREBALL_WALL_RADIUS : (b.vx < 0 ? -COLOSSUS_FIREBALL_WALL_RADIUS : 0));
+      const leadZ = b.z + (b.vz > 0 ? COLOSSUS_FIREBALL_WALL_RADIUS : (b.vz < 0 ? -COLOSSUS_FIREBALL_WALL_RADIUS : 0));
+      const ci = Math.round(leadX + HALF);
+      const cj = Math.round(leadZ + HALF);
       const hitWall = !inBounds(ci, cj) || isObstacle(ci, cj);
       if (hitWall) {
         spawnColossusLavaPool(b.x, b.z);
@@ -2750,12 +2772,12 @@
     if (b.recoverTimer > 0) {
       b.recoverTimer = Math.max(0, b.recoverTimer - dt);
       const p = 1 - b.recoverTimer / 0.45;
-      bossMesh.scale.setScalar(1.6 + Math.cos(Math.PI * p) * 0.28);
+      bossMesh.scale.setScalar(COLOSSUS_RENDER_SCALE + Math.cos(Math.PI * p) * 0.42);
       colossusImpactRing.visible = true;
       colossusImpactRing.scale.setScalar(0.7 + p * 1.5);
       colossusImpactRing.material.opacity = 0.85 * (1 - p);
       if (b.recoverTimer === 0) {
-        bossMesh.scale.setScalar(1.6);
+        bossMesh.scale.setScalar(COLOSSUS_RENDER_SCALE);
         colossusImpactRing.visible = false;
         b.jumpState = 'idle';
       }
@@ -2773,7 +2795,7 @@
       if (!b.jumpHidden) {
         bossMesh.position.set(b.x, Math.sin(takeoff * Math.PI * 0.5) * 2.8, b.z);
         bossMesh.rotation.z = takeoff * 0.08;
-        bossMesh.scale.setScalar(1.6 + takeoff * 0.15);
+        bossMesh.scale.setScalar(COLOSSUS_RENDER_SCALE + takeoff * 0.225);
       }
 
       colossusShadow.visible = true;
@@ -2793,7 +2815,7 @@
         bossMesh.visible = true;
         bossMesh.position.set(b.x, 0, b.z);
         bossMesh.rotation.z = 0;
-        bossMesh.scale.setScalar(1.88);
+        bossMesh.scale.setScalar(COLOSSUS_RENDER_SCALE * 1.175);
         colossusShadow.visible = false;
         colossusImpactRing.visible = true;
         colossusImpactRing.position.set(b.x, 0.18, b.z);
@@ -2810,7 +2832,7 @@
     bossMesh.visible = true;
     bossMesh.rotation.z = 0;
     if (b.recoverTimer <= 0) {
-      bossMesh.scale.setScalar(1.6 + Math.sin(state.time * 2.2) * 0.025);
+      bossMesh.scale.setScalar(COLOSSUS_RENDER_SCALE + Math.sin(state.time * 2.2) * 0.0375);
     }
     b.jumpTimer -= dt;
     if (b.jumpTimer <= 0) {
