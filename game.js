@@ -23,8 +23,7 @@
   const WISP_HIDE_HALF_SIZE = 4;
   const WISP_RENDER_SCALE = 1.45;
   const PLAYER_BULLET_RADIUS = 0.16;
-  // 鬼火本体宽约 1.47 格；计入玩家弹半径后，中心到中心命中距离约为 0.9 格
-  const WISP_HIT_RADIUS = 0.9;
+  const ENEMY_HIT_RADIUS = 1.5;
   const GHOST_BULLET_RADIUS = 0.56;
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
@@ -2887,8 +2886,7 @@
         for (let e = 0; e < state.enemies.length; e++) {
           const en = state.enemies[e];
           if (!en.alive) continue;
-          const hitRadius = en.type === 'emberWisp' ? WISP_HIT_RADIUS : 0.62;
-          if (Math.hypot(en.x - b.x, en.z - b.z) < hitRadius) {
+          if (Math.hypot(en.x - b.x, en.z - b.z) < ENEMY_HIT_RADIUS) {
             if (en.hp > 1) {
               en.hp -= 1; // 圣甲虫壳硬，需要两发
               // 翅膀被打灰：第一发后换成破损贴图
