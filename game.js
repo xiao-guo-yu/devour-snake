@@ -18,9 +18,21 @@
   const ENEMY_COOL_SPEED = 0.55;
   const BOSS_HP = 140;
   const BOSS_SPEED = 1.0;
+  const SLIME_JUMP_DISTANCE = 5;
+  const SLIME_JUMP_INTERVAL = 3;
+  const WISP_HIDE_HALF_SIZE = 4;
+  const WISP_RENDER_SCALE = 1.45;
+  const PLAYER_BULLET_RADIUS = 0.16;
+  // 鬼火本体宽约 1.47 格；计入玩家弹半径后，中心到中心命中距离约为 0.9 格
+  const WISP_HIT_RADIUS = 0.9;
+  const GHOST_BULLET_RADIUS = 0.56;
+  // 原命中半径 0.62，攻击整体放大为两倍
+  const GHOST_BULLET_HIT_RADIUS = 1.24;
+  const GHOST_BULLET_SPEED = 2;
   // ⚠️ 测试用：直接从第 5 关（神庙·柱厅）开始；恢复正常游戏请改回 0
   const DEBUG_START_LEVEL = 8;
   const DOOR_CELL = { i: 22, j: 1 };
+  const SPAWN_DOOR_CELL = { i: 22, j: N - 1 };
   const BOSS_CELL = { i: 22, j: 22 };
 
   // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
@@ -1386,7 +1398,7 @@
   const bulletPool = [];
   for (let i = 0; i < 40; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 8, 6),
+      new THREE.SphereGeometry(PLAYER_BULLET_RADIUS, 8, 6),
       new THREE.MeshStandardMaterial({ color: 0x9ff5d8, emissive: 0x2ee6a8, emissiveIntensity: 1.6 })
     );
     mesh.visible = false;
@@ -1421,7 +1433,7 @@
   const ghostBulletPool = [];
   for (let i = 0; i < 80; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.28, 10, 8),
+      new THREE.SphereGeometry(GHOST_BULLET_RADIUS, 10, 8),
       new THREE.MeshStandardMaterial({
         color: 0x9bdfff,
         emissive: 0x349fe8,
@@ -1493,9 +1505,16 @@
   bossMesh.visible = false;
   scene.add(bossMesh);
 
-  // ---------- 传送门：紫青色漩涡 ----------
+  // ---------- 传送门：项目方提供的像素环 ----------
   const doorGroup = new THREE.Group();
-  const PORTAL_TEX = spriteTexture(256, drawPortal);
+  const PORTAL_TEX = imageTextureLoader
+    ? imageTextureLoader.load('assets/portal.png?v=20261118-pixel-portal')
+    : spriteTexture(256, drawPortal);
+  if (PORTAL_TEX && imageTextureLoader) {
+    PORTAL_TEX.magFilter = THREE.NearestFilter;
+    PORTAL_TEX.minFilter = THREE.NearestFilter;
+    PORTAL_TEX.generateMipmaps = false;
+  }
   const doorPad = new THREE.Mesh(
     new THREE.PlaneGeometry(3, 3),
     new THREE.MeshBasicMaterial({
@@ -1511,6 +1530,25 @@
   doorGroup.add(doorPad);
   doorGroup.position.set(cellX(DOOR_CELL.i), 0, cellZ(DOOR_CELL.j));
   scene.add(doorGroup);
+
+  // 过关后从地图底部出生传送门钻出
+  const spawnDoorGroup = new THREE.Group();
+  const spawnDoorPad = new THREE.Mesh(
+    new THREE.PlaneGeometry(3, 3),
+    new THREE.MeshBasicMaterial({
+      map: PORTAL_TEX || null,
+      color: PORTAL_TEX ? 0xffffff : 0x6ee7b7,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    })
+  );
+  spawnDoorPad.rotation.x = -Math.PI / 2;
+  spawnDoorPad.position.y = 0.12;
+  spawnDoorGroup.add(spawnDoorPad);
+  spawnDoorGroup.position.set(cellX(SPAWN_DOOR_CELL.i), 0, cellZ(SPAWN_DOOR_CELL.j));
+  spawnDoorGroup.visible = false;
+  scene.add(spawnDoorGroup);
 
   // ---------- 技能卡 ----------
   const CARD_DEFS = [
@@ -1555,6 +1593,10 @@
     energyCd: 0,
     roomActive: false,
     roomTimer: 0,
+    spawnEmerging: false,
+    spawnPending: 0,
+    spawnPortalClosing: false,
+    spawnPortalOpacity: 0,
     enemies: [],
     pellets: [],
     boss: null,
@@ -1665,7 +1707,7 @@
       Object.assign(slot, {
         alive: true, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
         shootTimer: 0.8 + Math.random() * 1.4,
-        jumpTimer: 4,
+        jumpTimer: SLIME_JUMP_INTERVAL,
         jumpElapsed: 0,
         jumpFrom: null,
         jumpTo: null,
@@ -1758,9 +1800,15 @@
     state.enemySpeedMul = room.theme === 'green' ? (idx === 1 ? 2 : (idx === 2 ? 0.7 : 1)) : 1;
     state.enemyShoot = room.theme === 'green' && idx === 2;
 
-    // 第一关：从左侧 4×4 出生小房间钻出来；其余关卡仍在底部重生
+    // 第一关：从左侧 4×4 出生小房间钻出来；后续关卡从底部传送门逐节钻出
     state.roomActive = false;
     state.roomTimer = 0;
+    state.spawnEmerging = false;
+    state.spawnPending = 0;
+    state.spawnPortalClosing = false;
+    state.spawnPortalOpacity = 0;
+    spawnDoorGroup.visible = false;
+    spawnDoorPad.material.opacity = 0;
     state.spawnGrace = idx === 0 ? 2.2 : 0;
     // 只有第一关开局时门洞是开的；其余关卡外墙保持完整
     doorPlug.visible = idx !== 0;
@@ -1778,10 +1826,15 @@
       }
     } else {
       const keep = Math.max(START_LEN, state.cells.length || START_LEN);
-      const startJ = Math.min(40, 44 - keep);
       state.cells.length = 0;
-      for (let k = 0; k < keep; k++) state.cells.push({ i: 22, j: startJ + k });
+      state.cells.push({ i: SPAWN_DOOR_CELL.i, j: SPAWN_DOOR_CELL.j });
       state.dir = { i: 0, j: -1 };
+      state.spawnEmerging = true;
+      state.spawnPending = keep - 1;
+      state.spawnPortalOpacity = 0.9;
+      spawnDoorPad.material.opacity = 0.9;
+      spawnDoorGroup.visible = true;
+      state.spawnGrace = Math.min(2.2, keep * STEP + 0.25);
       startRoom.visible = false;
     }
     state.progress = 1;
@@ -1813,7 +1866,7 @@
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
-      enemyPool[k].scale.setScalar(type === 'emberWisp' ? 1.45 : 1);
+      enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : 1);
       state.enemies[k].type = type;
       state.enemies[k].hp = type === 'scarab' || type === 'obsidianBeetle' ? 2 : 1;
     }
@@ -2017,6 +2070,10 @@
       state.prevTail = null; // 生长：尾巴不动
       spawnPellet();
       updateHud();
+    } else if (state.spawnEmerging && state.spawnPending > 0) {
+      // 蛇身逐节从底部传送门钻出，暂不收尾
+      state.spawnPending -= 1;
+      state.prevTail = null;
     } else {
       state.prevTail = state.cells.pop(); // 记录被裁掉的尾格，用于平滑收尾
       if (state.cells.length > MAX_BODY) state.cells.pop();
@@ -2043,6 +2100,8 @@
 
   function applyDir(d) {
     if (!d || state.over || state.paused) return;
+    // 出洞时默认向上；禁止反向钻回传送门，但保留横向转向以支持超长蛇
+    if (state.spawnEmerging && d.j > 0) return;
     const reverse = d.i === -state.dir.i && d.j === -state.dir.j;
     if (reverse && state.cells.length > 2) return;
     state.dir = d;
@@ -2265,8 +2324,8 @@
     const angles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
     for (const off of angles) {
       const a = base + off;
-      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * 4));
-      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * 4));
+      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * SLIME_JUMP_DISTANCE));
+      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * SLIME_JUMP_DISTANCE));
       if (!isObstacle(Math.round(tx + HALF), Math.round(tz + HALF))) {
         return { x: tx, z: tz };
       }
@@ -2275,7 +2334,7 @@
   }
 
   function updateMagmaSlime(e, mesh, hp, dt) {
-    if (e.jumpTimer === undefined) e.jumpTimer = 4;
+    if (e.jumpTimer === undefined) e.jumpTimer = SLIME_JUMP_INTERVAL;
     if (e.jumpElapsed > 0) {
       e.jumpElapsed += dt;
       const t = Math.min(1, e.jumpElapsed / 0.55);
@@ -2288,7 +2347,7 @@
       mesh.scale.setScalar(1 + Math.sin(Math.PI * t) * 0.18);
       if (t >= 1) {
         e.jumpElapsed = 0;
-        e.jumpTimer = 4;
+        e.jumpTimer = SLIME_JUMP_INTERVAL;
         mesh.scale.setScalar(1);
       }
     } else {
@@ -2316,7 +2375,7 @@
   function updateEmberWisp(e, mesh, hp, dt) {
     const dx = hp.x - e.x;
     const dz = hp.z - e.z;
-    const inRange = Math.abs(dx) <= 3.5 && Math.abs(dz) <= 3.5;
+    const inRange = Math.abs(dx) <= WISP_HIDE_HALF_SIZE && Math.abs(dz) <= WISP_HIDE_HALF_SIZE;
     if (e.hidden) {
       mesh.visible = false;
       if (!inRange) {
@@ -2354,7 +2413,7 @@
     mesh.visible = true;
     mesh.position.set(nx, 0.58 + Math.sin(state.time * 2.4 + e.bob) * 0.11, nz);
     mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.12;
-    mesh.scale.setScalar(1.45 + Math.sin(state.time * 3 + e.bob) * 0.05);
+    mesh.scale.setScalar(WISP_RENDER_SCALE + Math.sin(state.time * 3 + e.bob) * 0.05);
 
     if (e.shootTimer === undefined) e.shootTimer = 2.4;
     e.shootTimer -= dt;
@@ -2787,23 +2846,21 @@
       mesh,
       x,
       z,
-      vx: (dx / len) * 4,
-      vz: (dz / len) * 4,
-      life: 4.5,
+      vx: (dx / len) * GHOST_BULLET_SPEED,
+      vz: (dz / len) * GHOST_BULLET_SPEED,
     });
   }
 
   function updateGhostBullets(dt) {
     for (let k = state.ghostBullets.length - 1; k >= 0; k--) {
       const b = state.ghostBullets[k];
-      b.life -= dt;
       b.x += b.vx * dt;
       b.z += b.vz * dt;
       b.mesh.position.set(b.x, 0.55, b.z);
-      let dead = b.life <= 0 || Math.abs(b.x) > HALF + 1 || Math.abs(b.z) > HALF + 1 ||
-        isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF));
-      if (!dead && bodyDistanceSq(b.x, b.z) < 0.62 * 0.62) {
-        dead = true;
+      const ci = Math.round(b.x + HALF);
+      const cj = Math.round(b.z + HALF);
+      let dead = !inBounds(ci, cj) || isObstacle(ci, cj);
+      if (!dead && bodyDistanceSq(b.x, b.z) < GHOST_BULLET_HIT_RADIUS * GHOST_BULLET_HIT_RADIUS) {
         damage(1);
       }
       if (dead) {
@@ -2830,7 +2887,8 @@
         for (let e = 0; e < state.enemies.length; e++) {
           const en = state.enemies[e];
           if (!en.alive) continue;
-          if (Math.hypot(en.x - b.x, en.z - b.z) < 0.62) {
+          const hitRadius = en.type === 'emberWisp' ? WISP_HIT_RADIUS : 0.62;
+          if (Math.hypot(en.x - b.x, en.z - b.z) < hitRadius) {
             if (en.hp > 1) {
               en.hp -= 1; // 圣甲虫壳硬，需要两发
               // 翅膀被打灰：第一发后换成破损贴图
@@ -2895,6 +2953,25 @@
     doorPad.material.opacity += (target - doorPad.material.opacity) * Math.min(1, dt * 6);
     doorPad.visible = doorPad.material.opacity > 0.02;
     doorGroup.rotation.y += dt * 0.4;
+
+    if (state.spawnEmerging) {
+      const tail = state.cells[state.cells.length - 1];
+      if (tail && tail.j < SPAWN_DOOR_CELL.j) {
+        state.spawnEmerging = false;
+        state.spawnPortalClosing = true;
+      }
+    }
+    spawnDoorGroup.rotation.y += dt * 0.45;
+    if (state.spawnPortalClosing) {
+      state.spawnPortalOpacity = Math.max(0, state.spawnPortalOpacity - dt * 3.2);
+      spawnDoorPad.material.opacity = state.spawnPortalOpacity;
+      if (state.spawnPortalOpacity <= 0.01) {
+        state.spawnPortalOpacity = 0;
+        spawnDoorPad.material.opacity = 0;
+        spawnDoorGroup.visible = false;
+        state.spawnPortalClosing = false;
+      }
+    }
   }
 
   /** 出生小房间：蛇完全钻出来后关门并隐藏房间 */
@@ -2997,7 +3074,12 @@
     state.slowTimer = 0;
     state.roomActive = false;
     state.roomTimer = 0;
+    state.spawnEmerging = false;
+    state.spawnPending = 0;
+    state.spawnPortalClosing = false;
+    state.spawnPortalOpacity = 0;
     if (startRoom) startRoom.visible = false;
+    if (spawnDoorGroup) spawnDoorGroup.visible = false;
     if (doorPlug) doorPlug.visible = false;
     state.time = 0;
     state.shotDamage = 6;

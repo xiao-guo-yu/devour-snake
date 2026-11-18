@@ -1,0 +1,28 @@
+# Character Asset Sources
+
+All character artwork in this directory was supplied by the project owner in the current Codex conversation. The images were not downloaded from a third-party asset pack.
+
+Processing applied:
+
+- Cropped to the individual character within each reference sheet.
+- Removed the connected flat background and preserved the original character pixels.
+- Cropped transparent margins and padded to a square canvas.
+- Resized with Lanczos resampling to 256px for regular enemies and 512px for bosses.
+- Created one grayscale/darkened `scarab-broken.png` state from the supplied scarab image for its existing damaged-state behavior.
+- Brightened and increased contrast on `magma-colossus.png` at the project owner's request.
+
+Original conversation attachment paths:
+
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-c8ed0d6c-5d18-46c8-bf9f-0d43e2b8956f.png`
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-e094f7cc-ed6f-4801-bde9-a5451cab127e.png`
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-7ca6ce3a-86d2-4043-89d7-94006759ede6.png`
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-0749c960-04ca-4374-b73e-4e602da18cd7.png`
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-28291516-6aa7-4a8d-b37b-f6f0e0344197.png`
+- `C:\Users\17928\AppData\Local\Temp\codex-clipboard-43b25b21-53c4-48c0-87e5-572b64d9fce1.png`
+
+## Portal Asset Source
+
+- `portal.png` was supplied by the project owner in the current Codex conversation on 2026-11-18.
+- Original attachment: `C:\Users\17928\AppData\Local\Temp\codex-clipboard-63d791a5-2ad1-4fa0-9339-6bab002669e7.png`
+- The supplied 96×96 RGBA image is shipped without pixel modification.
+- Runtime import uses nearest-neighbor filtering with mipmaps disabled to preserve the pixel-art edges.
