@@ -41,7 +41,7 @@
     { i: 22, j: 22 },
   ];
   const COLOSSUS_RENDER_SCALE = 2.4;
-  const COLOSSUS_JUMP_TIME = 1;
+  const COLOSSUS_JUMP_TIME = 0.2;
   const COLOSSUS_JUMP_COOLDOWN = 10;
   const COLOSSUS_CRUSH_RADIUS = 5.25;
   const COLOSSUS_FIREBALL_SIZE = 7.6;
@@ -2660,6 +2660,26 @@
     return randomColossusLanding(b.x, b.z);
   }
 
+  function fireColossusLandingRings(b) {
+    const rings = [
+      { radius: 7.2, count: 16, speed: 4.8, offset: 0 },
+      { radius: 8.7, count: 16, speed: 6.0, offset: Math.PI / 16 },
+      { radius: 10.2, count: 16, speed: 7.2, offset: 0 },
+    ];
+    for (const ring of rings) {
+      for (let k = 0; k < ring.count; k++) {
+        const angle = (k / ring.count) * Math.PI * 2 + ring.offset;
+        spawnBossBullet(
+          b.x + Math.cos(angle) * ring.radius,
+          b.z + Math.sin(angle) * ring.radius,
+          Math.cos(angle) * ring.speed,
+          Math.sin(angle) * ring.speed,
+          6
+        );
+      }
+    }
+  }
+
   function spawnColossusFireball(b) {
     const mesh = colossusFireballPool.find((m) => !m.visible);
     if (!mesh) return;
@@ -2821,6 +2841,7 @@
         colossusImpactRing.position.set(b.x, 0.18, b.z);
         colossusImpactRing.scale.setScalar(0.7);
         colossusImpactRing.material.opacity = 0.85;
+        fireColossusLandingRings(b);
         if (bodyDistanceSq(b.x, b.z) < COLOSSUS_CRUSH_RADIUS * COLOSSUS_CRUSH_RADIUS) {
           gameOver('被熔岩巨像砸中');
         }
