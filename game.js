@@ -41,7 +41,7 @@
     { i: 22, j: 22 },
   ];
   const COLOSSUS_RENDER_SCALE = 2.4;
-  const COLOSSUS_JUMP_TIME = 0.2;
+  const COLOSSUS_JUMP_TIME = 2.2;
   const COLOSSUS_JUMP_COOLDOWN = 10;
   const COLOSSUS_CRUSH_RADIUS = 5.25;
   const COLOSSUS_FIREBALL_SIZE = 7.6;
