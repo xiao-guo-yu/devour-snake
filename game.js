@@ -28,8 +28,8 @@
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
   const GHOST_BULLET_SPEED = 2;
-  // ⚠️ 测试用：直接从第 5 关（神庙·柱厅）开始；恢复正常游戏请改回 0
-  const DEBUG_START_LEVEL = 8;
+  // ⚠️ 测试用：直接进入熔岩巨像 Boss；恢复正常游戏请改回 0
+  const DEBUG_START_LEVEL = 11;
   const DOOR_CELL = { i: 22, j: 1 };
   const SPAWN_DOOR_CELL = { i: 22, j: N - 1 };
   const BOSS_CELL = { i: 22, j: 22 };
@@ -1931,7 +1931,7 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
-    const start = isColossus ? COLOSSUS_LANDING_CELLS[4] : BOSS_CELL;
+    const start = isColossus ? COLOSSUS_LANDING_CELLS[randInt(4)] : BOSS_CELL;
     state.boss = {
       alive: true,
       kind,
