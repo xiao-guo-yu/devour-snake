@@ -48,7 +48,7 @@
   const COLOSSUS_FIREBALL_SPEED = 5.2;
   const COLOSSUS_FIREBALL_HIT_RADIUS = 4.2;
   const COLOSSUS_FIREBALL_WALL_RADIUS = 3.6;
-  const COLOSSUS_POOL_SIZE = 5;
+  const COLOSSUS_POOL_SIZE = 7;
   const COLOSSUS_POOL_DURATION = 10;
 
   // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
