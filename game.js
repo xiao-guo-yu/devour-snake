@@ -43,6 +43,10 @@
   const COLOSSUS_JUMP_TIME = 3;
   const COLOSSUS_JUMP_COOLDOWN = 10;
   const COLOSSUS_CRUSH_RADIUS = 3.5;
+  const COLOSSUS_FIREBALL_SPEED = 5.2;
+  const COLOSSUS_FIREBALL_HIT_RADIUS = 2.1;
+  const COLOSSUS_POOL_SIZE = 5;
+  const COLOSSUS_POOL_DURATION = 10;
 
   // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
   const ROOMS = [
@@ -1159,6 +1163,17 @@
       ? imageTextureLoader.load(`assets/${file}?v=20261117-volcano-light2`)
       : fallback
   );
+  const loadPixelTexture = (file, fallback) => {
+    const texture = imageTextureLoader
+      ? imageTextureLoader.load(`assets/${file}?v=20261118-colossus-attacks`)
+      : fallback;
+    if (texture && imageTextureLoader) {
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
+    }
+    return texture;
+  };
   const TEX = {
     spore: loadCharacterTexture('spore.png', spriteTexture(192, drawSpore)),
     vine: loadCharacterTexture('vine.png', spriteTexture(192, drawVine)),
@@ -1546,16 +1561,50 @@
   colossusImpactRing.visible = false;
   scene.add(colossusImpactRing);
 
+  const COLOSSUS_FIREBALL_TEX = loadPixelTexture('colossus-fireball.png', null);
+  const COLOSSUS_POOL_TEX = loadPixelTexture('colossus-lava-pool.png', null);
+  const colossusFireballPool = [];
+  for (let i = 0; i < 16; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.8, 3.8),
+      new THREE.MeshBasicMaterial({
+        map: COLOSSUS_FIREBALL_TEX || null,
+        color: COLOSSUS_FIREBALL_TEX ? 0xffffff : 0xff6b1a,
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.48;
+    mesh.visible = false;
+    scene.add(mesh);
+    colossusFireballPool.push(mesh);
+  }
+
+  const colossusPoolPool = [];
+  for (let i = 0; i < 12; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(COLOSSUS_POOL_SIZE, COLOSSUS_POOL_SIZE),
+      new THREE.MeshBasicMaterial({
+        map: COLOSSUS_POOL_TEX || null,
+        color: COLOSSUS_POOL_TEX ? 0xffffff : 0xff5b12,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.11;
+    mesh.visible = false;
+    scene.add(mesh);
+    colossusPoolPool.push(mesh);
+  }
+
   // ---------- 传送门：项目方提供的像素环 ----------
   const doorGroup = new THREE.Group();
-  const PORTAL_TEX = imageTextureLoader
-    ? imageTextureLoader.load('assets/portal.png?v=20261118-pixel-portal')
-    : spriteTexture(256, drawPortal);
-  if (PORTAL_TEX && imageTextureLoader) {
-    PORTAL_TEX.magFilter = THREE.NearestFilter;
-    PORTAL_TEX.minFilter = THREE.NearestFilter;
-    PORTAL_TEX.generateMipmaps = false;
-  }
+  const PORTAL_TEX = loadPixelTexture('portal.png', spriteTexture(256, drawPortal));
   const doorPad = new THREE.Mesh(
     new THREE.PlaneGeometry(3, 3),
     new THREE.MeshBasicMaterial({
@@ -1629,6 +1678,8 @@
     pods: [],
     ghostBullets: [],
     hazards: [],
+    lavaBalls: [],
+    lavaPools: [],
     orbs: [],
     booms: [],
     energyCd: 0,
@@ -1829,6 +1880,10 @@
     state.ghostBullets = [];
     (state.hazards || []).forEach((h) => { h.mesh.visible = false; });
     state.hazards = [];
+    (state.lavaBalls || []).forEach((b) => { b.mesh.visible = false; });
+    state.lavaBalls = [];
+    (state.lavaPools || []).forEach((p) => { p.mesh.visible = false; });
+    state.lavaPools = [];
     (state.orbs || []).forEach((o) => { o.mesh.visible = false; });
     state.orbs = [];
     (state.booms || []).forEach((b) => { b.mesh.visible = false; });
@@ -1931,14 +1986,16 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
-    const start = isColossus ? COLOSSUS_LANDING_CELLS[randInt(4)] : BOSS_CELL;
+    const start = isColossus
+      ? randomColossusLanding()
+      : { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      x: cellX(start.i),
-      z: cellZ(start.j),
+      x: start.x,
+      z: start.z,
       shootTimer: isPharaoh ? 2.4 : 3,
       jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
@@ -1947,6 +2004,8 @@
       jumpState: isColossus ? 'idle' : 'none',
       shadowWarning: 0,
       recoverTimer: 0,
+      jumpHidden: false,
+      fireballTimer: isColossus ? 3 : 0,
       cool: 0,
     };
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -1977,6 +2036,10 @@
     // Boss 死后残留弹幕立刻清空
     state.enemyBullets.forEach((b) => { b.mesh.visible = false; });
     state.enemyBullets.length = 0;
+    state.lavaBalls.forEach((b) => { b.mesh.visible = false; });
+    state.lavaBalls.length = 0;
+    state.lavaPools.forEach((p) => { p.mesh.visible = false; });
+    state.lavaPools.length = 0;
     spawnCards();
     updateHud();
     toast('Boss 倒下', '撞向一张技能卡即可获得');
@@ -2561,31 +2624,119 @@
     }
   }
 
-  function chooseColossusLanding(b) {
-    const currentI = Math.round(b.x + HALF);
-    const currentJ = Math.round(b.z + HALF);
-    const choices = COLOSSUS_LANDING_CELLS.filter((c) => c.i !== currentI || c.j !== currentJ);
-    const target = choices[randInt(choices.length)];
-    return { x: cellX(target.i), z: cellZ(target.j) };
+  function randomColossusLanding(excludeX, excludeZ) {
+    for (let tries = 0; tries < 80; tries++) {
+      const i = 5 + randInt(N - 10);
+      const j = 5 + randInt(N - 10);
+      if (isObstacle(i, j)) continue;
+      const x = cellX(i);
+      const z = cellZ(j);
+      if (excludeX !== undefined && Math.hypot(x - excludeX, z - excludeZ) < 3) continue;
+      return { x, z };
+    }
+    return { x: 0, z: 0 };
   }
 
-  function fireColossusLandingVolley(b) {
-    // 同一中心发出三圈不同速度与角偏移的弹幕，形成三排扩散攻击
-    const rows = [
-      { count: 12, radius: 4.4, speed: 4.6, offset: 0 },
-      { count: 12, radius: 5.8, speed: 5.8, offset: Math.PI / 12 },
-      { count: 12, radius: 7.2, speed: 7.0, offset: 0 },
-    ];
-    for (const row of rows) {
-      for (let k = 0; k < row.count; k++) {
-        const angle = (k / row.count) * Math.PI * 2 + row.offset;
-        spawnBossBullet(
-          b.x + Math.cos(angle) * row.radius,
-          b.z + Math.sin(angle) * row.radius,
-          Math.cos(angle) * row.speed,
-          Math.sin(angle) * row.speed,
-          6
-        );
+  function chooseColossusLanding(b) {
+    return randomColossusLanding(b.x, b.z);
+  }
+
+  function spawnColossusFireball(b) {
+    const mesh = colossusFireballPool.find((m) => !m.visible);
+    if (!mesh) return;
+    const target = headPosition(_tmpA);
+    const dx = target.x - b.x;
+    const dz = target.z - b.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = dx / len;
+    const nz = dz / len;
+    const x = b.x + nx * 2;
+    const z = b.z + nz * 2;
+    mesh.visible = true;
+    mesh.position.set(x, 0.48, z);
+    state.lavaBalls.push({
+      mesh,
+      x,
+      z,
+      vx: nx * COLOSSUS_FIREBALL_SPEED,
+      vz: nz * COLOSSUS_FIREBALL_SPEED,
+      size: 3.8,
+      hit: false,
+    });
+  }
+
+  function spawnColossusLavaPool(x, z) {
+    const mesh = colossusPoolPool.find((m) => !m.visible);
+    if (!mesh) return;
+    const margin = COLOSSUS_POOL_SIZE / 2;
+    x = Math.max(-HALF + margin, Math.min(HALF - margin, x));
+    z = Math.max(-HALF + margin, Math.min(HALF - margin, z));
+    mesh.visible = true;
+    mesh.material.opacity = 0.92;
+    mesh.position.set(x, 0.11, z);
+    mesh.scale.setScalar(1);
+    state.lavaPools.push({
+      mesh,
+      x,
+      z,
+      size: COLOSSUS_POOL_SIZE,
+      life: COLOSSUS_POOL_DURATION,
+      hit: false,
+    });
+  }
+
+  function bodyTouchesColossusPool(pool) {
+    const half = COLOSSUS_POOL_SIZE / 2;
+    for (const cell of state.cells) {
+      if (Math.abs(cellX(cell.i) - pool.x) <= half && Math.abs(cellZ(cell.j) - pool.z) <= half) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateColossusFireballs(dt) {
+    for (let k = state.lavaBalls.length - 1; k >= 0; k--) {
+      const b = state.lavaBalls[k];
+      b.x += b.vx * dt;
+      b.z += b.vz * dt;
+      b.mesh.position.set(b.x, 0.48, b.z);
+      b.mesh.rotation.z += dt * 2.6;
+
+      if (!b.hit && state.invuln <= 0 &&
+        bodyDistanceSq(b.x, b.z) < COLOSSUS_FIREBALL_HIT_RADIUS * COLOSSUS_FIREBALL_HIT_RADIUS) {
+        b.hit = true;
+        damage(3);
+        toast('熔岩火球命中', '体长 -3');
+      }
+
+      const ci = Math.round(b.x + HALF);
+      const cj = Math.round(b.z + HALF);
+      const hitWall = !inBounds(ci, cj) || isObstacle(ci, cj);
+      if (hitWall) {
+        spawnColossusLavaPool(b.x, b.z);
+        b.mesh.visible = false;
+        state.lavaBalls.splice(k, 1);
+      }
+    }
+  }
+
+  function updateColossusLavaPools(dt) {
+    for (let k = state.lavaPools.length - 1; k >= 0; k--) {
+      const pool = state.lavaPools[k];
+      pool.life -= dt;
+      pool.mesh.material.opacity = pool.life < 2 ? Math.max(0, pool.life / 2) * 0.92 : 0.92;
+      pool.mesh.scale.setScalar(1 + Math.sin(state.time * 4 + k) * 0.025);
+
+      if (!pool.hit && state.invuln <= 0 && bodyTouchesColossusPool(pool)) {
+        pool.hit = true;
+        state.slowTimer = Math.max(state.slowTimer, 3);
+        damage(1);
+        toast('踩入岩浆池', '体长 -1 · 移动速度降低 3 秒');
+      }
+      if (pool.life <= 0) {
+        pool.mesh.visible = false;
+        state.lavaPools.splice(k, 1);
       }
     }
   }
@@ -2613,13 +2764,17 @@
     if (b.jumpState === 'airborne') {
       b.jumpElapsed += dt;
       const t = Math.min(1, b.jumpElapsed / COLOSSUS_JUMP_TIME);
-      const ease = t * t * (3 - 2 * t);
-      b.x = b.jumpFrom.x + (b.jumpTo.x - b.jumpFrom.x) * ease;
-      b.z = b.jumpFrom.z + (b.jumpTo.z - b.jumpFrom.z) * ease;
       b.shadowWarning = Math.max(0, COLOSSUS_JUMP_TIME - b.jumpElapsed);
-      bossMesh.position.set(b.x, Math.sin(Math.PI * t) * 6.5, b.z);
-      bossMesh.rotation.z = Math.sin(t * Math.PI * 4) * 0.055 * (1 - t);
-      bossMesh.scale.setScalar(1.6 + Math.sin(Math.PI * t) * 0.22);
+      b.x = b.jumpFrom.x;
+      b.z = b.jumpFrom.z;
+      const takeoff = Math.min(1, t / 0.12);
+      bossMesh.visible = takeoff < 1;
+      b.jumpHidden = takeoff >= 1;
+      if (!b.jumpHidden) {
+        bossMesh.position.set(b.x, Math.sin(takeoff * Math.PI * 0.5) * 2.8, b.z);
+        bossMesh.rotation.z = takeoff * 0.08;
+        bossMesh.scale.setScalar(1.6 + takeoff * 0.15);
+      }
 
       colossusShadow.visible = true;
       colossusShadow.position.set(b.jumpTo.x, 0.16, b.jumpTo.z);
@@ -2634,6 +2789,8 @@
         b.jumpState = 'landed';
         b.shadowWarning = 0;
         b.recoverTimer = 0.45;
+        b.jumpHidden = false;
+        bossMesh.visible = true;
         bossMesh.position.set(b.x, 0, b.z);
         bossMesh.rotation.z = 0;
         bossMesh.scale.setScalar(1.88);
@@ -2642,7 +2799,6 @@
         colossusImpactRing.position.set(b.x, 0.18, b.z);
         colossusImpactRing.scale.setScalar(0.7);
         colossusImpactRing.material.opacity = 0.85;
-        fireColossusLandingVolley(b);
         if (bodyDistanceSq(b.x, b.z) < COLOSSUS_CRUSH_RADIUS * COLOSSUS_CRUSH_RADIUS) {
           gameOver('被熔岩巨像砸中');
         }
@@ -2651,6 +2807,7 @@
     }
 
     bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.visible = true;
     bossMesh.rotation.z = 0;
     if (b.recoverTimer <= 0) {
       bossMesh.scale.setScalar(1.6 + Math.sin(state.time * 2.2) * 0.025);
@@ -2661,11 +2818,18 @@
       b.jumpTo = chooseColossusLanding(b);
       b.jumpElapsed = 0.0001;
       b.jumpState = 'airborne';
+      b.jumpHidden = false;
       b.shadowWarning = COLOSSUS_JUMP_TIME;
       colossusShadow.visible = true;
       colossusShadow.position.set(b.jumpTo.x, 0.16, b.jumpTo.z);
       colossusShadow.material.opacity = 0.22;
       colossusShadow.scale.setScalar(0.78);
+    }
+
+    b.fireballTimer -= dt;
+    if (b.fireballTimer <= 0) {
+      b.fireballTimer = 3;
+      spawnColossusFireball(b);
     }
   }
 
@@ -3278,6 +3442,8 @@
       if (state.phase === 'boss') {
         updateBoss(dt);
         updateBossBullets(dt);
+        updateColossusFireballs(dt);
+        updateColossusLavaPools(dt);
       }
 
       updateBullets(dt);

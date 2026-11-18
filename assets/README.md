@@ -26,3 +26,12 @@ Original conversation attachment paths:
 - Original attachment: `C:\Users\17928\AppData\Local\Temp\codex-clipboard-63d791a5-2ad1-4fa0-9339-6bab002669e7.png`
 - The supplied 96×96 RGBA image is shipped without pixel modification.
 - Runtime import uses nearest-neighbor filtering with mipmaps disabled to preserve the pixel-art edges.
+
+## Colossus Attack Asset Sources
+
+- `colossus-fireball.png` and `colossus-lava-pool.png` were supplied by the project owner on 2026-11-18.
+- Original attachments:
+  - `C:\Users\17928\AppData\Local\Temp\codex-clipboard-54e105d8-2b88-4cb3-b0c4-36a71909d768.png`
+  - `C:\Users\17928\AppData\Local\Temp\codex-clipboard-d14cb1a3-fb7f-40fe-8aef-9ff817a7e7e7.png`
+- Both supplied 96×96 RGBA files are shipped without pixel modification.
+- Runtime import uses nearest-neighbor filtering with mipmaps disabled.
