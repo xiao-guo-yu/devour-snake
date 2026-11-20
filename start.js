@@ -195,7 +195,6 @@
     const t = ts / 1000;
     ctx.clearRect(0, 0, W, H);
     drawParticles(t);
-    drawSnake(t);
     requestAnimationFrame(frame);
   }
 
