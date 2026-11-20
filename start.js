@@ -202,7 +202,18 @@
   function startGame() {
     screen.classList.add('gone');
     window.setTimeout(() => { screen.style.display = 'none'; }, 460);
-    if (typeof window.startDevour === 'function') window.startDevour();
+    if (window.DevourCampaign && typeof window.DevourCampaign.showRegions === 'function') {
+      window.DevourCampaign.showRegions();
+      return;
+    }
+    if (typeof window.startDevour === 'function') window.startDevour(0);
+  }
+
+  function continueGame() {
+    if (!window.DevourCampaign) return;
+    screen.classList.add('gone');
+    window.setTimeout(() => { screen.style.display = 'none'; }, 460);
+    window.DevourCampaign.showLastRegion();
   }
 
   function refreshBest() {
@@ -212,6 +223,7 @@
     } catch (err) {
       /* localStorage may be unavailable when opened as a local file. */
     }
+    if (window.DevourCampaign) window.DevourCampaign.refreshEntryState();
   }
 
   function restartGame() {
@@ -224,6 +236,7 @@
 
   function returnToMenu() {
     if (window.__devour) window.__devour.paused = true;
+    if (window.DevourCampaign) window.DevourCampaign.hide();
     const overlay = document.getElementById('overlay');
     if (overlay) overlay.classList.remove('show');
     panel.innerHTML = '';
@@ -233,10 +246,25 @@
     refreshBest();
   }
 
+  function returnToCampaignMap() {
+    if (window.__devour) window.__devour.paused = true;
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.classList.remove('show');
+    panel.innerHTML = '';
+    panel.classList.remove('show');
+    if (!window.DevourCampaign) return;
+    screen.classList.add('gone');
+    screen.style.display = 'none';
+    window.DevourCampaign.showLastRegion();
+  }
+
   document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnContinue').addEventListener('click', continueGame);
   document.getElementById('btnRestartGame').addEventListener('click', restartGame);
+  document.getElementById('btnGameMap').addEventListener('click', returnToCampaignMap);
   document.getElementById('btnMainMenu').addEventListener('click', returnToMenu);
   document.getElementById('btnOverlayRestart').addEventListener('click', restartGame);
+  document.getElementById('btnOverlayMap').addEventListener('click', returnToCampaignMap);
   document.getElementById('btnOverlayMenu').addEventListener('click', returnToMenu);
 
   document.getElementById('btnHelp').addEventListener('click', () => {
@@ -274,6 +302,7 @@
   } catch (err) {
     /* file:// 下可能禁用 localStorage，忽略 */
   }
+  if (window.DevourCampaign) window.DevourCampaign.refreshEntryState();
 
   const sendKey = (type, key) => {
     window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));

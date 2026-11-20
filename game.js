@@ -28,8 +28,15 @@
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
   const GHOST_BULLET_SPEED = 2;
-  // ⚠️ 测试用：直接进入熔岩巨像 Boss；恢复正常游戏请改回 0
-  const DEBUG_START_LEVEL = 11;
+  // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
+  const DEBUG_START_LEVEL = (() => {
+    try {
+      const value = Number(new URLSearchParams(window.location.search).get('level'));
+      return Number.isInteger(value) ? Math.max(0, Math.min(ROOM_COUNT - 1, value)) : 0;
+    } catch (err) {
+      return 0;
+    }
+  })();
   const DOOR_CELL = { i: 22, j: 1 };
   const SPAWN_DOOR_CELL = { i: 22, j: N - 1 };
   const BOSS_CELL = { i: 22, j: 22 };
@@ -1710,6 +1717,7 @@
     enemyShoot: false,
     spawnGrace: 0,
     slowTimer: 0,
+    clearedNotified: new Set(),
   };
 
   let viewMode = 'full';
@@ -1775,6 +1783,19 @@
     levelIntroTimer = window.setTimeout(() => el.levelIntro.classList.remove('show'), 3200);
   }
 
+  function notifyLevelCleared(levelIndex) {
+    if (!state.clearedNotified || state.clearedNotified.has(levelIndex)) return;
+    state.clearedNotified.add(levelIndex);
+    const stars = state.cells.length >= 18 ? 3 : (state.cells.length >= 10 ? 2 : 1);
+    if (typeof window.onDevourLevelCleared === 'function') {
+      window.onDevourLevelCleared({
+        level: levelIndex,
+        stars,
+        bodyLength: state.cells.length,
+      });
+    }
+  }
+
   function randomFreeCell() {
     for (let tries = 0; tries < 400; tries++) {
       const i = randInt(N), j = randInt(N);
@@ -1833,9 +1854,18 @@
     }
   }
 
+  function campaignPosition(levelIndex) {
+    const safe = Math.max(0, Math.min(ROOM_COUNT - 1, levelIndex));
+    const region = Math.floor(safe / 4);
+    const roomInRegion = safe % 4;
+    const node = roomInRegion === 3 ? 8 : roomInRegion + 1;
+    return { region, node };
+  }
+
   function updateHud() {
     const len = state.cells.length;
-    el.level.textContent = `${Math.min(state.level + 1, ROOM_COUNT)} / ${ROOM_COUNT}`;
+    const position = campaignPosition(state.level);
+    el.level.textContent = `${position.region + 1}-${position.node} / 8`;
     el.len.textContent = String(len);
     el.score.textContent = String(state.score);
     el.kills.textContent = String(state.kills);
@@ -1981,8 +2011,9 @@
     if (room.kind === 'clear') {
       const safeDistance = idx === 0 ? 14 : 9;
       for (let k = 0; k < room.enemies; k++) spawnEnemy(safeDistance);
+      const position = campaignPosition(idx);
       showLevelIntro(
-        `LEVEL ${String(idx + 1).padStart(2, '0')} / ${String(ROOM_COUNT).padStart(2, '0')}`,
+        `REGION ${position.region + 1} · LEVEL ${String(position.node).padStart(2, '0')} / 08`,
         room.name,
         `敌人 ${room.enemies} · 清除后开启传送门`
       );
@@ -2040,6 +2071,7 @@
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
     state.phase = 'pick';
+    notifyLevelCleared(state.level);
     // Boss 战结束也停止刷豆，场上豆子清空
     state.pelletsOff = true;
     state.pellets.length = 0;
@@ -3320,6 +3352,7 @@
     if (Math.hypot(dx, dz) > 1.4) return;
 
     if (state.phase === 'clear') {
+      notifyLevelCleared(state.level);
       startLevel(Math.min(state.level + 1, ROOM_COUNT - 1));
     } else if (state.phase === 'exit') {
       if (state.level + 1 < ROOM_COUNT) startLevel(state.level + 1);
@@ -3374,7 +3407,7 @@
   }
 
   // ---------- 流程 ----------
-  function resetGame() {
+  function resetGame(startLevelIndex = DEBUG_START_LEVEL) {
     state.cells.length = 0;
     for (let k = 0; k < START_LEN; k++) state.cells.push({ i: 22, j: 34 + k });
     state.dir = { i: 0, j: -1 };
@@ -3389,6 +3422,7 @@
     state.shootCd = 0;
     state.energyCd = 0;
     state.slowTimer = 0;
+    state.clearedNotified.clear();
     state.roomActive = false;
     state.roomTimer = 0;
     state.spawnEmerging = false;
@@ -3405,13 +3439,14 @@
 
     el.overlay.classList.remove('show');
     // 调试直跳时给一点体长，方便测试后面的关卡
-    if (DEBUG_START_LEVEL > 0) {
+    const safeStartLevel = Math.max(0, Math.min(ROOM_COUNT - 1, Number(startLevelIndex) || 0));
+    if (safeStartLevel > 0) {
       while (state.cells.length < 12) {
         const tail = state.cells[state.cells.length - 1];
         state.cells.push({ i: tail.i, j: tail.j });
       }
     }
-    startLevel(DEBUG_START_LEVEL);
+    startLevel(safeStartLevel);
   }
 
   function formatDuration(sec) {
@@ -3438,7 +3473,8 @@
     el.ovsub.textContent = reason;
     el.ovscore.textContent = `${state.score} 分`;
     el.ovtime.textContent = `存活 ${formatDuration(state.time)}`;
-    el.ovdetail.textContent = `抵达第 ${state.level + 1} 关 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
+    const position = campaignPosition(state.level);
+    el.ovdetail.textContent = `抵达 ${position.region + 1}-${position.node} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
     el.overlay.classList.add('show');
   }
 
@@ -3530,8 +3566,8 @@
     isObstacle,
     clearObstacles: () => obstacles.clear(),
   };
-  window.startDevour = () => {
-    resetGame();
+  window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {
+    resetGame(levelIndex);
     showHelp();
     clock.getDelta(); // 清掉暂停期间累积的 delta
     state.paused = false;
