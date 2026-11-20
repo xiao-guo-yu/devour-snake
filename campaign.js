@@ -261,6 +261,7 @@
   }
 
   function showRegions(fromGame = false) {
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     previousFocus = fromGame ? null : document.activeElement;
     document.body.classList.add('campaign-open');
     campaignScreen.hidden = false;
@@ -276,6 +277,7 @@
 
   function showLevelMap(regionIndex) {
     if (!regionUnlocked(regionIndex)) return;
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     previousFocus = document.activeElement;
     activeRegion = regionIndex;
     progress.lastRegion = regionIndex;
@@ -326,6 +328,7 @@
       startScreen.classList.add('gone');
       startScreen.style.display = 'none';
     }
+    if (window.DevourAudio) window.DevourAudio.playGameplay();
     if (typeof window.startDevour === 'function') window.startDevour(level.room);
   }
 

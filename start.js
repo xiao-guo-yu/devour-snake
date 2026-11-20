@@ -199,17 +199,22 @@
   }
 
   function startGame() {
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     screen.classList.add('gone');
     window.setTimeout(() => { screen.style.display = 'none'; }, 460);
     if (window.DevourCampaign && typeof window.DevourCampaign.showRegions === 'function') {
       window.DevourCampaign.showRegions();
       return;
     }
-    if (typeof window.startDevour === 'function') window.startDevour(0);
+    if (typeof window.startDevour === 'function') {
+      if (window.DevourAudio) window.DevourAudio.playGameplay();
+      window.startDevour(0);
+    }
   }
 
   function continueGame() {
     if (!window.DevourCampaign) return;
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     screen.classList.add('gone');
     window.setTimeout(() => { screen.style.display = 'none'; }, 460);
     window.DevourCampaign.showLastRegion();
@@ -235,6 +240,7 @@
 
   function returnToMenu() {
     if (window.__devour) window.__devour.paused = true;
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     if (window.DevourCampaign) window.DevourCampaign.hide();
     const overlay = document.getElementById('overlay');
     if (overlay) overlay.classList.remove('show');
@@ -247,6 +253,7 @@
 
   function returnToCampaignMap() {
     if (window.__devour) window.__devour.paused = true;
+    if (window.DevourAudio) window.DevourAudio.playMenu();
     const overlay = document.getElementById('overlay');
     if (overlay) overlay.classList.remove('show');
     panel.innerHTML = '';
@@ -289,6 +296,7 @@
 
   window.addEventListener('keydown', (e) => {
     if (screen.classList.contains('gone')) return;
+    if (document.body.classList.contains('settings-open')) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       startGame();

@@ -640,6 +640,163 @@
     50% { filter: brightness(1.05); }
   }
 
+  /* Settings */
+  .settings-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(55,117,88,.14), transparent 32%),
+      rgba(1,5,3,.76);
+    backdrop-filter: blur(8px);
+  }
+  .settings-screen[hidden] { display: none !important; }
+  .settings-card {
+    position: relative;
+    width: min(520px, calc(100vw - 36px));
+    padding: 38px 44px 34px;
+    border: 1px solid rgba(185,146,81,.5);
+    background:
+      linear-gradient(125deg, rgba(211,171,96,.08), transparent 37%),
+      linear-gradient(180deg, rgba(12,25,17,.97), rgba(4,11,7,.97));
+    box-shadow:
+      0 28px 80px rgba(0,0,0,.62),
+      inset 0 1px 0 rgba(255,246,215,.05),
+      inset 0 0 52px rgba(53,136,99,.04);
+  }
+  .settings-card::before {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: 8px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(210,176,105,.43), transparent);
+  }
+  .settings-close {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    background: transparent;
+    color: #9d9b89;
+    font: 28px/1 Georgia, serif;
+    cursor: pointer;
+  }
+  .settings-close:hover,
+  .settings-close:focus-visible {
+    outline: 0;
+    color: #f2d894;
+  }
+  .settings-kicker {
+    display: block;
+    color: rgba(99,225,180,.72);
+    font: 9px/1 Georgia, serif;
+    letter-spacing: .32em;
+    text-indent: .32em;
+  }
+  .settings-card h2 {
+    margin: 10px 0 8px;
+    color: #efdcae;
+    font-family: var(--display);
+    font-size: 39px;
+    font-weight: 600;
+    letter-spacing: .15em;
+    text-indent: .15em;
+  }
+  .settings-copy {
+    margin: 0 0 28px;
+    color: #8f978b;
+    font-size: 12px;
+    line-height: 1.65;
+  }
+  .volume-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 13px;
+    color: #ded5ba;
+    font-family: var(--display);
+    font-size: 20px;
+    letter-spacing: .1em;
+  }
+  .volume-row output {
+    color: #e4bd72;
+    font: 17px/1 Georgia, serif;
+    letter-spacing: .04em;
+  }
+  .volume-slider {
+    --range-progress: 55%;
+    width: 100%;
+    height: 32px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  .volume-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border: 1px solid rgba(159,130,82,.3);
+    background:
+      linear-gradient(90deg, #c6985d 0 var(--range-progress), rgba(126,134,122,.18) var(--range-progress) 100%);
+  }
+  .volume-slider::-moz-range-track {
+    height: 4px;
+    border: 1px solid rgba(159,130,82,.3);
+    background: rgba(126,134,122,.18);
+  }
+  .volume-slider::-moz-range-progress {
+    height: 4px;
+    background: #c6985d;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    margin-top: -8px;
+    border: 1px solid #f0d19a;
+    border-radius: 50%;
+    appearance: none;
+    -webkit-appearance: none;
+    background: #674b2d;
+    box-shadow: 0 0 0 4px rgba(201,164,96,.1), 0 0 16px rgba(229,189,104,.22);
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #f0d19a;
+    border-radius: 50%;
+    background: #674b2d;
+    box-shadow: 0 0 0 4px rgba(201,164,96,.1), 0 0 16px rgba(229,189,104,.22);
+  }
+  .volume-slider:focus-visible { outline: 0; }
+  .volume-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(104,231,184,.24), 0 0 18px rgba(229,189,104,.32);
+  }
+  .volume-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1px;
+    color: #70786e;
+    font-size: 9px;
+    letter-spacing: .08em;
+  }
+  .volume-hint {
+    margin: 21px 0 0;
+    padding-top: 13px;
+    border-top: 1px solid rgba(143,114,72,.17);
+    color: #777f73;
+    font-size: 10px;
+    letter-spacing: .04em;
+  }
+  body.settings-open #settingsScreen { display: grid; }
+
   /* ---------- 战役区域与关卡地图 ---------- */
   .campaign-screen {
     --map-accent: #68e7b8;
@@ -1781,6 +1938,16 @@
       font-size: 8px;
     }
     .st-footer span:first-child { display: none; }
+    .settings-screen { padding: 17px; }
+    .settings-card {
+      width: 100%;
+      padding: 31px 24px 26px;
+    }
+    .settings-close { top: 7px; right: 7px; }
+    .settings-card h2 { font-size: 31px; }
+    .settings-copy { margin-bottom: 22px; font-size: 11px; }
+    .volume-row { font-size: 18px; }
+    .volume-hint { margin-top: 17px; }
   }
 
   @media (max-height: 650px) and (min-width: 761px) {
@@ -1937,6 +2104,7 @@
       <button class="st-start" id="btnStart">开始游戏</button>
       <nav class="st-subs" aria-label="主菜单">
         <button class="st-sub-btn" id="btnContinue" disabled>继续游戏</button>
+        <button class="st-sub-btn" id="btnSettings">设置</button>
         <button class="st-sub-btn" id="btnHelp">操作说明</button>
         <button class="st-sub-btn" id="btnCredits">制作名单</button>
       </nav>
@@ -1948,11 +2116,29 @@
     <span>v0.1 prototype</span>
     <span>最高分 <b id="stBest">0</b></span>
   </div>
+  <section id="settingsScreen" class="settings-screen" role="dialog" aria-modal="true"
+    aria-labelledby="settingsTitle" aria-hidden="true" hidden>
+    <div class="settings-card">
+      <button class="settings-close" id="btnSettingsClose" type="button" aria-label="关闭设置">×</button>
+      <span class="settings-kicker">AUDIO RITE</span>
+      <h2 id="settingsTitle">设置</h2>
+      <p class="settings-copy">菜单与关卡会自动切换配乐，音量设置会保存在本机。</p>
+      <div class="volume-row">
+        <label for="musicVolumeSlider">音乐大小</label>
+        <output id="musicVolumeValue" for="musicVolumeSlider" aria-live="polite">55%</output>
+      </div>
+      <input id="musicVolumeSlider" class="volume-slider" type="range" min="0" max="100"
+        step="5" value="55" aria-describedby="volumeHint">
+      <div class="volume-scale" aria-hidden="true"><span>静音</span><span>中等</span><span>响亮</span></div>
+      <p class="volume-hint" id="volumeHint">建议先使用中等音量试听。</p>
+    </div>
+  </section>
 </div>
 
 <script src="vendor/three.min.js?v=20261117"></script>
 <script src="game.js?v=20261120-start3"></script>
-<script src="campaign.js?v=20261120-start3"></script>
-<script src="start.js?v=20261120-start3"></script>
+<script src="campaign.js?v=20261120-audio1"></script>
+<script src="audio.js?v=20261120-audio1"></script>
+<script src="start.js?v=20261120-audio1"></script>
 </body>
 </html>
