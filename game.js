@@ -57,6 +57,8 @@
   const COLOSSUS_FIREBALL_WALL_RADIUS = 3.6;
   const COLOSSUS_POOL_SIZE = 7;
   const COLOSSUS_POOL_DURATION = 10;
+  const TWO_STAR_MIN_LENGTH = 8;
+  const THREE_STAR_TIME_LIMIT = 180;
 
   // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
   const ROOMS = [
@@ -1711,6 +1713,8 @@
     doorOpen: false,
     pelletsOff: false,
     time: 0,
+    levelTime: 0,
+    timerDisplayedSecond: -1,
     shotDamage: 6,
     shootCdMul: 1,
     enemySpeedMul: 1,
@@ -1729,6 +1733,7 @@
     len: document.getElementById('len'),
     score: document.getElementById('score'),
     kills: document.getElementById('kills'),
+    levelTime: document.getElementById('levelTime'),
     hp: document.getElementById('hpfill'),
     objective: document.getElementById('objective'),
     bossbar: document.getElementById('bossbar'),
@@ -1783,17 +1788,37 @@
     levelIntroTimer = window.setTimeout(() => el.levelIntro.classList.remove('show'), 3200);
   }
 
+  function evaluateLevelStars(bodyLength, elapsed) {
+    const lengthBonus = bodyLength >= TWO_STAR_MIN_LENGTH;
+    const timeBonus = elapsed < THREE_STAR_TIME_LIMIT;
+    const stars = lengthBonus && timeBonus ? 3 : (lengthBonus ? 2 : 1);
+    return { stars, lengthBonus, timeBonus };
+  }
+
   function notifyLevelCleared(levelIndex) {
     if (!state.clearedNotified || state.clearedNotified.has(levelIndex)) return;
     state.clearedNotified.add(levelIndex);
-    const stars = state.cells.length >= 18 ? 3 : (state.cells.length >= 10 ? 2 : 1);
+    const bodyLength = state.cells.length;
+    const elapsed = state.levelTime;
+    const evaluation = evaluateLevelStars(bodyLength, elapsed);
     if (typeof window.onDevourLevelCleared === 'function') {
       window.onDevourLevelCleared({
         level: levelIndex,
-        stars,
-        bodyLength: state.cells.length,
+        stars: evaluation.stars,
+        bodyLength,
+        elapsed,
+        lengthBonus: evaluation.lengthBonus,
+        timeBonus: evaluation.timeBonus,
       });
     }
+    return { stars: evaluation.stars, bodyLength, elapsed };
+  }
+
+  function formatLevelTime(sec) {
+    const total = Math.max(0, Math.floor(sec));
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
 
   function randomFreeCell() {
@@ -1902,6 +1927,8 @@
   function startLevel(idx) {
     const room = ROOMS[idx] || ROOMS[0];
     state.level = idx;
+    state.levelTime = 0;
+    state.timerDisplayedSecond = -1;
     state.phase = room.kind === 'boss' ? 'boss' : 'clear';
     state.doorOpen = false;
     state.boss = null;
@@ -2071,7 +2098,6 @@
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
     state.phase = 'pick';
-    notifyLevelCleared(state.level);
     // Boss 战结束也停止刷豆，场上豆子清空
     state.pelletsOff = true;
     state.pellets.length = 0;
@@ -3352,9 +3378,16 @@
     if (Math.hypot(dx, dz) > 1.4) return;
 
     if (state.phase === 'clear') {
-      notifyLevelCleared(state.level);
+      const award = notifyLevelCleared(state.level);
+      if (award) {
+        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `长度 ${award.bodyLength} · 用时 ${formatLevelTime(award.elapsed)}`);
+      }
       startLevel(Math.min(state.level + 1, ROOM_COUNT - 1));
     } else if (state.phase === 'exit') {
+      const award = notifyLevelCleared(state.level);
+      if (award) {
+        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `长度 ${award.bodyLength} · 用时 ${formatLevelTime(award.elapsed)}`);
+      }
       if (state.level + 1 < ROOM_COUNT) startLevel(state.level + 1);
       else victory();
     }
@@ -3505,6 +3538,12 @@
     }
 
     if (!state.paused && !state.over) {
+      state.levelTime += dt;
+      const timerSecond = Math.floor(state.levelTime);
+      if (timerSecond !== state.timerDisplayedSecond && el.levelTime) {
+        state.timerDisplayedSecond = timerSecond;
+        el.levelTime.textContent = formatLevelTime(state.levelTime);
+      }
       state.shootCd = Math.max(0, state.shootCd - dt);
       state.invuln = Math.max(0, state.invuln - dt);
       state.slowTimer = Math.max(0, state.slowTimer - dt);
@@ -3564,6 +3603,7 @@
     resetGame,
     spawnPellet,
     isObstacle,
+    evaluateLevelStars,
     clearObstacles: () => obstacles.clear(),
   };
   window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {

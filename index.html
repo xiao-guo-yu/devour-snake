@@ -1809,7 +1809,12 @@
     .level-node:nth-child(6) { left: 35%; top: 40%; }
     .level-node:nth-child(7) { left: 69%; top: 31%; }
     .level-node:nth-child(8) { left: 48%; top: 14%; }
-    .region-map-footer { display: none; }
+    .region-map-footer {
+      display: flex;
+      min-height: 20px;
+      font-size: 7px;
+    }
+    .region-map-footer .map-key { display: none; }
   }
 
   @media (max-height: 660px) and (min-width: 761px) {
@@ -1979,6 +1984,7 @@
   <div class="row"><span>体长 / HP</span><b id="len">6</b></div>
   <div class="row"><span>分数</span><b id="score">0</b></div>
   <div class="row"><span>击杀</span><b id="kills">0</b></div>
+  <div class="row"><span>本关用时</span><b id="levelTime">00:00</b></div>
   <div id="hpbar"><div id="hpfill"></div></div>
   <div id="toast"><span id="toasttext"></span><b id="toastbig"></b></div>
   <div id="objective">清光敌人，门会打开</div>
@@ -2085,7 +2091,7 @@
       </div>
     </div>
     <footer class="region-map-footer">
-      <span>第 3 关完成后直接开放 Boss</span>
+      <span>1星通关 · 2星长度 &gt; 7 · 3星用时 &lt; 3分钟</span>
       <span class="map-key">第 4–7 关为后续设计预留</span>
     </footer>
   </div>
@@ -2136,7 +2142,7 @@
 </div>
 
 <script src="vendor/three.min.js?v=20261117"></script>
-<script src="game.js?v=20261120-start3"></script>
+<script src="game.js?v=20261120-stars1"></script>
 <script src="campaign.js?v=20261120-audio1"></script>
 <script src="audio.js?v=20261120-audio1"></script>
 <script src="start.js?v=20261120-audio1"></script>
