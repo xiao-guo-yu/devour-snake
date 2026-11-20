@@ -15,13 +15,13 @@
       base: 0,
       levels: [
         { n: 1, room: 0, name: '温室前厅', icon: 'assets/spore.png' },
-        { n: 2, room: 1, name: '根礼拜堂', icon: 'assets/vine.png' },
-        { n: 3, room: 2, name: '根之圣所', icon: 'assets/trap.png' },
-        { n: 4, planned: true },
-        { n: 5, planned: true },
-        { n: 6, planned: true },
-        { n: 7, planned: true },
-        { n: 8, room: 3, name: '腐根盘蛇', boss: true, icon: 'assets/rootcoil.png' },
+        { n: 2, room: 1, name: '根礼拜堂', icon: 'assets/spore.png' },
+        { n: 3, room: 2, name: '根之圣所', icon: 'assets/vine.png' },
+        { n: 4, room: 3, name: '腐生苗床', icon: 'assets/spore.png' },
+        { n: 5, room: 4, name: '根脉交叉', icon: 'assets/trap.png' },
+        { n: 6, room: 5, name: '捕食花圃', icon: 'assets/vine.png' },
+        { n: 7, room: 6, name: '圣所深处', icon: 'assets/trap.png' },
+        { n: 8, room: 7, name: '腐根盘蛇', boss: true, icon: 'assets/rootcoil.png' },
       ],
     },
     {
@@ -32,16 +32,16 @@
       art: 'assets/pharaoh.png',
       accent: '#f0c66c',
       accent2: '#88612a',
-      base: 4,
+      base: 8,
       levels: [
-        { n: 1, room: 4, name: '神庙柱厅', icon: 'assets/scarab.png' },
-        { n: 2, room: 5, name: '供奉长廊', icon: 'assets/mummy.png' },
-        { n: 3, room: 6, name: '阿努比斯内殿', icon: 'assets/anubis.png' },
-        { n: 4, planned: true },
-        { n: 5, planned: true },
-        { n: 6, planned: true },
-        { n: 7, planned: true },
-        { n: 8, room: 7, name: '黄金法老', boss: true, icon: 'assets/pharaoh.png' },
+        { n: 1, room: 8, name: '神庙柱厅', icon: 'assets/scarab.png' },
+        { n: 2, room: 9, name: '供奉长廊', icon: 'assets/scarab.png' },
+        { n: 3, room: 10, name: '阿努比斯内殿', icon: 'assets/mummy.png' },
+        { n: 4, room: 11, name: '圣甲虫墓道', icon: 'assets/scarab.png' },
+        { n: 5, room: 12, name: '王陵中庭', icon: 'assets/anubis.png' },
+        { n: 6, room: 13, name: '守墓长廊', icon: 'assets/mummy.png' },
+        { n: 7, room: 14, name: '黄金王座', icon: 'assets/anubis.png' },
+        { n: 8, room: 15, name: '黄金法老', boss: true, icon: 'assets/pharaoh.png' },
       ],
     },
     {
@@ -52,16 +52,16 @@
       art: 'assets/magma-colossus.png',
       accent: '#ff9a47',
       accent2: '#a63712',
-      base: 8,
+      base: 16,
       levels: [
-        { n: 1, room: 8, name: '熔岩裂谷', icon: 'assets/magma-slime.png' },
-        { n: 2, room: 9, name: '焦岩长廊', icon: 'assets/obsidian-beetle.png' },
-        { n: 3, room: 10, name: '余烬祭坛', icon: 'assets/ember-wisp.png' },
-        { n: 4, planned: true },
-        { n: 5, planned: true },
-        { n: 6, planned: true },
-        { n: 7, planned: true },
-        { n: 8, room: 11, name: '熔岩巨像', boss: true, icon: 'assets/magma-colossus.png' },
+        { n: 1, room: 16, name: '熔岩裂谷', icon: 'assets/magma-slime.png' },
+        { n: 2, room: 17, name: '焦岩长廊', icon: 'assets/magma-slime.png' },
+        { n: 3, room: 18, name: '余烬祭坛', icon: 'assets/obsidian-beetle.png' },
+        { n: 4, room: 19, name: '熔渣坡道', icon: 'assets/magma-slime.png' },
+        { n: 5, room: 20, name: '炽脉交汇', icon: 'assets/ember-wisp.png' },
+        { n: 6, room: 21, name: '熔炉深处', icon: 'assets/obsidian-beetle.png' },
+        { n: 7, room: 22, name: '火山核心', icon: 'assets/ember-wisp.png' },
+        { n: 8, room: 23, name: '熔岩巨像', boss: true, icon: 'assets/magma-colossus.png' },
       ],
     },
   ];
@@ -156,7 +156,6 @@
   function levelAvailable(regionIndex, level) {
     if (!level || level.planned || !regionUnlocked(regionIndex)) return false;
     if (level.n === 1) return true;
-    if (level.n === 8) return starsFor(regionIndex, 3) > 0;
     return starsFor(regionIndex, level.n - 1) > 0;
   }
 

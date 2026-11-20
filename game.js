@@ -1,4 +1,4 @@
-/* DEVOUR — 三小关 + Boss 原型
+/* DEVOUR — 七小关 + Boss 战役原型
  * 45×45 格 · 8 方向格点移动 · 体长 = HP · 射击消耗体节
  * 流程：清光敌人 → 门开 → 下一关 ×3 → Boss → 三张技能卡（射击选择）→ 传送门通关
  */
@@ -60,19 +60,33 @@
   const TWO_STAR_MIN_LENGTH = 8;
   const THREE_STAR_TIME_LIMIT = 180;
 
-  // 关卡表：温室 3 小关 + Rootcoil → 神庙 3 小关 + 法老
+  // 每个区域 7 个普通关 + 第 8 关 Boss；composition 表示三种小怪的具体数量。
   const ROOMS = [
-    { theme: 'green', kind: 'clear', enemies: 8, types: ['spore'], name: '腐殖温室 · 前厅' },
-    { theme: 'green', kind: 'clear', enemies: 10, types: ['vine'], name: '腐殖温室 · 根礼拜堂' },
-    { theme: 'green', kind: 'clear', enemies: 12, types: ['trap'], name: '腐殖温室 · 根之圣所' },
+    { theme: 'green', kind: 'clear', composition: { spore: 8 }, name: '腐殖温室 · 前厅' },
+    { theme: 'green', kind: 'clear', composition: { spore: 5, vine: 3 }, name: '腐殖温室 · 根礼拜堂' },
+    { theme: 'green', kind: 'clear', composition: { vine: 8 }, name: '腐殖温室 · 根之圣所' },
+    { theme: 'green', kind: 'clear', composition: { spore: 5, trap: 3 }, name: '腐殖温室 · 腐生苗床' },
+    { theme: 'green', kind: 'clear', composition: { spore: 3, vine: 2, trap: 3 }, name: '腐殖温室 · 根脉交叉' },
+    { theme: 'green', kind: 'clear', composition: { vine: 5, trap: 3 }, name: '腐殖温室 · 捕食花圃' },
+    { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
     { theme: 'green', kind: 'boss', boss: 'rootcoil', name: '腐根盘蛇 · ROOTCOIL' },
-    { theme: 'temple', kind: 'clear', enemies: 9, types: ['scarab'], name: '沙海神庙 · 柱厅' },
-    { theme: 'temple', kind: 'clear', enemies: 11, types: ['mummy'], name: '沙海神庙 · 供奉廊' },
-    { theme: 'temple', kind: 'clear', enemies: 13, types: ['anubis'], name: '沙海神庙 · 内殿' },
+
+    { theme: 'temple', kind: 'clear', composition: { scarab: 8 }, name: '沙海神庙 · 柱厅' },
+    { theme: 'temple', kind: 'clear', composition: { scarab: 5, mummy: 3 }, name: '沙海神庙 · 供奉廊' },
+    { theme: 'temple', kind: 'clear', composition: { mummy: 8 }, name: '沙海神庙 · 内殿' },
+    { theme: 'temple', kind: 'clear', composition: { scarab: 5, anubis: 3 }, name: '沙海神庙 · 圣甲虫墓道' },
+    { theme: 'temple', kind: 'clear', composition: { scarab: 3, mummy: 2, anubis: 3 }, name: '沙海神庙 · 王陵中庭' },
+    { theme: 'temple', kind: 'clear', composition: { mummy: 5, anubis: 3 }, name: '沙海神庙 · 守墓长廊' },
+    { theme: 'temple', kind: 'clear', composition: { anubis: 8 }, name: '沙海神庙 · 黄金王座' },
     { theme: 'temple', kind: 'boss', boss: 'pharaoh', name: '黄金法老 · PHARAOH' },
-    { theme: 'volcano', kind: 'clear', enemies: 9, types: ['magmaSlime'], name: '熔火地脉 · 裂谷' },
-    { theme: 'volcano', kind: 'clear', enemies: 11, types: ['obsidianBeetle'], name: '熔火地脉 · 焦岩廊' },
-    { theme: 'volcano', kind: 'clear', enemies: 10, types: ['emberWisp'], name: '熔火地脉 · 余烬祭坛' },
+
+    { theme: 'volcano', kind: 'clear', composition: { magmaSlime: 8 }, name: '熔火地脉 · 裂谷' },
+    { theme: 'volcano', kind: 'clear', composition: { magmaSlime: 5, obsidianBeetle: 3 }, name: '熔火地脉 · 焦岩长廊' },
+    { theme: 'volcano', kind: 'clear', composition: { obsidianBeetle: 8 }, name: '熔火地脉 · 余烬祭坛' },
+    { theme: 'volcano', kind: 'clear', composition: { magmaSlime: 5, emberWisp: 3 }, name: '熔火地脉 · 熔渣坡道' },
+    { theme: 'volcano', kind: 'clear', composition: { magmaSlime: 3, obsidianBeetle: 2, emberWisp: 3 }, name: '熔火地脉 · 炽脉交汇' },
+    { theme: 'volcano', kind: 'clear', composition: { obsidianBeetle: 5, emberWisp: 3 }, name: '熔火地脉 · 熔炉深处' },
+    { theme: 'volcano', kind: 'clear', composition: { emberWisp: 8 }, name: '熔火地脉 · 火山核心' },
     { theme: 'volcano', kind: 'boss', boss: 'magma_colossus', name: '熔岩巨像 · MAGMA COLOSSUS' },
   ];
   const ROOM_COUNT = ROOMS.length;
@@ -1881,10 +1895,19 @@
 
   function campaignPosition(levelIndex) {
     const safe = Math.max(0, Math.min(ROOM_COUNT - 1, levelIndex));
-    const region = Math.floor(safe / 4);
-    const roomInRegion = safe % 4;
-    const node = roomInRegion === 3 ? 8 : roomInRegion + 1;
+    const region = Math.floor(safe / 8);
+    const node = (safe % 8) + 1;
     return { region, node };
+  }
+
+  function roomEnemyTypes(room) {
+    if (room.composition) {
+      return Object.entries(room.composition).flatMap(([type, count]) => (
+        Array.from({ length: count }, () => type)
+      ));
+    }
+    const types = room.types || ['spore'];
+    return Array.from({ length: room.enemies || 0 }, (_, index) => types[index % types.length]);
   }
 
   function updateHud() {
@@ -2025,7 +2048,8 @@
     if (document.body && document.body.dataset) document.body.dataset.gameTheme = room.theme;
 
     // 敌人外观 / 类型按关卡轮换
-    const types = room.types || ['spore'];
+    const roomTypes = roomEnemyTypes(room);
+    const types = roomTypes.length ? roomTypes : ['spore'];
     for (let k = 0; k < enemyPool.length; k++) {
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
@@ -2037,12 +2061,12 @@
 
     if (room.kind === 'clear') {
       const safeDistance = idx === 0 ? 14 : 9;
-      for (let k = 0; k < room.enemies; k++) spawnEnemy(safeDistance);
+      for (let k = 0; k < types.length; k++) spawnEnemy(safeDistance);
       const position = campaignPosition(idx);
       showLevelIntro(
         `REGION ${position.region + 1} · LEVEL ${String(position.node).padStart(2, '0')} / 08`,
         room.name,
-        `敌人 ${room.enemies} · 清除后开启传送门`
+        `敌人 ${types.length} · 清除后开启传送门`
       );
     } else {
       spawnBoss(room.boss);
