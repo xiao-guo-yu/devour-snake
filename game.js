@@ -77,11 +77,13 @@
     mummy: {
       hp: 1, speed: 1.2, contactDamage: 2, contactCooldown: 1.3,
       contactRadius: 0.74, retreatSpeedMul: 0.38,
+      eyeGlowCooldown: 6, eyeInvulnDuration: 2,
     },
     anubis: {
       hp: 1, speed: 1.35, contactDamage: 2, contactCooldown: 1.2,
       contactRadius: 0.76, retreatSpeedMul: 0.4,
       shootCooldown: 5.5, shootRange: 24, projectileCount: 2, projectileSpread: 0.16,
+      staffGlow: true, pelletAbsorbHalfSize: 2,
     },
     magmaSlime: {
       hp: 1, contactDamage: 2, contactCooldown: 1.4, contactRadius: 0.8,
@@ -1487,6 +1489,58 @@
     enemyPool.push(mesh);
   }
 
+  // 木乃伊双眼发光与阿努比斯法杖光效，均跟随对应小怪移动。
+  const mummyEyeGeo = new THREE.CircleGeometry(0.15, 18);
+  const mummyEyes = [];
+  const anubisStaffGlowGeo = new THREE.CircleGeometry(0.34, 24);
+  const anubisStaffCoreGeo = new THREE.CircleGeometry(0.1, 16);
+  const anubisStaffs = [];
+  for (let i = 0; i < enemyPool.length; i++) {
+    const eyePair = [-0.24, 0.24].map((x) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffd84a,
+        transparent: true,
+        opacity: 0.94,
+        depthWrite: false,
+        fog: false,
+      });
+      const eye = new THREE.Mesh(mummyEyeGeo, material);
+      eye.position.set(x, 0.5, 0.07);
+      eye.visible = false;
+      enemyPool[i].add(eye);
+      return eye;
+    });
+    mummyEyes.push(eyePair);
+
+    const staffGlow = new THREE.Mesh(
+      anubisStaffGlowGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xffb42d,
+        transparent: true,
+        opacity: 0.66,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    staffGlow.position.set(-0.58, 0.26, 0.08);
+    staffGlow.visible = false;
+    enemyPool[i].add(staffGlow);
+    const staffCore = new THREE.Mesh(
+      anubisStaffCoreGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xfff0a0,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    staffCore.position.set(-0.58, 0.26, 0.1);
+    staffCore.visible = false;
+    enemyPool[i].add(staffCore);
+    anubisStaffs.push({ glow: staffGlow, core: staffCore });
+  }
+
   // ---------- 子弹 ----------
   const bulletPool = [];
   for (let i = 0; i < 40; i++) {
@@ -1914,6 +1968,10 @@
         hidden: false,
         revealTimer: 0,
         hp: enemyStats(slot.type).hp,
+        speedMul: 1,
+        eyeTimer: enemyStats(slot.type).eyeGlowCooldown || 0,
+        invulnTimer: 0,
+        staffPulse: 0,
       });
       // 复活时恢复原色/原贴图（甲虫被打灰后）
       const idx = state.enemies.indexOf(slot);
@@ -2095,6 +2153,10 @@
       enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : 1);
       state.enemies[k].type = type;
       state.enemies[k].hp = enemyStats(type).hp;
+      state.enemies[k].speedMul = 1;
+      state.enemies[k].eyeTimer = enemyStats(type).eyeGlowCooldown || 0;
+      state.enemies[k].invulnTimer = 0;
+      state.enemies[k].staffPulse = 0;
     }
 
     if (room.kind === 'clear') {
@@ -2116,6 +2178,7 @@
   function spawnBoss(kind = 'rootcoil') {
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
+    const isRootcoil = !isPharaoh && !isColossus;
     const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
     const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
@@ -2123,7 +2186,10 @@
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isPharaoh ? 0.95 : 1),
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isPharaoh ? 0.95 : 2),
+      bulletHitRadius: isRootcoil ? 4.6 : 2.3,
+      orbHitRadius: isRootcoil ? 5.2 : 2.6,
+      contactRadius: isRootcoil ? 4.8 : 2.5,
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
@@ -2677,6 +2743,67 @@
     }
   }
 
+  function updateMummyAbility(e, dt) {
+    const stats = enemyStats(e.type);
+    if (e.eyeTimer === undefined) e.eyeTimer = stats.eyeGlowCooldown;
+    if (e.invulnTimer > 0) {
+      e.invulnTimer = Math.max(0, e.invulnTimer - dt);
+      if (e.invulnTimer === 0) e.eyeTimer = stats.eyeGlowCooldown;
+    } else {
+      e.eyeTimer -= dt;
+      if (e.eyeTimer <= 0) {
+        e.invulnTimer = stats.eyeInvulnDuration;
+        e.eyeTimer = stats.eyeGlowCooldown;
+      }
+    }
+  }
+
+  function updateEnemyAbilityVisuals(e, mesh, index, dt) {
+    const eyes = mummyEyes[index];
+    const eyesActive = e.type === 'mummy' && e.invulnTimer > 0;
+    for (const eye of eyes) {
+      eye.visible = eyesActive;
+      if (eyesActive) {
+        const pulse = 1 + Math.sin(state.time * 10 + index) * 0.16;
+        eye.scale.setScalar(pulse);
+        eye.material.opacity = 0.72 + Math.sin(state.time * 14 + index) * 0.2;
+      }
+    }
+
+    const staff = anubisStaffs[index];
+    const staffActive = e.type === 'anubis';
+    staff.glow.visible = staffActive;
+    staff.core.visible = staffActive;
+    e.staffPulse = Math.max(0, (e.staffPulse || 0) - dt);
+    if (staffActive) {
+      const pulse = 1 + Math.sin(state.time * 6 + index) * 0.12 + (e.staffPulse > 0 ? 0.32 : 0);
+      staff.glow.scale.setScalar(pulse);
+      staff.core.scale.setScalar(1 + Math.sin(state.time * 9 + index) * 0.08);
+      staff.glow.material.opacity = 0.46 + Math.sin(state.time * 5 + index) * 0.16 +
+        (e.staffPulse > 0 ? 0.16 : 0);
+      staff.core.material.opacity = 0.88;
+    }
+  }
+
+  function absorbPelletsNearAnubis(e) {
+    const stats = enemyStats(e.type);
+    const half = stats.pelletAbsorbHalfSize;
+    if (!half) return;
+    let absorbed = 0;
+    for (let k = state.pellets.length - 1; k >= 0; k--) {
+      const pellet = state.pellets[k];
+      if (Math.abs(pellet.i - e.i) <= half && Math.abs(pellet.j - e.j) <= half) {
+        state.pellets.splice(k, 1);
+        absorbed += 1;
+      }
+    }
+    if (absorbed > 0) e.staffPulse = 0.45;
+  }
+
+  function isEnemyInvulnerable(e) {
+    return e.type === 'mummy' && e.invulnTimer > 0;
+  }
+
   function updateEnemies(dt) {
     const hp = headPosition(_tmpA).clone();
     const spawnLocked = state.spawnGrace > 0;
@@ -2691,6 +2818,9 @@
         mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
         continue;
       }
+
+      if (e.type === 'mummy') updateMummyAbility(e, dt);
+      updateEnemyAbilityVisuals(e, mesh, k, dt);
 
       const dx = hp.x - e.x;
       const dz = hp.z - e.z;
@@ -2725,6 +2855,7 @@
       }
       e.x = nx; e.z = nz;
       e.i = Math.round(nx + HALF); e.j = Math.round(nz + HALF);
+      if (e.type === 'anubis') absorbPelletsNearAnubis(e);
 
       if (e.type === 'obsidianBeetle') {
         updateObsidianBeetle(e, mesh, nx, nz, dt);
@@ -3025,10 +3156,11 @@
 
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.2) * 0.04;
-    bossMesh.scale.setScalar(1 + Math.sin(state.time * 2.6) * 0.03);
+    const baseScale = b.renderScale || 1;
+    bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 2.6) * 0.03 * baseScale);
 
     if (b.cool > 0) b.cool -= dt;
-    if (bodyDistanceSq(b.x, b.z) < 2.5 * 2.5 && b.cool <= 0) {
+    if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
       b.cool = 1.6;
       damage(2);
       if (state.over) return;
@@ -3150,6 +3282,7 @@
     const cj = Math.round(z + HALF);
     for (const en of state.enemies) {
       if (!en.alive) continue;
+      if (isEnemyInvulnerable(en)) continue;
       if (Math.abs(en.i - ci) <= 1 && Math.abs(en.j - cj) <= 1) {
         en.alive = false;
         state.kills += 1;
@@ -3194,7 +3327,7 @@
       }
       // 打 Boss 也有效
       if (!boom && state.boss && state.boss.alive &&
-        Math.hypot(state.boss.x - o.x, state.boss.z - o.z) < 2.6) {
+        Math.hypot(state.boss.x - o.x, state.boss.z - o.z) < state.boss.orbHitRadius) {
         boom = true;
         o.boomX = state.boss.x;
         o.boomZ = state.boss.z;
@@ -3329,6 +3462,10 @@
           const en = state.enemies[e];
           if (!en.alive) continue;
           if (Math.hypot(en.x - b.x, en.z - b.z) < ENEMY_HIT_RADIUS) {
+            if (isEnemyInvulnerable(en)) {
+              dead = true;
+              break;
+            }
             if (en.hp > 1) {
               en.hp -= 1; // 圣甲虫壳硬，需要两发
               // 翅膀被打灰：第一发后换成破损贴图
@@ -3352,7 +3489,7 @@
 
       // 命中 Boss
       if (!dead && state.phase === 'boss' && state.boss && state.boss.alive) {
-        if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < 2.3) {
+        if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < state.boss.bulletHitRadius) {
           state.boss.hp -= state.shotDamage;
           state.score += 10;
           updateHud();
