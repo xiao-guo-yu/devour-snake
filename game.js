@@ -9,7 +9,7 @@
   const N = 45;
   const HALF = (N - 1) / 2;
   const STEP = 0.12;
-  const START_LEN = 3;
+  const START_LEN = 5;
   const MAX_BODY = 80;
   const SHOOT_COOLDOWN = 0.14;
   const BULLET_SPEED = 18;
@@ -2117,7 +2117,7 @@
         startRoomGate.visible = true;
       }
     } else {
-      const keep = Math.max(START_LEN, state.cells.length || START_LEN);
+      const keep = START_LEN;
       state.cells.length = 0;
       state.cells.push({ i: SPAWN_DOOR_CELL.i, j: SPAWN_DOOR_CELL.j });
       state.dir = { i: 0, j: -1 };
@@ -3683,14 +3683,7 @@
     state.enemies = Array.from({ length: 24 }, () => ({ alive: false, i: 0, j: 0, x: 0, z: 0, cool: 0, bob: 0 }));
 
     el.overlay.classList.remove('show');
-    // 调试直跳时给一点体长，方便测试后面的关卡
     const safeStartLevel = Math.max(0, Math.min(ROOM_COUNT - 1, Number(startLevelIndex) || 0));
-    if (safeStartLevel > 0) {
-      while (state.cells.length < 12) {
-        const tail = state.cells[state.cells.length - 1];
-        state.cells.push({ i: tail.i, j: tail.j });
-      }
-    }
     startLevel(safeStartLevel);
   }
 
