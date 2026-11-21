@@ -222,7 +222,7 @@
 
   function refreshBest() {
     try {
-      const best = Number(window.localStorage.getItem('devour-best') || 0);
+      const best = Number(window.localStorage.getItem('devour-best-v2') || 0);
       document.getElementById('stBest').textContent = String(best);
     } catch (err) {
       /* localStorage may be unavailable when opened as a local file. */
@@ -311,7 +311,7 @@
   });
 
   try {
-    const best = Number(window.localStorage.getItem('devour-best') || 0);
+    const best = Number(window.localStorage.getItem('devour-best-v2') || 0);
     document.getElementById('stBest').textContent = String(best);
   } catch (err) {
     /* file:// 下可能禁用 localStorage，忽略 */

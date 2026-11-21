@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'devour-campaign-v1';
+  const STORAGE_KEY = 'devour-campaign-v2';
   const REGIONS = [
     {
       id: 'green',
@@ -97,7 +97,7 @@
 
   function emptyProgress() {
     return {
-      version: 1,
+      version: 2,
       lastRegion: 0,
       regions: Object.fromEntries(REGIONS.map((region) => [region.id, {}])),
     };

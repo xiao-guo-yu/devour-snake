@@ -3844,7 +3844,7 @@
 
   function saveBest() {
     try {
-      const key = 'devour-best';
+      const key = 'devour-best-v2';
       const best = Math.max(Number(window.localStorage.getItem(key) || 0), state.score);
       window.localStorage.setItem(key, String(best));
     } catch (err) {

@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'devour-skills-v1';
+  const STORAGE_KEY = 'devour-skills-v2';
   const SKILLS = {
     green: {
       id: 'green',
@@ -39,7 +39,7 @@
 
   function freshData() {
     return {
-      version: 1,
+      version: 2,
       unlocked: { green: false, yellow: false, red: false },
       equipped: { e: null, q: null },
     };
