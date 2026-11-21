@@ -14,7 +14,7 @@
   const SHOOT_COOLDOWN = 0.14;
   const BULLET_SPEED = 18;
   const INVULN = 0.8;
-  const BOSS_HP = 140;
+  const BOSS_HP = 280;
   const BOSS_SPEED = 1.0;
   const WISP_RENDER_SCALE = 1.45;
   const PLAYER_BULLET_RADIUS = 0.16;
