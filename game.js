@@ -1926,6 +1926,14 @@
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
 
+  function showResultRating(stars, elapsed) {
+    const safeStars = Math.max(0, Math.min(3, Math.floor(stars)));
+    el.ovscore.textContent = `${'★'.repeat(safeStars)}${'☆'.repeat(3 - safeStars)}`;
+    if (el.ovscore.setAttribute) el.ovscore.setAttribute('aria-label', `${safeStars} 星`);
+    el.ovscore.classList.add('rating-stars');
+    el.ovtime.textContent = `用时 ${formatLevelTime(elapsed)}`;
+  }
+
   function randomFreeCell() {
     for (let tries = 0; tries < 400; tries++) {
       const i = randInt(N), j = randInt(N);
@@ -3709,8 +3717,7 @@
     saveBest();
     el.ovtitle.textContent = '被吞掉了';
     el.ovsub.textContent = reason;
-    el.ovscore.textContent = `${state.score} 分`;
-    el.ovtime.textContent = `存活 ${formatDuration(state.time)}`;
+    showResultRating(0, state.levelTime);
     const position = campaignPosition(state.level);
     el.ovdetail.textContent = `抵达 ${position.region + 1}-${position.node} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
     el.overlay.classList.add('show');
@@ -3721,8 +3728,8 @@
     saveBest();
     el.ovtitle.textContent = '通关';
     el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老与熔岩巨像，三座遗迹都成了你的巢。';
-    el.ovscore.textContent = `${state.score} 分`;
-    el.ovtime.textContent = `存活 ${formatDuration(state.time)}`;
+    const rating = evaluateLevelStars(state.cells.length, state.levelTime);
+    showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
     el.overlay.classList.add('show');
   }
