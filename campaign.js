@@ -74,7 +74,7 @@
     { x: 66, y: 73 },
     { x: 79, y: 53 },
     { x: 91, y: 70 },
-    { x: 73, y: 22 },
+    { x: 50, y: 22 },
   ];
 
   const campaignScreen = document.getElementById('campaignScreen');
