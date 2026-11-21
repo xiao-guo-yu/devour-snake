@@ -211,6 +211,64 @@
     letter-spacing: .12em;
     color: rgba(190,187,168,.76);
   }
+  #skillHud {
+    top: 112px;
+    right: 24px;
+    width: min(250px, calc(100vw - 48px));
+    padding: 10px;
+  }
+  #skillHud[hidden] { display: none !important; }
+  .skill-hud-item {
+    --skill-color: #68e7b8;
+    position: relative;
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 38px;
+    padding: 5px 7px;
+    border-top: 1px solid rgba(168,124,75,.13);
+  }
+  .skill-hud-item:first-child { border-top: 0; }
+  .skill-hud-item[hidden] { display: none !important; }
+  .skill-hud-orb {
+    width: 25px;
+    height: 25px;
+    border: 1px solid color-mix(in srgb, var(--skill-color) 68%, white);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 28%, #fff 0 5%, var(--skill-color) 23%, rgba(0,0,0,.86) 78%);
+    box-shadow: 0 0 13px color-mix(in srgb, var(--skill-color) 42%, transparent);
+  }
+  .skill-hud-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .skill-hud-copy b {
+    overflow: hidden;
+    color: #ece3c8;
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .skill-hud-copy small {
+    color: #778478;
+    font-size: 8px;
+    letter-spacing: .08em;
+  }
+  .skill-hud-state {
+    color: var(--skill-color);
+    font: 10px/1.2 Georgia, serif;
+    letter-spacing: .05em;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .skill-hud-item.is-cooling .skill-hud-orb { filter: saturate(.32) brightness(.7); }
   #gameMenu {
     position: fixed;
     top: 67px;
@@ -650,9 +708,9 @@
 
   /* Settings */
   .settings-screen {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    z-index: 9;
+    z-index: 60;
     display: grid;
     place-items: center;
     padding: 24px;
@@ -664,7 +722,9 @@
   .settings-screen[hidden] { display: none !important; }
   .settings-card {
     position: relative;
-    width: min(520px, calc(100vw - 36px));
+    width: min(760px, calc(100vw - 36px));
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
     padding: 38px 44px 34px;
     border: 1px solid rgba(185,146,81,.5);
     background:
@@ -803,6 +863,179 @@
     font-size: 10px;
     letter-spacing: .04em;
   }
+  .settings-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 24px;
+    border-bottom: 1px solid rgba(143,114,72,.2);
+  }
+  .settings-tab {
+    position: relative;
+    min-width: 96px;
+    min-height: 39px;
+    padding: 0 18px;
+    border: 0;
+    background: transparent;
+    color: #777f73;
+    font-family: var(--display);
+    font-size: 16px;
+    letter-spacing: .12em;
+    cursor: pointer;
+  }
+  .settings-tab::after {
+    content: "";
+    position: absolute;
+    right: 17px;
+    bottom: -1px;
+    left: 17px;
+    height: 1px;
+    background: transparent;
+    box-shadow: none;
+  }
+  .settings-tab:hover,
+  .settings-tab:focus-visible,
+  .settings-tab.is-active {
+    outline: 0;
+    color: #f1d58f;
+  }
+  .settings-tab.is-active::after {
+    background: #d6b46e;
+    box-shadow: 0 0 12px rgba(214,180,110,.45);
+  }
+  .settings-panel[hidden] { display: none !important; }
+  .skill-settings-intro {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 16px;
+    color: #858d81;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+  .skill-settings-intro b {
+    color: #e5c983;
+    font-weight: 500;
+  }
+  #skillSettingsList {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 11px;
+  }
+  .skill-card {
+    --skill-color: #68e7b8;
+    position: relative;
+    display: flex;
+    min-height: 278px;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 15px 14px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--skill-color) 26%, rgba(168,124,75,.28));
+    background:
+      radial-gradient(circle at 50% 15%, color-mix(in srgb, var(--skill-color) 12%, transparent), transparent 36%),
+      linear-gradient(180deg, rgba(12,25,17,.82), rgba(3,10,6,.9));
+    text-align: center;
+  }
+  .skill-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18%;
+    width: 64%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--skill-color), transparent);
+    opacity: .38;
+  }
+  .skill-card.is-equipped {
+    border-color: color-mix(in srgb, var(--skill-color) 72%, #d7bc78);
+    box-shadow: inset 0 0 30px color-mix(in srgb, var(--skill-color) 10%, transparent);
+  }
+  .skill-card.is-locked {
+    filter: saturate(.22);
+    opacity: .58;
+  }
+  .skill-orb {
+    position: relative;
+    width: 76px;
+    height: 76px;
+    margin-bottom: 15px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 33% 27%, #fff 0 3%, color-mix(in srgb, var(--skill-color) 78%, white) 10%, var(--skill-color) 28%, rgba(6,15,10,.94) 72%);
+    box-shadow:
+      inset -9px -12px 18px rgba(0,0,0,.55),
+      0 0 0 6px color-mix(in srgb, var(--skill-color) 8%, transparent),
+      0 0 24px color-mix(in srgb, var(--skill-color) 34%, transparent);
+  }
+  .skill-orb::before,
+  .skill-orb::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border: 1px solid color-mix(in srgb, var(--skill-color) 30%, transparent);
+    border-radius: 50%;
+    transform: rotate(28deg) scaleY(.4);
+  }
+  .skill-orb::after { transform: rotate(-38deg) scaleY(.55); }
+  .skill-orb i {
+    position: absolute;
+    inset: 30px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 14px var(--skill-color);
+  }
+  .skill-card-copy { flex: 1; }
+  .skill-card-kicker {
+    color: color-mix(in srgb, var(--skill-color) 72%, #a8a68e);
+    font: 8px/1 Georgia, serif;
+    letter-spacing: .17em;
+  }
+  .skill-card h3 {
+    margin: 7px 0 8px;
+    color: #ead7a5;
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: .09em;
+  }
+  .skill-card p {
+    margin: 0;
+    color: #858d81;
+    font-size: 10px;
+    line-height: 1.65;
+  }
+  .skill-card-state {
+    width: 100%;
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(143,114,72,.16);
+  }
+  .skill-status {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--skill-color);
+    font-size: 9px;
+    letter-spacing: .12em;
+  }
+  .skill-install {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid color-mix(in srgb, var(--skill-color) 42%, rgba(168,124,75,.36));
+    background: color-mix(in srgb, var(--skill-color) 6%, rgba(3,9,6,.76));
+    color: #ded5ba;
+    font-family: var(--ui);
+    font-size: 10px;
+    letter-spacing: .08em;
+    cursor: pointer;
+  }
+  .skill-install:hover,
+  .skill-install:focus-visible {
+    outline: 0;
+    border-color: var(--skill-color);
+    color: #fff7dd;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--skill-color) 17%, transparent);
+  }
+  .skill-install:disabled { cursor: default; color: #6d746b; }
   body.settings-open #settingsScreen { display: grid; }
 
   /* ---------- 战役区域与关卡地图 ---------- */
@@ -1582,7 +1815,8 @@
   body.campaign-open #stats,
   body.campaign-open #bossbar,
   body.campaign-open #mode,
-  body.campaign-open #help { display: none !important; }
+  body.campaign-open #help,
+  body.campaign-open #skillHud { display: none !important; }
 
   #touchControls {
     display: none;
@@ -1607,7 +1841,8 @@
   }
   .touch-key,
   .touch-action,
-  .touch-fire {
+  .touch-fire,
+  .touch-shield {
     pointer-events: auto;
     touch-action: none;
     -webkit-user-select: none;
@@ -1625,7 +1860,8 @@
   }
   .touch-key:active,
   .touch-action:active,
-  .touch-fire:active {
+  .touch-fire:active,
+  .touch-shield:active {
     color: var(--jade-pale, #c6ffeb);
     border-color: var(--jade);
     background: rgba(23,91,70,.88);
@@ -1657,7 +1893,8 @@
     gap: 11px;
   }
   .touch-action,
-  .touch-fire {
+  .touch-fire,
+  .touch-shield {
     border-radius: 50%;
     display: flex;
     flex-direction: column;
@@ -1668,7 +1905,8 @@
     font-size: 14px;
   }
   .touch-action small,
-  .touch-fire small {
+  .touch-fire small,
+  .touch-shield small {
     margin-bottom: 4px;
     color: rgba(193,189,168,.6);
     font-size: 8px;
@@ -1678,6 +1916,12 @@
     width: 62px;
     height: 62px;
     border-color: rgba(229,189,104,.32);
+  }
+  .touch-shield {
+    width: 58px;
+    height: 58px;
+    border-color: rgba(154,211,255,.42);
+    color: #dff4ff;
   }
   .touch-fire {
     width: 82px;
@@ -1861,6 +2105,16 @@
       line-height: 1.5;
       text-align: right;
     }
+    #skillHud {
+      top: calc(max(10px, env(safe-area-inset-top)) + 94px);
+      right: max(10px, env(safe-area-inset-right));
+      width: 174px;
+      padding: 7px;
+    }
+    .skill-hud-item { grid-template-columns: 24px 1fr; min-height: 33px; gap: 7px; padding: 4px 3px; }
+    .skill-hud-orb { width: 21px; height: 21px; }
+    .skill-hud-copy b { font-size: 10px; }
+    .skill-hud-state { grid-column: 2; font-size: 8px; text-align: left; }
     #gameMenu {
       top: calc(max(10px, env(safe-area-inset-top)) + 42px);
       right: max(10px, env(safe-area-inset-right));
@@ -1959,11 +2213,27 @@
     .settings-screen { padding: 17px; }
     .settings-card {
       width: 100%;
+      max-height: calc(100dvh - 34px);
+      overflow-y: auto;
       padding: 31px 24px 26px;
     }
     .settings-close { top: 7px; right: 7px; }
     .settings-card h2 { font-size: 31px; }
     .settings-copy { margin-bottom: 22px; font-size: 11px; }
+    .settings-tabs { margin-bottom: 19px; }
+    .settings-tab { min-width: 82px; padding: 0 11px; font-size: 15px; }
+    #skillSettingsList { grid-template-columns: 1fr; }
+    .skill-settings-intro { margin-bottom: 12px; }
+    .skill-card {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      min-height: 0;
+      column-gap: 14px;
+      padding: 15px;
+      text-align: left;
+    }
+    .skill-orb { grid-row: 1 / span 2; width: 60px; height: 60px; margin: 8px auto 0; }
+    .skill-card-state { grid-column: 1 / -1; margin-top: 10px; }
     .volume-row { font-size: 18px; }
     .volume-hint { margin-top: 17px; }
   }
@@ -2015,9 +2285,21 @@
 </div>
 
 <div class="hud panel" id="mode">视角：全图（F 切换）</div>
+<div class="hud panel" id="skillHud" hidden aria-label="已安装技能">
+  <div class="skill-hud-item" id="eSkillHud" style="--skill-color:#68e7b8" hidden>
+    <span class="skill-hud-orb" aria-hidden="true"></span>
+    <span class="skill-hud-copy"><b id="eSkillName">E · 翠核疾射</b><small id="eSkillDesc">消耗 1 格 · 普通射击</small></span>
+    <span class="skill-hud-state" id="eSkillState">就绪</span>
+  </div>
+  <div class="skill-hud-item" id="qSkillHud" style="--skill-color:#f0c66c" hidden>
+    <span class="skill-hud-orb" aria-hidden="true"></span>
+    <span class="skill-hud-copy"><b id="qSkillName">Q · 金核壁垒</b><small id="qSkillDesc">护盾 2 秒 · 冷却 5 秒</small></span>
+    <span class="skill-hud-state" id="qSkillState">就绪</span>
+  </div>
+</div>
 <div class="hud panel" id="help">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键 移动（8 方向） ·
-  <kbd>空格</kbd> 射击（耗 1 节） · <kbd>E</kbd> 能量球（耗 3 节 · 需 &gt; 4 节） ·
+  <kbd>空格</kbd> 射击（耗 1 节） · <kbd>E</kbd> 已装备核心技能 · <kbd>Q</kbd> 金核护盾 ·
   <kbd>F</kbd> 视角 · <kbd>P</kbd> 暂停 · <kbd>R</kbd> 重开
 </div>
 
@@ -2030,7 +2312,8 @@
     <button class="touch-key touch-down" data-key="s" aria-label="向下">▼</button>
   </div>
   <div class="touch-actions">
-    <button class="touch-action" data-key="e"><small>消耗 3 节</small>能量</button>
+    <button class="touch-action" data-key="e"><small>核心 E</small>射击</button>
+    <button class="touch-shield" data-key="q"><small>消耗 1</small>护盾</button>
     <button class="touch-fire" data-key=" "><small>消耗 1 节</small>射击</button>
   </div>
 </div>
@@ -2050,6 +2333,7 @@
     <p id="ovdetail"></p>
     <p class="hint">按 <b>R</b> 重新开始</p>
     <div class="overlay-actions">
+      <button class="menu-action" id="btnOverlaySettings" type="button">技能设置</button>
       <button class="menu-action" id="btnOverlayRestart" type="button">重新开始</button>
       <button class="menu-action" id="btnOverlayMap" type="button">关卡地图</button>
       <button class="menu-action" id="btnOverlayMenu" type="button">回到主菜单</button>
@@ -2130,33 +2414,53 @@
     </div>
   </div>
   <div class="st-footer">
-    <span>WASD / 方向键 移动　·　空格 射击（消耗 1 节）　·　F 切换视角</span>
+    <span>WASD / 方向键 移动　·　空格 射击　·　E / Q 使用已安装核心技能　·　F 切换视角</span>
     <span>v0.1 prototype</span>
     <span>最高分 <b id="stBest">0</b></span>
   </div>
-  <section id="settingsScreen" class="settings-screen" role="dialog" aria-modal="true"
+</div>
+<section id="settingsScreen" class="settings-screen" role="dialog" aria-modal="true"
     aria-labelledby="settingsTitle" aria-hidden="true" hidden>
     <div class="settings-card">
       <button class="settings-close" id="btnSettingsClose" type="button" aria-label="关闭设置">×</button>
-      <span class="settings-kicker">AUDIO RITE</span>
+      <span class="settings-kicker">RITES &amp; RELICS</span>
       <h2 id="settingsTitle">设置</h2>
-      <p class="settings-copy">菜单与关卡会自动切换配乐，音量设置会保存在本机。</p>
-      <div class="volume-row">
-        <label for="musicVolumeSlider">音乐大小</label>
-        <output id="musicVolumeValue" for="musicVolumeSlider" aria-live="polite">55%</output>
+      <p class="settings-copy">管理配乐，并查看、安装从 Boss 核心中吞噬而来的技能。</p>
+      <div class="settings-tabs" role="tablist" aria-label="设置分类">
+        <button class="settings-tab is-active" id="settingsTabAudio" type="button"
+          role="tab" aria-selected="true" aria-controls="settingsPanelAudio"
+          data-settings-tab="audio">音频</button>
+        <button class="settings-tab" id="settingsTabSkills" type="button"
+          role="tab" aria-selected="false" aria-controls="settingsPanelSkills"
+          data-settings-tab="skills">技能</button>
       </div>
-      <input id="musicVolumeSlider" class="volume-slider" type="range" min="0" max="100"
-        step="5" value="55" aria-describedby="volumeHint">
-      <div class="volume-scale" aria-hidden="true"><span>静音</span><span>中等</span><span>响亮</span></div>
-      <p class="volume-hint" id="volumeHint">建议先使用中等音量试听。</p>
+      <section class="settings-panel" id="settingsPanelAudio" role="tabpanel"
+        aria-labelledby="settingsTabAudio" data-settings-panel="audio">
+        <div class="volume-row">
+          <label for="musicVolumeSlider">音乐大小</label>
+          <output id="musicVolumeValue" for="musicVolumeSlider" aria-live="polite">55%</output>
+        </div>
+        <input id="musicVolumeSlider" class="volume-slider" type="range" min="0" max="100"
+          step="5" value="55" aria-describedby="volumeHint">
+        <div class="volume-scale" aria-hidden="true"><span>静音</span><span>中等</span><span>响亮</span></div>
+        <p class="volume-hint" id="volumeHint">建议先使用中等音量试听。</p>
+      </section>
+      <section class="settings-panel" id="settingsPanelSkills" role="tabpanel"
+        aria-labelledby="settingsTabSkills" data-settings-panel="skills" hidden>
+        <div class="skill-settings-intro">
+          <span>击败 Boss 后吞噬场地中央的发光核心。绿色与红色共用 <b>E</b> 槽，黄色独占 <b>Q</b> 槽。</span>
+          <span>新核心会<b>自动安装</b></span>
+        </div>
+        <div id="skillSettingsList" aria-live="polite"></div>
+      </section>
     </div>
-  </section>
-</div>
+</section>
 
 <script src="vendor/three.min.js?v=20261117"></script>
-<script src="game.js?v=20261121-resultstars1"></script>
+<script src="skills.js?v=20261121-core2"></script>
+<script src="game.js?v=20261121-core2"></script>
 <script src="campaign.js?v=20261121-layout5"></script>
-<script src="audio.js?v=20261120-audio1"></script>
-<script src="start.js?v=20261120-audio1"></script>
+<script src="audio.js?v=20261121-settings2"></script>
+<script src="start.js?v=20261121-core2"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* DEVOUR — 七小关 + Boss 战役原型
  * 45×45 格 · 8 方向格点移动 · 体长 = HP · 射击消耗体节
- * 流程：清光敌人 → 门开 → 下一关 ×3 → Boss → 三张技能卡（射击选择）→ 传送门通关
+ * 流程：清光敌人 → 门开 → 下一关 ×7 → Boss → 吞噬核心获得技能 → 传送门通关
  */
 (() => {
   'use strict';
@@ -19,6 +19,11 @@
   const WISP_RENDER_SCALE = 1.45;
   const PLAYER_BULLET_RADIUS = 0.16;
   const ENEMY_HIT_RADIUS = 1.5;
+  const SHIELD_DURATION = 2;
+  const SHIELD_COOLDOWN = 5;
+  const FIRE_BULLET_COST = 2;
+  const FIRE_BULLET_DAMAGE = 2;
+  const FIRE_BULLET_SCALE = 1.9;
   const GHOST_BULLET_RADIUS = 0.56;
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
@@ -1433,6 +1438,39 @@
   outline.frustumCulled = false;
   scene.add(outline);
 
+  const shieldPos = new Float32Array(MAX_PTS * 2 * 3);
+  const shieldGeo = new THREE.BufferGeometry();
+  shieldGeo.setAttribute('position', new THREE.BufferAttribute(shieldPos, 3));
+  shieldGeo.setAttribute('normal', new THREE.BufferAttribute(ribbonNrm.slice(), 3));
+  shieldGeo.setIndex(ribIdx.slice());
+  shieldGeo.setDrawRange(0, 0);
+  const shieldRibbon = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({
+    color: 0x9ddcff,
+    transparent: true,
+    opacity: 0.27,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    fog: false,
+  }));
+  shieldRibbon.frustumCulled = false;
+  shieldRibbon.visible = false;
+  scene.add(shieldRibbon);
+
+  const shieldHalo = new THREE.Mesh(
+    new THREE.RingGeometry(0.92, 1.18, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0xb8e9ff,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  shieldHalo.rotation.x = -Math.PI / 2;
+  shieldHalo.visible = false;
+  scene.add(shieldHalo);
+
   // 尾端封口：实心圆片，保证尾巴是同色而不是透出地板
   const tailCap = new THREE.Mesh(
     new THREE.CircleGeometry(0.24, 18),
@@ -1611,28 +1649,64 @@
     hazardPool.push(mesh);
   }
 
-  // ---------- 大招：巨型能量球（2×2）+ 3×3 爆炸 ----------
-  const orbPool = [];
-  for (let i = 0; i < 3; i++) {
+  // ---------- Boss 核心奖励 ----------
+  const rewardOrbGroup = new THREE.Group();
+  const rewardShellMat = new THREE.MeshStandardMaterial({
+    color: 0x68e7b8,
+    emissive: 0x68e7b8,
+    emissiveIntensity: 1.05,
+    transparent: true,
+    opacity: 0.72,
+    roughness: 0.24,
+    depthWrite: false,
+  });
+  const rewardShell = new THREE.Mesh(new THREE.SphereGeometry(1.0, 28, 20), rewardShellMat);
+  rewardShell.position.y = 1.0;
+  rewardOrbGroup.add(rewardShell);
+
+  const rewardCoreMat = new THREE.MeshStandardMaterial({
+    color: 0xcaffea,
+    emissive: 0x28b685,
+    emissiveIntensity: 2.4,
+    roughness: 0.2,
+  });
+  const rewardCore = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 14), rewardCoreMat);
+  rewardCore.position.y = 0.72;
+  rewardOrbGroup.add(rewardCore);
+
+  const rewardRingMat = new THREE.MeshBasicMaterial({
+    color: 0x8ef7ca,
+    transparent: true,
+    opacity: 0.68,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    fog: false,
+  });
+  const rewardRing = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.035, 8, 48), rewardRingMat);
+  rewardRing.rotation.x = Math.PI / 2;
+  rewardRing.position.y = 0.24;
+  rewardOrbGroup.add(rewardRing);
+  rewardOrbGroup.visible = false;
+  scene.add(rewardOrbGroup);
+
+  const fireBurstPool = [];
+  for (let i = 0; i < 8; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(1.0, 20, 16),
-      new THREE.MeshBasicMaterial({ color: 0x9dffe0, transparent: true, opacity: 0.92, fog: false })
-    );
-    mesh.visible = false;
-    scene.add(mesh);
-    orbPool.push(mesh);
-  }
-  const boomPool = [];
-  for (let i = 0; i < 4; i++) {
-    const mesh = new THREE.Mesh(
-      new THREE.RingGeometry(0.55, 1.0, 40),
-      new THREE.MeshBasicMaterial({ color: 0xa6ffe0, transparent: true, opacity: 0, side: THREE.DoubleSide, fog: false })
+      new THREE.RingGeometry(0.28, 1.28, 36),
+      new THREE.MeshBasicMaterial({
+        color: 0xff5a2e,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+      })
     );
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = 0.5;
+    mesh.position.y = 0.3;
     mesh.visible = false;
     scene.add(mesh);
-    boomPool.push(mesh);
+    fireBurstPool.push(mesh);
   }
 
   const bossMesh = new THREE.Group();
@@ -1761,24 +1835,12 @@
   spawnDoorGroup.visible = false;
   scene.add(spawnDoorGroup);
 
-  // ---------- 技能卡 ----------
-  const CARD_DEFS = [
-    { type: 'agility', color: 0x4fd1e0, name: '疾鳞', desc: '射击间隔 -35%' },
-    { type: 'survival', color: 0x5fd18a, name: '再生', desc: '立刻 +6 节' },
-    { type: 'strength', color: 0xe4572e, name: '巨牙', desc: '子弹伤害 ×1.7' },
-  ];
-  const cardMeshes = [];
-  for (let i = 0; i < 3; i++) {
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.15, 0.14, 1.65),
-      new THREE.MeshStandardMaterial({
-        color: CARD_DEFS[i].color, emissive: CARD_DEFS[i].color, emissiveIntensity: 0.55, roughness: 0.4,
-      })
-    );
-    mesh.visible = false;
-    scene.add(mesh);
-    cardMeshes.push(mesh);
-  }
+  // ---------- Boss 核心奖励 ----------
+  const SKILL_REWARDS = {
+    rootcoil: { id: 'green', color: 0x68e7b8, core: 0xcaffea, emissive: 0x28b685 },
+    pharaoh: { id: 'yellow', color: 0xf0c66c, core: 0xfff0b8, emissive: 0xc28d24 },
+    magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
+  };
 
   // ---------- 状态 ----------
   const state = {
@@ -1801,9 +1863,11 @@
     hazards: [],
     lavaBalls: [],
     lavaPools: [],
-    orbs: [],
-    booms: [],
-    energyCd: 0,
+    skillOrb: null,
+    fireBursts: [],
+    shieldTimer: 0,
+    shieldCooldown: 0,
+    shieldFlash: 0,
     roomActive: false,
     roomTimer: 0,
     spawnEmerging: false,
@@ -1815,7 +1879,6 @@
     boss: null,
     prevTail: null,
     hitFlash: 0,
-    cards: [],
     doorOpen: false,
     pelletsOff: false,
     time: 0,
@@ -1845,6 +1908,15 @@
     bfill: document.getElementById('bfill'),
     bname: document.getElementById('bname'),
     mode: document.getElementById('mode'),
+    skillHud: document.getElementById('skillHud'),
+    eSkillHud: document.getElementById('eSkillHud'),
+    eSkillName: document.getElementById('eSkillName'),
+    eSkillDesc: document.getElementById('eSkillDesc'),
+    eSkillState: document.getElementById('eSkillState'),
+    qSkillHud: document.getElementById('qSkillHud'),
+    qSkillName: document.getElementById('qSkillName'),
+    qSkillDesc: document.getElementById('qSkillDesc'),
+    qSkillState: document.getElementById('qSkillState'),
     toast: document.getElementById('toast'),
     toasttext: document.getElementById('toasttext'),
     toastbig: document.getElementById('toastbig'),
@@ -2048,11 +2120,50 @@
     } else if (state.phase === 'boss') {
       obj = '击败 Boss';
     } else if (state.phase === 'pick') {
-      obj = '射击一张技能卡';
+      obj = '吞噬发光核心，获得技能';
     } else if (state.phase === 'exit') {
       obj = '进入传送门，结束本局';
     }
     el.objective.textContent = obj;
+    updateSkillHud();
+  }
+
+  let lastSkillHudSignature = '';
+  function activeSkillId(slot) {
+    return window.DevourSkills?.getEquipped?.(slot) || null;
+  }
+
+  function updateSkillHud() {
+    if (!el.skillHud) return;
+    const eSkill = activeSkillId('e');
+    const qSkill = activeSkillId('q');
+    const shieldText = state.shieldTimer > 0
+      ? `${state.shieldTimer.toFixed(1)}s`
+      : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
+    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}`;
+    if (signature === lastSkillHudSignature) return;
+    lastSkillHudSignature = signature;
+
+    el.skillHud.hidden = !eSkill && !qSkill;
+    el.eSkillHud.hidden = !eSkill;
+    el.qSkillHud.hidden = !qSkill;
+
+    if (eSkill) {
+      const red = eSkill === 'red';
+      el.eSkillName.textContent = red ? 'E · 赤核烈焰' : 'E · 翠核疾射';
+      el.eSkillDesc.textContent = red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 1 格 · 普通射击';
+      el.eSkillState.textContent = state.cells.length > (red ? 3 : 2) ? '就绪' : '身体不足';
+      if (el.eSkillHud.style?.setProperty) {
+        el.eSkillHud.style.setProperty('--skill-color', red ? '#ff6542' : '#68e7b8');
+      }
+    }
+
+    if (qSkill) {
+      el.qSkillName.textContent = 'Q · 金核壁垒';
+      el.qSkillDesc.textContent = '护盾 2 秒 · 冷却 5 秒';
+      el.qSkillState.textContent = shieldText;
+      el.qSkillHud.classList.toggle('is-cooling', state.shieldCooldown > 0 || state.shieldTimer > 0);
+    }
   }
 
   // ---------- 关卡 ----------
@@ -2090,13 +2201,16 @@
     state.lavaBalls = [];
     (state.lavaPools || []).forEach((p) => { p.mesh.visible = false; });
     state.lavaPools = [];
-    (state.orbs || []).forEach((o) => { o.mesh.visible = false; });
-    state.orbs = [];
-    (state.booms || []).forEach((b) => { b.mesh.visible = false; });
-    state.booms = [];
     state.pellets.length = 0;
-    state.cards.length = 0;
-    cardMeshes.forEach((m) => { m.visible = false; });
+    state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
+    state.fireBursts.length = 0;
+    state.skillOrb = null;
+    rewardOrbGroup.visible = false;
+    state.shieldTimer = 0;
+    state.shieldCooldown = 0;
+    state.shieldFlash = 0;
+    shieldRibbon.visible = false;
+    shieldHalo.visible = false;
 
     // 温室关卡特性保留：第二关小怪更快，第三关会远程
 
@@ -2206,7 +2320,6 @@
       max: hp,
       renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isPharaoh ? 0.95 : 2),
       bulletHitRadius: isRootcoil ? 4.6 : 2.3,
-      orbHitRadius: isRootcoil ? 5.2 : 2.6,
       contactRadius: isRootcoil ? 4.8 : 2.5,
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
@@ -2239,6 +2352,7 @@
   }
 
   function bossDie() {
+    const bossKind = state.boss?.kind || 'rootcoil';
     state.boss.alive = false;
     bossMesh.visible = false;
     colossusShadow.visible = false;
@@ -2256,42 +2370,42 @@
     state.lavaBalls.length = 0;
     state.lavaPools.forEach((p) => { p.mesh.visible = false; });
     state.lavaPools.length = 0;
-    spawnCards();
+    spawnSkillOrb(bossKind);
     updateHud();
-    toast('Boss 倒下', '撞向一张技能卡即可获得');
+    toast('Boss 倒下', '吞噬场地中央的发光核心，获得技能');
   }
 
-  function spawnCards() {
-    state.cards.length = 0;
-    CARD_DEFS.forEach((def, idx) => {
-      const mesh = cardMeshes[idx];
-      mesh.visible = true;
-      state.cards.push({
-        type: def.type,
-        name: def.name,
-        desc: def.desc,
-        color: def.color,
-        mesh,
-        baseX: (idx - 1) * 3.2,
-        baseZ: 0,
-        phase: idx * 1.3,
-      });
-    });
+  function spawnSkillOrb(bossKind) {
+    const reward = SKILL_REWARDS[bossKind] || SKILL_REWARDS.rootcoil;
+    const x = cellX(BOSS_CELL.i);
+    const z = cellZ(BOSS_CELL.j);
+    rewardShellMat.color.setHex(reward.color);
+    rewardShellMat.emissive.setHex(reward.emissive);
+    rewardRingMat.color.setHex(reward.color);
+    rewardCoreMat.color.setHex(reward.core);
+    rewardCoreMat.emissive.setHex(reward.emissive);
+    rewardOrbGroup.position.set(x, 0, z);
+    rewardOrbGroup.visible = true;
+    rewardShell.scale.setScalar(1);
+    rewardRing.scale.setScalar(1);
+    state.skillOrb = { id: reward.id, bossKind, x, z, phase: 0, delay: 0.55 };
   }
 
-  function pickCard(cardIdx) {
-    const card = state.cards[cardIdx];
-    if (!card) return;
-    if (card.type === 'agility') state.shootCdMul *= 0.65;
-    if (card.type === 'survival') growBy(6);
-    if (card.type === 'strength') state.shotDamage *= 1.7;
-
-    state.cards.length = 0;
-    cardMeshes.forEach((m) => { m.visible = false; });
+  function consumeSkillOrb() {
+    if (!state.skillOrb) return false;
+    const skillId = state.skillOrb.id;
+    const skill = window.DevourSkills?.getSkill?.(skillId);
+    const firstUnlock = window.DevourSkills?.unlock?.(skillId) ?? false;
+    state.skillOrb = null;
+    rewardOrbGroup.visible = false;
     state.phase = 'exit';
     state.doorOpen = true;
     updateHud();
-    toast(`获得技能卡：${card.name}`, card.desc);
+    toast(
+      firstUnlock ? `吞噬核心：${skill?.name || '未知技能'}` : `核心已吸收：${skill?.name || '技能'}`,
+      '技能不会增加体长，可在设置 → 技能中更换装备'
+    );
+    return true;
   }
 
   // ---------- 蛇体 ----------
@@ -2352,8 +2466,12 @@
     return best;
   }
 
-  function damage(n) {
+  function damage(n, source = 'generic') {
     if (state.over || state.invuln > 0) return;
+    if (state.shieldTimer > 0 && (source === 'contact' || source === 'projectile')) {
+      state.shieldFlash = 0.16;
+      return;
+    }
     state.prevTail = null;
     state.hitFlash = 0.18;
     for (let k = 0; k < n && state.cells.length > 1; k++) state.cells.pop();
@@ -2440,25 +2558,60 @@
     state.dir = d;
   }
 
-  function shoot() {
+  function shoot(source = 'space') {
     if (state.over || state.paused) return;
     if (state.shootCd > 0) return;
-    if (state.cells.length <= 2) return;
+    const eSkill = source === 'e' ? activeSkillId('e') : null;
+    if (source === 'e' && !eSkill) {
+      toast('未安装 E 技能', '击败枯树或魔像后吞噬核心，并在设置中安装');
+      return;
+    }
+    const isFire = eSkill === 'red';
+    const bodyCost = isFire ? FIRE_BULLET_COST : 1;
+    if (state.cells.length <= bodyCost + 1) return;
     state.shootCd = SHOOT_COOLDOWN * state.shootCdMul;
-    state.cells.pop();
+    for (let k = 0; k < bodyCost; k++) state.cells.pop();
+    state.prevTail = null;
     const from = headPosition();
     const d = state.dir;
     const mesh = bulletPool.find((m) => !m.visible) || bulletPool[0];
     mesh.visible = true;
     mesh.position.copy(from);
+    mesh.scale.setScalar(isFire ? FIRE_BULLET_SCALE : 1);
+    mesh.material.color.setHex(isFire ? 0xffa070 : 0x9ff5d8);
+    mesh.material.emissive.setHex(isFire ? 0xff2f0b : 0x2ee6a8);
+    mesh.material.emissiveIntensity = isFire ? 2.4 : 1.6;
     state.bullets.push({
       mesh, x: from.x, z: from.z,
       vx: d.i * BULLET_SPEED, vz: d.j * BULLET_SPEED, life: 1.8,
+      fire: isFire,
+      enemyDamage: isFire ? FIRE_BULLET_DAMAGE : 1,
+      bossDamage: isFire ? state.shotDamage * 2 : state.shotDamage,
     });
     updateHud();
   }
 
+  function activateShield() {
+    if (state.over || state.paused) return;
+    if (activeSkillId('q') !== 'yellow') {
+      toast('未安装 Q 技能', '击败法老后吞噬金色核心，并在设置中安装');
+      return;
+    }
+    if (state.shieldTimer > 0 || state.shieldCooldown > 0) return;
+    if (state.cells.length <= 2) {
+      toast('无法启动金核壁垒', '至少需要 3 格身体');
+      return;
+    }
+    state.prevTail = null;
+    state.cells.pop();
+    state.shieldTimer = SHIELD_DURATION;
+    state.shieldCooldown = SHIELD_COOLDOWN;
+    updateHud();
+    toast('金核壁垒', '消耗 1 格身体 · 持续 2 秒');
+  }
+
   window.addEventListener('keydown', (e) => {
+    if (document.body.classList.contains('settings-open')) return;
     const k = e.key.toLowerCase();
     if (k === ' ' || k === 'spacebar') { e.preventDefault(); shoot(); return; }
     if (k === 'r') { resetGame(); return; }
@@ -2479,7 +2632,8 @@
       if (state.paused) showHelp();
       return;
     }
-    if (k === 'e') { e.preventDefault(); fireEnergy(); return; }
+    if (k === 'e') { e.preventDefault(); shoot('e'); return; }
+    if (k === 'q') { e.preventDefault(); activateShield(); return; }
     if (DIRS[k]) { e.preventDefault(); held.add(k); applyDir(directionFromHeld()); }
   });
 
@@ -2491,6 +2645,10 @@
   });
 
   window.addEventListener('blur', () => held.clear());
+  document.addEventListener('devour:skills-changed', () => {
+    lastSkillHudSignature = '';
+    updateSkillHud();
+  });
 
   // ---------- 更新 ----------
   function updateSnake(dt) {
@@ -2509,6 +2667,15 @@
     headPivot.rotation.y = Math.atan2(-di, -dj);
 
     updateRibbon();
+    const shieldActive = state.shieldTimer > 0;
+    shieldRibbon.visible = shieldActive;
+    shieldHalo.visible = shieldActive;
+    if (shieldActive) {
+      shieldRibbon.material.opacity = 0.2 + Math.sin(state.time * 9) * 0.05 + state.shieldFlash;
+      shieldHalo.position.set(pos.x, 0.64, pos.z);
+      shieldHalo.scale.setScalar(1 + Math.sin(state.time * 8) * 0.05);
+      shieldHalo.material.opacity = 0.42 + state.shieldFlash;
+    }
     headPivot.visible = state.invuln > 0 ? (Math.floor(state.time * 14) % 2 === 0) : true;
   }
 
@@ -2571,6 +2738,7 @@
     if (total < 0.05 || _poly.length < 2) {
       ribbonGeo.setDrawRange(0, 0);
       outlineGeo.setDrawRange(0, 0);
+      shieldGeo.setDrawRange(0, 0);
       return;
     }
     const spacing = 0.2;
@@ -2613,6 +2781,14 @@
       outlinePos[base + 4] = y - 0.05;
       outlinePos[base + 5] = _p0.z - nz * ow;
 
+      const sw = 0.72 * (0.55 + 0.45 * tailFade);
+      shieldPos[base] = _p0.x + nx * sw;
+      shieldPos[base + 1] = y + 0.09;
+      shieldPos[base + 2] = _p0.z + nz * sw;
+      shieldPos[base + 3] = _p0.x - nx * sw;
+      shieldPos[base + 4] = y + 0.09;
+      shieldPos[base + 5] = _p0.z - nz * sw;
+
       // 深浅相间的横纹
       const band = Math.floor(s / 1.5) % 2;
       const r = band ? 0.06 : 0.13;
@@ -2627,8 +2803,10 @@
     ribbonGeo.attributes.position.needsUpdate = true;
     ribbonGeo.attributes.color.needsUpdate = true;
     outlineGeo.attributes.position.needsUpdate = true;
+    shieldGeo.attributes.position.needsUpdate = true;
     ribbonGeo.setDrawRange(0, (count - 1) * 6);
     outlineGeo.setDrawRange(0, (count - 1) * 6);
+    shieldGeo.setDrawRange(0, (count - 1) * 6);
 
     // 尾端封口，跟到最后一个采样点（颜色跟随最后一节横纹）
     samplePoly(total, _p1);
@@ -2853,7 +3031,7 @@
         updateMagmaSlime(e, mesh, hp, dt);
         if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
           e.cool = stats.contactCooldown;
-          damage(stats.contactDamage);
+          damage(stats.contactDamage, 'contact');
           if (state.over) return;
         }
         continue;
@@ -2886,7 +3064,7 @@
         e.cool = stats.contactCooldown;
         e.x -= (dx / len) * 2.2;
         e.z -= (dz / len) * 2.2;
-        damage(stats.contactDamage);
+        damage(stats.contactDamage, 'contact');
         if (state.over) return;
       }
 
@@ -3026,8 +3204,9 @@
       if (!b.hit && state.invuln <= 0 &&
         bodyDistanceSq(b.x, b.z) < b.hitRadius * b.hitRadius) {
         b.hit = true;
-        damage(3);
-        toast('熔岩火球命中', '体长 -3');
+        const shielded = state.shieldTimer > 0;
+        damage(3, 'projectile');
+        if (!shielded) toast('熔岩火球命中', '体长 -3');
       }
 
       const leadX = b.x + (b.vx > 0 ? COLOSSUS_FIREBALL_WALL_RADIUS : (b.vx < 0 ? -COLOSSUS_FIREBALL_WALL_RADIUS : 0));
@@ -3053,7 +3232,7 @@
       if (!pool.hit && state.invuln <= 0 && bodyTouchesColossusPool(pool)) {
         pool.hit = true;
         state.slowTimer = Math.max(state.slowTimer, 3);
-        damage(1);
+        damage(1, 'hazard');
         toast('踩入岩浆池', '体长 -1 · 移动速度降低 3 秒');
       }
       if (pool.life <= 0) {
@@ -3180,7 +3359,7 @@
     if (b.cool > 0) b.cool -= dt;
     if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
       b.cool = 1.6;
-      damage(2);
+      damage(2, 'contact');
       if (state.over) return;
     }
 
@@ -3245,7 +3424,7 @@
         isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF)); // 木桩挡弹
       if (!dead && bodyDistanceSq(b.x, b.z) < 0.7 * 0.7) {
         dead = true;
-        damage(1);
+        damage(1, 'projectile');
       }
       if (dead) {
         b.mesh.visible = false;
@@ -3272,109 +3451,6 @@
     });
   }
 
-  // ---------- 大招：能量球 ----------
-  function fireEnergy() {
-    if (state.over || state.paused) return;
-    if (state.cells.length <= 4) {
-      toast('体长不足', '超过 4 节才能使用能量球（消耗 3 节）');
-      return;
-    }
-    if (state.energyCd > 0) return;
-    const mesh = orbPool.find((m) => !m.visible);
-    if (!mesh) return;
-    state.energyCd = 3;
-    // 消耗 3 节体长
-    for (let k = 0; k < 3 && state.cells.length > 1; k++) state.cells.pop();
-    state.prevTail = null;
-    updateHud();
-    const from = headPosition();
-    const d = state.dir;
-    mesh.visible = true;
-    mesh.position.set(from.x, 0.6, from.z);
-    state.orbs.push({ mesh, x: from.x, z: from.z, vx: d.i * 9, vz: d.j * 9, life: 2.6 });
-    toast('能量球', '消耗 3 节 · 命中后 3×3 范围清场');
-  }
-
-  function explodeAt(x, z) {
-    const ci = Math.round(x + HALF);
-    const cj = Math.round(z + HALF);
-    for (const en of state.enemies) {
-      if (!en.alive) continue;
-      if (isEnemyInvulnerable(en)) continue;
-      if (Math.abs(en.i - ci) <= 1 && Math.abs(en.j - cj) <= 1) {
-        en.alive = false;
-        state.kills += 1;
-        state.score += 30;
-        // 能量球清场不再返还体长，保证消耗固定为 3 节
-      }
-    }
-    const mesh = boomPool.find((m) => !m.visible) || boomPool[0];
-    mesh.visible = true;
-    mesh.position.set(x, 0.52, z);
-    mesh.scale.setScalar(0.6);
-    mesh.material.opacity = 0.95;
-    state.booms.push({ mesh, t: 0 });
-    updateHud();
-  }
-
-  function updateOrbs(dt) {
-    state.energyCd = Math.max(0, state.energyCd - dt);
-    for (let k = state.orbs.length - 1; k >= 0; k--) {
-      const o = state.orbs[k];
-      o.life -= dt;
-      o.x += o.vx * dt;
-      o.z += o.vz * dt;
-      o.mesh.position.set(o.x, 0.6, o.z);
-      o.mesh.rotation.y += dt * 3;
-
-      const ci = Math.round(o.x + HALF);
-      const cj = Math.round(o.z + HALF);
-      let boom = o.life <= 0 || Math.abs(o.x) > HALF + 1 || Math.abs(o.z) > HALF + 1 ||
-        !inBounds(ci, cj) || isObstacle(ci, cj);
-
-      if (!boom) {
-        for (const en of state.enemies) {
-          if (!en.alive) continue;
-          if (Math.hypot(en.x - o.x, en.z - o.z) < 1.15) {
-            boom = true;
-            o.boomX = en.x; // 以命中的怪为中心爆炸，保证 3×3 覆盖
-            o.boomZ = en.z;
-            break;
-          }
-        }
-      }
-      // 打 Boss 也有效
-      if (!boom && state.boss && state.boss.alive &&
-        Math.hypot(state.boss.x - o.x, state.boss.z - o.z) < state.boss.orbHitRadius) {
-        boom = true;
-        o.boomX = state.boss.x;
-        o.boomZ = state.boss.z;
-        state.boss.hp -= 45;
-        updateHud();
-        if (state.boss.hp <= 0) bossDie();
-      }
-      if (boom) {
-        o.mesh.visible = false;
-        state.orbs.splice(k, 1);
-        explodeAt(o.boomX !== undefined ? o.boomX : o.x, o.boomZ !== undefined ? o.boomZ : o.z);
-      }
-    }
-  }
-
-  function updateBooms(dt) {
-    for (let k = state.booms.length - 1; k >= 0; k--) {
-      const b = state.booms[k];
-      b.t += dt;
-      const p = Math.min(1, b.t / 0.45);
-      b.mesh.scale.setScalar(0.6 + p * 2.2);
-      b.mesh.material.opacity = 0.95 * (1 - p);
-      if (p >= 1) {
-        b.mesh.visible = false;
-        state.booms.splice(k, 1);
-      }
-    }
-  }
-
   function updatePods(dt) {
     for (let k = state.pods.length - 1; k >= 0; k--) {
       const b = state.pods[k];
@@ -3387,7 +3463,7 @@
         isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF)); // 木桩挡豆
       if (!dead && bodyDistanceSq(b.x, b.z) < 0.72 * 0.72) {
         dead = true;
-        damage(1);
+        damage(1, 'projectile');
       }
       if (dead) {
         b.mesh.visible = false;
@@ -3415,7 +3491,7 @@
       if (!h.hit && bodyDistanceSq(h.x, h.z) < 0.62 * 0.62) {
         h.hit = true;
         state.slowTimer = Math.max(state.slowTimer, 2);
-        damage(1);
+        damage(1, 'hazard');
         toast('岩浆灼伤', '体长 -1 · 移动速度降低 2 秒');
         if (state.over) return;
       }
@@ -3453,11 +3529,59 @@
       const cj = Math.round(b.z + HALF);
       let dead = !inBounds(ci, cj) || isObstacle(ci, cj);
       if (!dead && bodyDistanceSq(b.x, b.z) < GHOST_BULLET_HIT_RADIUS * GHOST_BULLET_HIT_RADIUS) {
-        damage(1);
+        damage(1, 'projectile');
       }
       if (dead) {
         b.mesh.visible = false;
         state.ghostBullets.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnFireBurst(x, z) {
+    const mesh = fireBurstPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.visible = true;
+    mesh.position.set(x, 0.3, z);
+    mesh.scale.setScalar(0.72);
+    mesh.material.opacity = 0.9;
+    state.fireBursts.push({ mesh, t: 0 });
+  }
+
+  function damageEnemiesInFireAoe(x, z, damageAmount) {
+    let hitCount = 0;
+    const areaCenterX = Math.floor(x) + 0.5;
+    const areaCenterZ = Math.floor(z) + 0.5;
+    for (let e = 0; e < state.enemies.length; e++) {
+      const en = state.enemies[e];
+      if (!en.alive || isEnemyInvulnerable(en)) continue;
+      if (Math.abs(en.x - areaCenterX) > 0.51 || Math.abs(en.z - areaCenterZ) > 0.51) continue;
+      en.hp -= damageAmount;
+      hitCount += 1;
+      if (en.hp <= 0) {
+        en.alive = false;
+        state.kills += 1;
+        state.score += 25;
+        growBy(2);
+      } else if (en.type === 'scarab' && enemyPool[e]) {
+        enemyPool[e].material.map = TEX.scarabBroken || enemyPool[e].material.map;
+        enemyPool[e].material.needsUpdate = true;
+      }
+    }
+    if (hitCount > 0) updateHud();
+    return hitCount;
+  }
+
+  function updateFireBursts(dt) {
+    for (let k = state.fireBursts.length - 1; k >= 0; k--) {
+      const burst = state.fireBursts[k];
+      burst.t += dt;
+      const progress = Math.min(1, burst.t / 0.34);
+      burst.mesh.scale.setScalar(0.72 + progress * 0.8);
+      burst.mesh.material.opacity = 0.9 * (1 - progress);
+      if (progress >= 1) {
+        burst.mesh.visible = false;
+        state.fireBursts.splice(k, 1);
       }
     }
   }
@@ -3473,6 +3597,7 @@
       const ci = Math.round(b.x + HALF);
       const cj = Math.round(b.z + HALF);
       let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
+      let burstSpawned = false;
 
       // 命中小怪
       if (!dead && state.phase === 'clear') {
@@ -3480,12 +3605,19 @@
           const en = state.enemies[e];
           if (!en.alive) continue;
           if (Math.hypot(en.x - b.x, en.z - b.z) < ENEMY_HIT_RADIUS) {
+            if (b.fire) {
+              damageEnemiesInFireAoe(b.x, b.z, b.enemyDamage);
+              spawnFireBurst(b.x, b.z);
+              burstSpawned = true;
+              dead = true;
+              break;
+            }
             if (isEnemyInvulnerable(en)) {
               dead = true;
               break;
             }
-            if (en.hp > 1) {
-              en.hp -= 1; // 圣甲虫壳硬，需要两发
+            en.hp -= b.enemyDamage;
+            if (en.hp > 0) {
               // 翅膀被打灰：第一发后换成破损贴图
               if (en.type === 'scarab' && enemyPool[e]) {
                 enemyPool[e].material.map = TEX.scarabBroken || enemyPool[e].material.map;
@@ -3508,38 +3640,42 @@
       // 命中 Boss
       if (!dead && state.phase === 'boss' && state.boss && state.boss.alive) {
         if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < state.boss.bulletHitRadius) {
-          state.boss.hp -= state.shotDamage;
+          state.boss.hp -= b.bossDamage;
           state.score += 10;
           updateHud();
           dead = true;
+          if (b.fire) {
+            spawnFireBurst(b.x, b.z);
+            burstSpawned = true;
+          }
           if (state.boss.hp <= 0) bossDie();
         }
       }
 
-      // 技能卡改为撞击拾取，子弹直接穿过
-
       if (dead) {
+        if (b.fire && !burstSpawned) spawnFireBurst(b.x, b.z);
         b.mesh.visible = false;
         state.bullets.splice(k, 1);
       }
     }
   }
 
-  function updateCards(dt) {
-    for (let k = 0; k < state.cards.length; k++) {
-      const card = state.cards[k];
-      card.mesh.position.set(
-        card.baseX + Math.sin(state.time * 1.4 + card.phase) * 0.25,
-        0.6 + Math.sin(state.time * 2.2 + card.phase) * 0.12,
-        card.baseZ + Math.cos(state.time * 1.1 + card.phase) * 0.25
-      );
-      card.mesh.rotation.y += dt * 1.2;
+  function updateSkillOrb(dt) {
+    if (!state.skillOrb || !rewardOrbGroup.visible) return;
+    const orb = state.skillOrb;
+    orb.phase += dt;
+    orb.delay = Math.max(0, orb.delay - dt);
+    rewardShell.position.y = 1 + Math.sin(state.time * 1.8) * 0.06;
+    rewardShell.scale.setScalar(1 + Math.sin(state.time * 2.4) * 0.035);
+    rewardCore.position.y = 0.72 + Math.sin(state.time * 3.1) * 0.1;
+    rewardCore.rotation.y += dt * 2.2;
+    rewardRing.rotation.z += dt * 0.9;
+    rewardRing.scale.setScalar(1 + Math.sin(state.time * 2.1) * 0.05);
 
-      // 撞击即获得（不再需要射击）
-      if (state.phase === 'pick' && bodyDistanceSq(card.mesh.position.x, card.mesh.position.z) < 1.15 * 1.15) {
-        pickCard(k);
-        return;
-      }
+    if (state.phase !== 'pick' || orb.delay > 0) return;
+    headPosition(_tmpA);
+    if (Math.hypot(_tmpA.x - orb.x, _tmpA.z - orb.z) < 0.62) {
+      consumeSkillOrb();
     }
   }
 
@@ -3673,7 +3809,11 @@
     state.over = false;
     state.paused = false;
     state.shootCd = 0;
-    state.energyCd = 0;
+    state.shieldTimer = 0;
+    state.shieldCooldown = 0;
+    state.shieldFlash = 0;
+    state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
+    state.fireBursts.length = 0;
     state.slowTimer = 0;
     state.clearedNotified.clear();
     state.roomActive = false;
@@ -3759,6 +3899,10 @@
       state.shootCd = Math.max(0, state.shootCd - dt);
       state.invuln = Math.max(0, state.invuln - dt);
       state.slowTimer = Math.max(0, state.slowTimer - dt);
+      state.shieldTimer = Math.max(0, state.shieldTimer - dt);
+      state.shieldCooldown = Math.max(0, state.shieldCooldown - dt);
+      state.shieldFlash = Math.max(0, state.shieldFlash - dt);
+      updateSkillHud();
 
       // 受击时身体整体闪一下（包括被身体挡下的伤害）
       state.hitFlash = Math.max(0, state.hitFlash - dt);
@@ -3785,10 +3929,9 @@
       }
 
       updateBullets(dt);
-      updateOrbs(dt);
-      updateBooms(dt);
+      updateFireBursts(dt);
       updatePellets();
-      updateCards(dt);
+      updateSkillOrb(dt);
       updateDoor(dt);
       checkClear();
       checkDoor();
@@ -3811,7 +3954,12 @@
   window.__devourApi = {
     startLevel,
     bossDie,
-    pickCard,
+    consumeSkillOrb,
+    spawnSkillOrb,
+    shoot,
+    activateShield,
+    damage,
+    damageEnemiesInFireAoe,
     resetGame,
     spawnPellet,
     isObstacle,

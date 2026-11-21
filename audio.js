@@ -126,7 +126,9 @@
     document.body.classList.add('settings-open');
     slider.value = String(musicLevel);
     updateVolumeUi();
-    window.setTimeout(() => slider.focus({ preventScroll: true }), 30);
+    document.dispatchEvent(new CustomEvent('devour:settings-open'));
+    const focusTarget = window.DevourSkills?.getSettingsFocusTarget?.() || slider;
+    window.setTimeout(() => focusTarget?.focus?.({ preventScroll: true }), 30);
   }
 
   function closeSettings() {
@@ -134,6 +136,7 @@
     settingsScreen.hidden = true;
     settingsScreen.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('settings-open');
+    document.dispatchEvent(new CustomEvent('devour:settings-close'));
     if (previousFocus && typeof previousFocus.focus === 'function') {
       previousFocus.focus({ preventScroll: true });
     }
@@ -168,7 +171,8 @@
       event.preventDefault();
       closeSettings();
     } else if (event.key === 'Tab') {
-      const focusable = [closeButton, slider].filter((element) => element && !element.disabled);
+      const focusable = [...settingsScreen.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => !element.disabled && !element.closest('[hidden]'));
       if (focusable.length < 2) return;
       if (event.shiftKey && document.activeElement === focusable[0]) {
         event.preventDefault();

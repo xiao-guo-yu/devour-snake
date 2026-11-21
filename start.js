@@ -272,13 +272,20 @@
   document.getElementById('btnOverlayRestart').addEventListener('click', restartGame);
   document.getElementById('btnOverlayMap').addEventListener('click', returnToCampaignMap);
   document.getElementById('btnOverlayMenu').addEventListener('click', returnToMenu);
+  document.getElementById('btnOverlaySettings').addEventListener('click', () => {
+    if (window.__devour) window.__devour.paused = true;
+    window.DevourSkills?.showTab?.('skills');
+    document.getElementById('btnSettings').click();
+  });
 
   document.getElementById('btnHelp').addEventListener('click', () => {
     panel.innerHTML = [
       'WASD / 方向键：8 方向移动',
       '空格：发射毒牙（消耗 1 节体长，最低保留 2 节）',
-      'E：能量球（消耗 3 节体长，需超过 4 节）命中后 3×3 范围清场',
+      'E：使用已装备的核心技能（绿色普通射击 / 红色 2×2 烈焰弹）',
+      'Q：金核壁垒，消耗 1 节，持续 2 秒，冷却 5 秒',
       'F：切换全图 / 跟随视角　P：暂停　R：重开',
+      '击败 Boss 后吞噬发光核心，可在“设置 → 技能”中更换 E 槽',
       '体长就是血量：受伤从尾部断节，体长 ≤ 1 时死亡',
       '吃金色豆子变长，击杀小怪 +2 节，清光敌人后门会打开',
     ].join('<br>');
