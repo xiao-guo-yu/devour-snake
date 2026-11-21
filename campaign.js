@@ -16,11 +16,11 @@
       levels: [
         { n: 1, room: 0, name: '温室前厅', icon: 'assets/spore.png' },
         { n: 2, room: 1, name: '根礼拜堂', icon: 'assets/spore.png' },
-        { n: 3, room: 2, name: '根之圣所', icon: 'assets/vine.png' },
+        { n: 3, room: 2, name: '圣所深处', icon: 'assets/trap.png' },
         { n: 4, room: 3, name: '腐生苗床', icon: 'assets/spore.png' },
         { n: 5, room: 4, name: '根脉交叉', icon: 'assets/trap.png' },
         { n: 6, room: 5, name: '捕食花圃', icon: 'assets/vine.png' },
-        { n: 7, room: 6, name: '圣所深处', icon: 'assets/trap.png' },
+        { n: 7, room: 6, name: '根之圣所', icon: 'assets/vine.png' },
         { n: 8, room: 7, name: '腐根盘蛇', boss: true, icon: 'assets/rootcoil.png' },
       ],
     },

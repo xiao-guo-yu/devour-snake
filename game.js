@@ -14,13 +14,8 @@
   const SHOOT_COOLDOWN = 0.14;
   const BULLET_SPEED = 18;
   const INVULN = 0.8;
-  const ENEMY_SPEED = 1.35;
-  const ENEMY_COOL_SPEED = 0.55;
   const BOSS_HP = 140;
   const BOSS_SPEED = 1.0;
-  const SLIME_JUMP_DISTANCE = 5;
-  const SLIME_JUMP_INTERVAL = 3;
-  const WISP_HIDE_HALF_SIZE = 4;
   const WISP_RENDER_SCALE = 1.45;
   const PLAYER_BULLET_RADIUS = 0.16;
   const ENEMY_HIT_RADIUS = 1.5;
@@ -60,15 +55,58 @@
   const TWO_STAR_MIN_LENGTH = 8;
   const THREE_STAR_TIME_LIMIT = 180;
 
+  // 小怪数值按类型读取；速度单位为格/秒。
+  const ENEMY_STATS = {
+    spore: {
+      hp: 1, speed: 0.9, contactDamage: 1, contactCooldown: 1.25,
+      contactRadius: 0.72, retreatSpeedMul: 0.4,
+    },
+    vine: {
+      hp: 1, speed: 1.8, contactDamage: 2, contactCooldown: 1.1,
+      contactRadius: 0.76, retreatSpeedMul: 0.42,
+    },
+    trap: {
+      hp: 1, speed: 1.05, contactDamage: 2, contactCooldown: 1.35,
+      contactRadius: 0.78, retreatSpeedMul: 0.36,
+      shootCooldown: 4, shootRange: 24,
+    },
+    scarab: {
+      hp: 2, speed: 1.6, contactDamage: 1, contactCooldown: 1.15,
+      contactRadius: 0.7, retreatSpeedMul: 0.4,
+    },
+    mummy: {
+      hp: 1, speed: 1.2, contactDamage: 2, contactCooldown: 1.3,
+      contactRadius: 0.74, retreatSpeedMul: 0.38,
+    },
+    anubis: {
+      hp: 1, speed: 1.35, contactDamage: 2, contactCooldown: 1.2,
+      contactRadius: 0.76, retreatSpeedMul: 0.4,
+      shootCooldown: 5.5, shootRange: 24, projectileCount: 2, projectileSpread: 0.16,
+    },
+    magmaSlime: {
+      hp: 1, contactDamage: 2, contactCooldown: 1.4, contactRadius: 0.8,
+      jumpDistance: 5, jumpInterval: 3, jumpDuration: 0.55,
+    },
+    obsidianBeetle: {
+      hp: 2, speed: 3.15, contactDamage: 2, contactCooldown: 1.15,
+      contactRadius: 0.72, retreatSpeedMul: 0.45, trailInterval: 0.6,
+    },
+    emberWisp: {
+      hp: 1, speed: 0.36, contactDamage: 0, contactCooldown: 1,
+      contactRadius: 0.7, retreatSpeedMul: 0.4,
+      shootCooldown: 3.6, revealDelay: 0.35, hideHalfSize: 4,
+    },
+  };
+
   // 每个区域 7 个普通关 + 第 8 关 Boss；composition 表示三种小怪的具体数量。
   const ROOMS = [
     { theme: 'green', kind: 'clear', composition: { spore: 8 }, name: '腐殖温室 · 前厅' },
     { theme: 'green', kind: 'clear', composition: { spore: 5, vine: 3 }, name: '腐殖温室 · 根礼拜堂' },
-    { theme: 'green', kind: 'clear', composition: { vine: 8 }, name: '腐殖温室 · 根之圣所' },
+    { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
     { theme: 'green', kind: 'clear', composition: { spore: 5, trap: 3 }, name: '腐殖温室 · 腐生苗床' },
     { theme: 'green', kind: 'clear', composition: { spore: 3, vine: 2, trap: 3 }, name: '腐殖温室 · 根脉交叉' },
     { theme: 'green', kind: 'clear', composition: { vine: 5, trap: 3 }, name: '腐殖温室 · 捕食花圃' },
-    { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
+    { theme: 'green', kind: 'clear', composition: { vine: 8 }, name: '腐殖温室 · 根之圣所' },
     { theme: 'green', kind: 'boss', boss: 'rootcoil', name: '腐根盘蛇 · ROOTCOIL' },
 
     { theme: 'temple', kind: 'clear', composition: { scarab: 8 }, name: '沙海神庙 · 柱厅' },
@@ -1731,8 +1769,6 @@
     timerDisplayedSecond: -1,
     shotDamage: 6,
     shootCdMul: 1,
-    enemySpeedMul: 1,
-    enemyShoot: false,
     spawnGrace: 0,
     slowTimer: 0,
     clearedNotified: new Set(),
@@ -1870,14 +1906,14 @@
       Object.assign(slot, {
         alive: true, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
         shootTimer: 0.8 + Math.random() * 1.4,
-        jumpTimer: SLIME_JUMP_INTERVAL,
+        jumpTimer: enemyStats(slot.type).jumpInterval || 0,
         jumpElapsed: 0,
         jumpFrom: null,
         jumpTo: null,
         trailTimer: 0.2,
         hidden: false,
         revealTimer: 0,
-        hp: slot.type === 'scarab' || slot.type === 'obsidianBeetle' ? 2 : 1,
+        hp: enemyStats(slot.type).hp,
       });
       // 复活时恢复原色/原贴图（甲虫被打灰后）
       const idx = state.enemies.indexOf(slot);
@@ -1908,6 +1944,10 @@
     }
     const types = room.types || ['spore'];
     return Array.from({ length: room.enemies || 0 }, (_, index) => types[index % types.length]);
+  }
+
+  function enemyStats(type) {
+    return ENEMY_STATS[type] || ENEMY_STATS.spore;
   }
 
   function updateHud() {
@@ -1984,8 +2024,6 @@
     cardMeshes.forEach((m) => { m.visible = false; });
 
     // 温室关卡特性保留：第二关小怪更快，第三关会远程
-    state.enemySpeedMul = room.theme === 'green' ? (idx === 1 ? 2 : (idx === 2 ? 0.7 : 1)) : 1;
-    state.enemyShoot = room.theme === 'green' && idx === 2;
 
     // 第一关：从左侧 4×4 出生小房间钻出来；后续关卡从底部传送门逐节钻出
     state.roomActive = false;
@@ -2056,7 +2094,7 @@
       enemyPool[k].material.color.setHex(0xffffff);
       enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : 1);
       state.enemies[k].type = type;
-      state.enemies[k].hp = type === 'scarab' || type === 'obsidianBeetle' ? 2 : 1;
+      state.enemies[k].hp = enemyStats(type).hp;
     }
 
     if (room.kind === 'clear') {
@@ -2529,7 +2567,7 @@
     }
   }
 
-  function chooseSlimeJump(e, hp) {
+  function chooseSlimeJump(e, hp, stats) {
     const dx = hp.x - e.x;
     const dz = hp.z - e.z;
     const len = Math.hypot(dx, dz) || 1;
@@ -2537,8 +2575,8 @@
     const angles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
     for (const off of angles) {
       const a = base + off;
-      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * SLIME_JUMP_DISTANCE));
-      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * SLIME_JUMP_DISTANCE));
+      const tx = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.x + Math.cos(a) * stats.jumpDistance));
+      const tz = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, e.z + Math.sin(a) * stats.jumpDistance));
       if (!isObstacle(Math.round(tx + HALF), Math.round(tz + HALF))) {
         return { x: tx, z: tz };
       }
@@ -2547,10 +2585,11 @@
   }
 
   function updateMagmaSlime(e, mesh, hp, dt) {
-    if (e.jumpTimer === undefined) e.jumpTimer = SLIME_JUMP_INTERVAL;
+    const stats = enemyStats(e.type);
+    if (e.jumpTimer === undefined) e.jumpTimer = stats.jumpInterval;
     if (e.jumpElapsed > 0) {
       e.jumpElapsed += dt;
-      const t = Math.min(1, e.jumpElapsed / 0.55);
+      const t = Math.min(1, e.jumpElapsed / stats.jumpDuration);
       const ease = t * t * (3 - 2 * t);
       e.x = e.jumpFrom.x + (e.jumpTo.x - e.jumpFrom.x) * ease;
       e.z = e.jumpFrom.z + (e.jumpTo.z - e.jumpFrom.z) * ease;
@@ -2560,7 +2599,7 @@
       mesh.scale.setScalar(1 + Math.sin(Math.PI * t) * 0.18);
       if (t >= 1) {
         e.jumpElapsed = 0;
-        e.jumpTimer = SLIME_JUMP_INTERVAL;
+        e.jumpTimer = stats.jumpInterval;
         mesh.scale.setScalar(1);
       }
     } else {
@@ -2569,31 +2608,33 @@
       mesh.scale.setScalar(1 + Math.max(0, 0.09 - e.jumpTimer * 0.02));
       if (e.jumpTimer <= 0) {
         e.jumpFrom = { x: e.x, z: e.z };
-        e.jumpTo = chooseSlimeJump(e, hp);
+        e.jumpTo = chooseSlimeJump(e, hp, stats);
         e.jumpElapsed = 0.0001;
       }
     }
   }
 
   function updateObsidianBeetle(e, mesh, nx, nz, dt) {
+    const stats = enemyStats(e.type);
     e.trailTimer = (e.trailTimer === undefined ? 0.2 : e.trailTimer) - dt;
     if (e.trailTimer <= 0) {
       spawnLavaHazard(e.x, e.z);
-      e.trailTimer = 0.6;
+      e.trailTimer = stats.trailInterval;
     }
     mesh.position.set(nx, 0.5 + Math.sin(state.time * 7 + e.bob) * 0.035, nz);
     mesh.rotation.z = Math.sin(state.time * 5 + e.bob) * 0.1;
   }
 
   function updateEmberWisp(e, mesh, hp, dt) {
+    const stats = enemyStats(e.type);
     const dx = hp.x - e.x;
     const dz = hp.z - e.z;
-    const inRange = Math.abs(dx) <= WISP_HIDE_HALF_SIZE && Math.abs(dz) <= WISP_HIDE_HALF_SIZE;
+    const inRange = Math.abs(dx) <= stats.hideHalfSize && Math.abs(dz) <= stats.hideHalfSize;
     if (e.hidden) {
       mesh.visible = false;
       if (!inRange) {
         e.revealTimer = (e.revealTimer || 0) + dt;
-        if (e.revealTimer >= 0.35) {
+        if (e.revealTimer >= stats.revealDelay) {
           e.hidden = false;
           e.revealTimer = 0;
         }
@@ -2610,7 +2651,7 @@
     }
 
     const len = Math.hypot(dx, dz) || 1;
-    const speed = ENEMY_SPEED * 0.2;
+    const speed = stats.speed;
     let nx = e.x + (dx / len) * speed * dt;
     let nz = e.z + (dz / len) * speed * dt;
     const ci = Math.round(nx + HALF);
@@ -2628,10 +2669,10 @@
     mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.12;
     mesh.scale.setScalar(WISP_RENDER_SCALE + Math.sin(state.time * 3 + e.bob) * 0.05);
 
-    if (e.shootTimer === undefined) e.shootTimer = 2.4;
+    if (e.shootTimer === undefined) e.shootTimer = stats.shootCooldown;
     e.shootTimer -= dt;
     if (e.shootTimer <= 0) {
-      e.shootTimer = 3.6;
+      e.shootTimer = stats.shootCooldown;
       spawnGhostBullet(nx, nz, hp.x, hp.z);
     }
   }
@@ -2660,18 +2701,19 @@
         continue;
       }
       if (e.type === 'magmaSlime') {
+        const stats = enemyStats(e.type);
         updateMagmaSlime(e, mesh, hp, dt);
-        if (bodyDistanceSq(e.x, e.z) < 0.8 * 0.8 && e.cool <= 0) {
-          e.cool = 1.4;
-          damage(2);
+        if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+          e.cool = stats.contactCooldown;
+          damage(stats.contactDamage);
           if (state.over) return;
         }
         continue;
       }
 
-      const typeMul = e.type === 'scarab' ? 1.2 : e.type === 'mummy' ? 1.5 : e.type === 'anubis' ? 0.9
-        : e.type === 'obsidianBeetle' ? 2.34 : 1;
-      const speed = (e.cool > 0 ? ENEMY_COOL_SPEED : ENEMY_SPEED) * state.enemySpeedMul * typeMul;
+      const stats = enemyStats(e.type);
+      const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul) *
+        (e.cool > 0 ? stats.retreatSpeedMul : 1);
       let nx = e.x + (dx / len) * speed * dt;
       let nz = e.z + (dz / len) * speed * dt;
 
@@ -2691,32 +2733,31 @@
         mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
       }
 
-      if (bodyDistanceSq(nx, nz) < 0.75 * 0.75 && e.cool <= 0) {
-        e.cool = 1.2;
+      if (bodyDistanceSq(nx, nz) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+        e.cool = stats.contactCooldown;
         e.x -= (dx / len) * 2.2;
         e.z -= (dz / len) * 2.2;
-        damage(2);
+        damage(stats.contactDamage);
         if (state.over) return;
       }
 
-      // 能量豆：温室第三关全体 / 神庙的阿努比斯守卫
-      if (state.enemyShoot || e.type === 'anubis') {
+      if (stats.shootCooldown) {
         if (e.shootTimer === undefined) e.shootTimer = 1 + Math.random() * 1.5;
         e.shootTimer -= dt;
         if (e.shootTimer <= 0) {
-          const isAnubis = e.type === 'anubis';
-          e.shootTimer = isAnubis ? 5.5 : 4;
+          e.shootTimer = stats.shootCooldown;
           const dist = Math.hypot(hp.x - nx, hp.z - nz);
-          if (dist < 24) {
-            if (isAnubis) {
-              // 阿努比斯：一次两发，带小角度散射
+          if (dist < stats.shootRange) {
+            const projectileCount = stats.projectileCount || 1;
+            if (projectileCount === 1) {
+              spawnPod(nx, nz, hp.x, hp.z);
+            } else {
               const base = Math.atan2(hp.z - nz, hp.x - nx);
-              for (const off of [-0.16, 0.16]) {
-                const a = base + off;
+              const spread = stats.projectileSpread || 0.16;
+              for (let shot = 0; shot < projectileCount; shot++) {
+                const a = base + (shot - (projectileCount - 1) / 2) * spread;
                 spawnPod(nx, nz, nx + Math.cos(a) * dist, nz + Math.sin(a) * dist, 0.75);
               }
-            } else {
-              spawnPod(nx, nz, hp.x, hp.z);
             }
           }
         }
@@ -3628,6 +3669,7 @@
     spawnPellet,
     isObstacle,
     evaluateLevelStars,
+    getEnemyStats: (type) => ({ ...enemyStats(type) }),
     clearObstacles: () => obstacles.clear(),
   };
   window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {
