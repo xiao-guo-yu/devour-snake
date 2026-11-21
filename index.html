@@ -1525,8 +1525,8 @@
       inset 0 3px 4px rgba(255,255,255,.14);
   }
   .level-node.is-boss .node-platform {
-    width: 92px;
-    height: 60px;
+    width: 116px;
+    height: 72px;
     border-color: rgba(239,174,97,.66);
     background:
       radial-gradient(ellipse at 50% 27%, rgba(108,45,29,.9), #20110d 72%);
@@ -1537,7 +1537,13 @@
       0 20px 26px rgba(0,0,0,.48),
       0 0 24px rgba(255,111,57,.13);
   }
-  .level-node.is-boss .node-art { width: 72px; height: 54px; }
+  .level-node.is-boss { width: 176px; height: 174px; z-index: 4; }
+  .level-node.is-boss .node-number { font-size: 15px; }
+  .level-node.is-boss .node-art { width: 94px; height: 68px; }
+  .level-node.is-boss .node-stars { margin-top: 10px; }
+  .level-node.is-boss .node-stars i { font-size: 14px; }
+  .level-node.is-boss .node-label { max-width: 170px; font-size: 12px; }
+  .level-node.is-boss .node-state { font-size: 9px; }
   .level-node.is-boss .node-label { color: #efc49e; }
   .level-node.is-boss .node-state { color: #ffae70; }
   .region-map-footer {
@@ -1768,8 +1774,11 @@
     .node-stars i { font-size: 9px; }
     .node-label { max-width: 94px; margin-top: 2px; font-size: 8px; }
     .node-state { margin-top: 1px; font-size: 7px; }
-    .level-node.is-boss .node-platform { width: 72px; height: 47px; }
-    .level-node.is-boss .node-art { width: 58px; height: 44px; }
+    .level-node.is-boss { width: 122px; height: 154px; }
+    .level-node.is-boss .node-platform { width: 92px; height: 59px; }
+    .level-node.is-boss .node-art { width: 76px; height: 56px; }
+    .level-node.is-boss .node-label { max-width: 120px; font-size: 10px; }
+    .level-node.is-boss .node-state { font-size: 8px; }
     .planned-mark { font-size: 24px; }
     .region-map-footer {
       min-height: 22px;
@@ -1794,14 +1803,14 @@
     }
     .level-routes-desktop { display: none; }
     .level-routes-mobile { display: block; }
-    .level-node:nth-child(1) { left: 21%; top: 84%; }
-    .level-node:nth-child(2) { left: 36%; top: 68%; }
-    .level-node:nth-child(3) { left: 68%; top: 78%; }
-    .level-node:nth-child(4) { left: 33%; top: 56%; }
-    .level-node:nth-child(5) { left: 67%; top: 57%; }
-    .level-node:nth-child(6) { left: 35%; top: 40%; }
-    .level-node:nth-child(7) { left: 69%; top: 31%; }
-    .level-node:nth-child(8) { left: 48%; top: 14%; }
+    .level-node:nth-child(1) { left: 21%; top: 87%; }
+    .level-node:nth-child(2) { left: 36%; top: 72%; }
+    .level-node:nth-child(3) { left: 68%; top: 83%; }
+    .level-node:nth-child(4) { left: 33%; top: 60%; }
+    .level-node:nth-child(5) { left: 67%; top: 62%; }
+    .level-node:nth-child(6) { left: 35%; top: 45%; }
+    .level-node:nth-child(7) { left: 69%; top: 36%; }
+    .level-node:nth-child(8) { left: 48%; top: 22%; }
     .region-map-footer {
       display: flex;
       min-height: 20px;
@@ -2072,12 +2081,12 @@
     <div class="level-map-viewport">
       <div class="level-stage">
         <svg class="level-routes level-routes-desktop" viewBox="0 0 1200 700" preserveAspectRatio="none" aria-hidden="true">
-          <path class="level-route-base" d="M108 532 C170 475 220 410 288 392 S390 445 468 511 S568 355 624 336 S716 418 792 448 S880 320 948 294 S1040 382 1092 427 S1030 230 876 119"/>
-          <path class="level-route-mid" d="M108 532 C170 475 220 410 288 392 S390 445 468 511 S568 355 624 336 S716 418 792 448 S880 320 948 294 S1040 382 1092 427 S1030 230 876 119"/>
+          <path class="level-route-base" d="M108 581 C170 530 220 485 288 462 S390 535 468 567 S568 455 624 413 S716 475 792 511 S880 410 948 371 S1040 430 1092 490 S1035 285 876 154"/>
+          <path class="level-route-mid" d="M108 581 C170 530 220 485 288 462 S390 535 468 567 S568 455 624 413 S716 475 792 511 S880 410 948 371 S1040 430 1092 490 S1035 285 876 154"/>
         </svg>
         <svg class="level-routes level-routes-mobile" viewBox="0 0 390 880" preserveAspectRatio="none" aria-hidden="true">
-          <path class="level-route-base" d="M82 739 C90 680 110 630 140 598 C170 560 225 640 265 686 C295 710 310 600 300 544 C290 478 160 510 129 493 C90 470 200 530 261 502 C300 480 160 390 137 352 C110 300 200 300 269 273 C315 250 250 180 187 123"/>
-          <path class="level-route-mid" d="M82 739 C90 680 110 630 140 598 C170 560 225 640 265 686 C295 710 310 600 300 544 C290 478 160 510 129 493 C90 470 200 530 261 502 C300 480 160 390 137 352 C110 300 200 300 269 273 C315 250 250 180 187 123"/>
+          <path class="level-route-base" d="M82 766 C90 705 110 660 140 634 C170 598 225 690 265 730 C295 755 310 618 300 570 C290 500 160 550 129 528 C90 505 200 565 261 546 C300 520 160 440 137 396 C110 345 200 345 269 317 C315 295 250 260 187 194"/>
+          <path class="level-route-mid" d="M82 766 C90 705 110 660 140 634 C170 598 225 690 265 730 C295 755 310 618 300 570 C290 500 160 550 129 528 C90 505 200 565 261 546 C300 520 160 440 137 396 C110 345 200 345 269 317 C315 295 250 260 187 194"/>
         </svg>
         <div id="levelNodes" aria-label="关卡路径"></div>
       </div>
@@ -2135,7 +2144,7 @@
 
 <script src="vendor/three.min.js?v=20261117"></script>
 <script src="game.js?v=20261121-enemies1"></script>
-<script src="campaign.js?v=20261121-enemies1"></script>
+<script src="campaign.js?v=20261121-layout3"></script>
 <script src="audio.js?v=20261120-audio1"></script>
 <script src="start.js?v=20261120-audio1"></script>
 </body>

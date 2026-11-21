@@ -67,14 +67,14 @@
   ];
 
   const NODE_POSITIONS = [
-    { x: 9, y: 76 },
-    { x: 24, y: 56 },
-    { x: 39, y: 73 },
-    { x: 52, y: 48 },
-    { x: 66, y: 64 },
-    { x: 79, y: 42 },
-    { x: 91, y: 61 },
-    { x: 73, y: 17 },
+    { x: 9, y: 83 },
+    { x: 24, y: 66 },
+    { x: 39, y: 81 },
+    { x: 52, y: 59 },
+    { x: 66, y: 73 },
+    { x: 79, y: 53 },
+    { x: 91, y: 70 },
+    { x: 73, y: 22 },
   ];
 
   const campaignScreen = document.getElementById('campaignScreen');
