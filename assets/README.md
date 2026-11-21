@@ -35,3 +35,15 @@ Original conversation attachment paths:
   - `C:\Users\17928\AppData\Local\Temp\codex-clipboard-d14cb1a3-fb7f-40fe-8aef-9ff817a7e7e7.png`
 - Both supplied 96×96 RGBA files are shipped without pixel modification.
 - Runtime import uses nearest-neighbor filtering with mipmaps disabled.
+
+## Frozen Wastes Asset Sources
+
+The Chapter 4 enemy, boss, ice-block, map, and breath artwork was supplied by the project owner on 2026-11-21.
+
+- `ice-slug.png`, `frost-wolf.png`, and `frost-wisp.png`
+- `frost-dragon-idle.png` and `frost-dragon-attack.png`
+- `ice-block.png`
+- `dragon-breath.png`
+- `frozen-wastes-map.jpg`
+
+The source files were read from `C:\Users\17928\DSH生成文件夹`. Character artwork uses an edge-connected background removal, is cropped, and is resized to at most 640px. The supplied transparent breath PNG is resized to at most 1200px. The map is resized to 1000px and encoded as JPEG for use as the Chapter 4 campaign backdrop. The import steps are reproducible with `tools/import_frozen_assets.py`.

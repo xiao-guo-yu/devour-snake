@@ -64,6 +64,26 @@
         { n: 8, room: 23, name: '熔岩巨像', boss: true, icon: 'assets/magma-colossus.png' },
       ],
     },
+    {
+      id: 'frozen',
+      name: '永冻冰原',
+      en: 'FROZEN WASTES',
+      subtitle: '穿过火山，冰系军团在荒原列阵',
+      art: 'assets/frost-dragon-idle.png',
+      accent: '#8bd8ff',
+      accent2: '#2f6f9d',
+      base: 24,
+      levels: [
+        { n: 1, room: 24, name: '霜原边缘', icon: 'assets/ice-slug.png' },
+        { n: 2, room: 25, name: '裂冰走廊', icon: 'assets/ice-slug.png' },
+        { n: 3, room: 26, name: '狼嚎冻谷', icon: 'assets/frost-wolf.png' },
+        { n: 4, room: 27, name: '寒晶蛞蝓穴', icon: 'assets/ice-slug.png' },
+        { n: 5, room: 28, name: '雾灵回廊', icon: 'assets/frost-wisp.png' },
+        { n: 6, room: 29, name: '霜骨荒径', icon: 'assets/frost-wolf.png' },
+        { n: 7, room: 30, name: '冰封王座前庭', icon: 'assets/frost-wisp.png' },
+        { n: 8, room: 31, name: '凛冬冰龙', boss: true, icon: 'assets/frost-dragon-idle.png' },
+      ],
+    },
   ];
 
   const NODE_POSITIONS = [
@@ -200,7 +220,7 @@
         </button>`;
     }).join('');
 
-    campaignTotal.textContent = `${totalCompleted()} / 24`;
+    campaignTotal.textContent = `${totalCompleted()} / ${REGIONS.length * 8}`;
     regionCards.querySelectorAll('.region-card:not(:disabled)').forEach((card) => {
       card.addEventListener('click', () => showLevelMap(Number(card.dataset.region)));
     });

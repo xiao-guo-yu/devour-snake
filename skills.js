@@ -28,6 +28,14 @@
       subtitle: 'RED CORE · E',
       desc: '按 E 消耗 2 格身体，发射伤害 2、覆盖 2×2 格并灼烧 Boss 的烈焰弹。',
     },
+    ice: {
+      id: 'ice',
+      slot: 'e',
+      color: '#8de9ff',
+      name: '寒冰吐息',
+      subtitle: 'BLUE CORE · E',
+      desc: '按 E 消耗 2 格身体，喷吐寒流冻结前方大片扇形范围内的敌人。',
+    },
   };
 
   const tabs = [...document.querySelectorAll('[data-settings-tab]')];
@@ -122,7 +130,7 @@
     // on the shared E slot; replaying green must not overwrite a chosen red loadout.
     if (skill.slot === 'q') {
       data.equipped.q = id;
-    } else if (id === 'red' || !data.equipped.e) {
+    } else if (id === 'red' || id === 'ice' || !data.equipped.e) {
       data.equipped.e = id;
     }
 

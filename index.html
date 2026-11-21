@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>吞噬之蛇 — 温室、神庙与火山</title>
+<title>吞噬之蛇 — 温室、神庙、火山与永冻冰原</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307110c'/%3E%3Cpath d='M13 37c8 0 8-13 17-13s8 13 17 13 7-8 7-8' fill='none' stroke='%2362e2b3' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='51' cy='29' r='7' fill='%2362e2b3'/%3E%3Ccircle cx='53' cy='27' r='1.6' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -58,6 +58,37 @@
       0 0 24px rgba(255,82,18,.16),
       inset 0 0 22px rgba(255,93,20,.1);
   }
+  body[data-game-theme="frozen"] {
+    --jade: #8bd8ff;
+    --jade-deep: #2f6f9d;
+    --gold: #d9f5ff;
+    --bronze: #6aa5c3;
+    --crimson: #b8ecff;
+    --paper: #eefaff;
+    --ink: #030b14;
+  }
+  body[data-game-theme="frozen"] .panel {
+    background:
+      linear-gradient(135deg, rgba(139,216,255,.1), transparent 36%),
+      rgba(4, 15, 27, .88);
+    border-color: rgba(112, 188, 224, .56);
+    box-shadow:
+      0 14px 34px rgba(0,0,0,.56),
+      inset 0 0 26px rgba(102,201,245,.045);
+  }
+  body[data-game-theme="frozen"] #hpfill {
+    background: linear-gradient(90deg, #3d90bd, #8bd8ff 72%, #e5fbff);
+    box-shadow: 0 0 16px rgba(113,213,255,.52);
+  }
+  body[data-game-theme="frozen"] .touch-action,
+  body[data-game-theme="frozen"] .touch-fire {
+    border-color: rgba(139,216,255,.7);
+    color: #eefaff;
+    box-shadow:
+      0 0 0 5px rgba(89,186,235,.04),
+      0 0 24px rgba(92,190,239,.17),
+      inset 0 0 22px rgba(108,209,255,.1);
+  }
   #stage { position: fixed; inset: 0; }
   #stage::before {
     content: "";
@@ -76,8 +107,8 @@
     z-index: 4;
     pointer-events: none;
     background:
-      linear-gradient(90deg, rgba(0,0,0,.24), transparent 12% 88%, rgba(0,0,0,.24)),
-      radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(0,0,0,.44) 100%);
+      linear-gradient(90deg, rgba(0,0,0,.12), transparent 12% 88%, rgba(0,0,0,.12)),
+      radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,.22) 100%);
   }
   canvas { display: block; }
 
@@ -918,7 +949,7 @@
   }
   #skillSettingsList {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 11px;
   }
   .skill-card {
@@ -1092,6 +1123,15 @@
   body[data-campaign-theme="volcano"] .campaign-screen {
     --map-accent: #ff9a47;
     --map-accent-deep: #a63712;
+  }
+  body[data-campaign-theme="frozen"] .campaign-screen {
+    --map-accent: #8bd8ff;
+    --map-accent-deep: #2f6f9d;
+    background:
+      linear-gradient(180deg, rgba(3,12,24,.7), rgba(6,27,44,.78) 52%, rgba(2,9,17,.92)),
+      radial-gradient(circle at 50% 6%, rgba(157,226,255,.24), transparent 28%),
+      url("assets/frozen-wastes-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #071b2d, #04101d);
   }
   .campaign-shell {
     position: relative;
@@ -1480,6 +1520,13 @@
       radial-gradient(circle at 67% 26%, color-mix(in srgb, var(--map-accent) 16%, transparent), transparent 23%),
       radial-gradient(ellipse at 24% 76%, rgba(51,161,130,.16), transparent 31%),
       linear-gradient(180deg, #061715, #0a2925 58%, #071411);
+  }
+  body[data-campaign-theme="frozen"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(3,12,24,.7), rgba(6,27,44,.8) 55%, rgba(2,9,17,.94)),
+      radial-gradient(circle at 50% 10%, rgba(157,226,255,.2), transparent 26%),
+      url("assets/frozen-wastes-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #071b2d, #04101d);
   }
   #levelMapScreen .campaign-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
   .region-map-head {
@@ -1946,6 +1993,7 @@
   }
 
   @media (max-width: 760px) {
+    #skillSettingsList { grid-template-columns: 1fr; }
     .campaign-shell {
       padding:
         max(14px, env(safe-area-inset-top))
@@ -2349,10 +2397,10 @@
         <span class="eyebrow">DEVOUR CAMPAIGN</span>
         <h2>吞噬版图</h2>
       </div>
-      <div class="campaign-total" aria-label="战役总进度">总星途 <b id="campaignTotal">0 / 24</b></div>
+      <div class="campaign-total" aria-label="战役总进度">总星途 <b id="campaignTotal">0 / 32</b></div>
     </header>
     <div class="region-stage">
-      <div class="region-cards" id="regionCards" aria-label="三个区域"></div>
+      <div class="region-cards" id="regionCards" aria-label="四个区域"></div>
     </div>
     <footer class="campaign-legend" aria-label="地图说明">
       <span><i></i> 已开放关卡</span>
@@ -2448,7 +2496,7 @@
       <section class="settings-panel" id="settingsPanelSkills" role="tabpanel"
         aria-labelledby="settingsTabSkills" data-settings-panel="skills" hidden>
         <div class="skill-settings-intro">
-          <span>击败 Boss 后吞噬场地中央的发光核心。绿色与红色共用 <b>E</b> 槽，黄色独占 <b>Q</b> 槽。</span>
+          <span>击败 Boss 后吞噬场地中央的发光核心。绿、红、蓝核心共用 <b>E</b> 槽，黄色独占 <b>Q</b> 槽。</span>
           <span>新核心会<b>自动安装</b></span>
         </div>
         <div id="skillSettingsList" aria-live="polite"></div>
@@ -2457,10 +2505,10 @@
 </section>
 
 <script src="vendor/three.min.js?v=20261117"></script>
-<script src="skills.js?v=20261121-reset1"></script>
-<script src="game.js?v=20261121-reset1"></script>
-<script src="campaign.js?v=20261121-reset1"></script>
+<script src="skills.js?v=20261121-frozen1"></script>
+<script src="game.js?v=20261122-frozen2"></script>
+<script src="campaign.js?v=20261121-frozen1"></script>
 <script src="audio.js?v=20261121-settings2"></script>
-<script src="start.js?v=20261121-reset1"></script>
+<script src="start.js?v=20261121-frozen1"></script>
 </body>
 </html>

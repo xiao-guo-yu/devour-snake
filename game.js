@@ -28,6 +28,18 @@
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
   const GHOST_BULLET_SPEED = 2;
+  const ICE_SPAWN_INTERVAL = 15;
+  const ICE_MAX_ACTIVE = 72;
+  const DRAGON_BREATH_TELEGRAPH = 0.85;
+  const DRAGON_BREATH_ACTIVE = 1.15;
+  const DRAGON_BREATH_COOLDOWN = 6.2;
+  const DRAGON_BREATH_RANGE = 19;
+  const DRAGON_BREATH_HALF_ANGLE = Math.PI * 0.29;
+  const FROST_SKILL_COST = 2;
+  const FROST_SKILL_COOLDOWN = 6;
+  const FROST_SKILL_DURATION = 3;
+  const FROST_SKILL_RANGE = 13;
+  const FROST_SKILL_HALF_ANGLE = Math.PI * 0.34;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   const DEBUG_START_LEVEL = (() => {
     try {
@@ -103,6 +115,19 @@
       contactRadius: 0.7, retreatSpeedMul: 0.4,
       shootCooldown: 3.6, revealDelay: 0.35, hideHalfSize: 4,
     },
+    // 第四章小怪的机制与最终数值后续单独补齐；此处只提供关卡主体所需的占位数值。
+    iceSlug: {
+      hp: 1, speed: 0.78, contactDamage: 1, contactCooldown: 1.3,
+      contactRadius: 0.74, retreatSpeedMul: 0.4,
+    },
+    frostWolf: {
+      hp: 1, speed: 2.05, contactDamage: 2, contactCooldown: 1.15,
+      contactRadius: 0.76, retreatSpeedMul: 0.46,
+    },
+    frostWisp: {
+      hp: 1, speed: 0.42, contactDamage: 1, contactCooldown: 1.25,
+      contactRadius: 0.7, retreatSpeedMul: 0.4,
+    },
   };
 
   // 每个区域 7 个普通关 + 第 8 关 Boss；composition 表示三种小怪的具体数量。
@@ -133,6 +158,15 @@
     { theme: 'volcano', kind: 'clear', composition: { obsidianBeetle: 5, emberWisp: 3 }, name: '熔火地脉 · 熔炉深处' },
     { theme: 'volcano', kind: 'clear', composition: { emberWisp: 8 }, name: '熔火地脉 · 火山核心' },
     { theme: 'volcano', kind: 'boss', boss: 'magma_colossus', name: '熔岩巨像 · MAGMA COLOSSUS' },
+
+    { theme: 'frozen', kind: 'clear', composition: { iceSlug: 8 }, name: '永冻冰原 · 霜原边缘' },
+    { theme: 'frozen', kind: 'clear', composition: { iceSlug: 5, frostWolf: 3 }, name: '永冻冰原 · 裂冰走廊' },
+    { theme: 'frozen', kind: 'clear', composition: { frostWolf: 8 }, name: '永冻冰原 · 狼嚎冻谷' },
+    { theme: 'frozen', kind: 'clear', composition: { iceSlug: 5, frostWisp: 3 }, name: '永冻冰原 · 寒晶蛞蝓穴' },
+    { theme: 'frozen', kind: 'clear', composition: { iceSlug: 3, frostWolf: 2, frostWisp: 3 }, name: '永冻冰原 · 雾灵回廊' },
+    { theme: 'frozen', kind: 'clear', composition: { frostWolf: 5, frostWisp: 3 }, name: '永冻冰原 · 霜骨荒径' },
+    { theme: 'frozen', kind: 'clear', composition: { frostWisp: 8 }, name: '永冻冰原 · 冰封王座前庭' },
+    { theme: 'frozen', kind: 'boss', boss: 'frost_dragon', name: '凛冬冰龙 · FROST DRAGON' },
   ];
   const ROOM_COUNT = ROOMS.length;
 
@@ -291,10 +325,11 @@
 
   // ---------- 障碍柱子 ----------
   const obstacles = new Set();
+  const dynamicIce = new Map();
   const STUMP_COUNT = 8;
 
   const inBounds = (i, j) => i >= 0 && j >= 0 && i < N && j < N;
-  const isObstacle = (i, j) => obstacles.has(`${i},${j}`);
+  const isObstacle = (i, j) => obstacles.has(`${i},${j}`) || dynamicIce.has(`${i},${j}`);
 
   // ---------- 手绘 sprite（canvas 2D 贴图） ----------
   function spriteTexture(size, draw) {
@@ -1231,7 +1266,7 @@
     : null;
   const loadCharacterTexture = (file, fallback) => (
     imageTextureLoader
-      ? imageTextureLoader.load(`assets/${file}?v=20261117-volcano-light2`)
+      ? imageTextureLoader.load(`assets/${file}?v=20261122-frozen2`)
       : fallback
   );
   const loadPixelTexture = (file, fallback) => {
@@ -1259,11 +1294,20 @@
     magmaSlime: loadCharacterTexture('magma-slime.png', spriteTexture(192, drawMagmaSlime)),
     obsidianBeetle: loadCharacterTexture('obsidian-beetle.png', spriteTexture(192, drawObsidianBeetle)),
     emberWisp: loadCharacterTexture('ember-wisp.png', spriteTexture(192, drawEmberWisp)),
+    iceSlug: loadCharacterTexture('ice-slug.png', null),
+    frostWolf: loadCharacterTexture('frost-wolf.png', null),
+    frostWisp: loadCharacterTexture('frost-wisp.png', null),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
     ENEMY_MATS[key] = TEX[key]
-      ? new THREE.MeshBasicMaterial({ map: TEX[key], transparent: true, depthWrite: false })
+      ? new THREE.MeshBasicMaterial({
+        map: TEX[key],
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
       : new THREE.MeshBasicMaterial({ color: 0x8a7b86 });
   }
   const magmaColossusTex = loadCharacterTexture(
@@ -1274,7 +1318,10 @@
     rootcoil: loadCharacterTexture('rootcoil.png', spriteTexture(512, drawBoss)),
     pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
     magma_colossus: magmaColossusTex,
+    frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
   };
+  const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
+  const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -1301,6 +1348,32 @@
       mesh.renderOrder = 1;
       scene.add(mesh);
       stumpPlanes.push(mesh);
+    }
+  }
+
+  // 第四章冰障：每个实例严格占 1×1 格，由计时器动态追加。
+  const iceBlockMeshes = [];
+  const ICE_BLOCK_TEX = loadCharacterTexture('ice-block.png', null);
+  {
+    const geo = new THREE.PlaneGeometry(1.02, 1.02);
+    for (let k = 0; k < ICE_MAX_ACTIVE; k++) {
+      const mesh = new THREE.Mesh(
+        geo,
+        new THREE.MeshBasicMaterial({
+          map: ICE_BLOCK_TEX || null,
+          color: ICE_BLOCK_TEX ? 0xffffff : 0x8bdcff,
+          transparent: true,
+          opacity: 0.98,
+          depthWrite: false,
+          fog: false,
+        })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.31;
+      mesh.visible = false;
+      mesh.renderOrder = 2;
+      scene.add(mesh);
+      iceBlockMeshes.push(mesh);
     }
   }
 
@@ -1404,6 +1477,12 @@
     placeObstacles(seeds, LAVA_PIT_TEX);
   }
 
+  /** 第四章：不铺设固定障碍，冰晶由独立计时器生成。 */
+  function layoutFrozen() {
+    placeObstacles([], null);
+    clearIceObstacles();
+  }
+
   // ---------- 蛇：一条连续的带状身体 ----------
   const MAX_PTS = 400;
   const ribbonGeo = new THREE.BufferGeometry();
@@ -1486,7 +1565,13 @@
   const headPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(1.9, 1.9),
     headTex
-      ? new THREE.MeshBasicMaterial({ map: headTex, transparent: true, depthWrite: false })
+      ? new THREE.MeshBasicMaterial({
+        map: headTex,
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
       : new THREE.MeshBasicMaterial({ color: 0x4ecb9b })
   );
   headPlane.rotation.x = -Math.PI / 2;
@@ -1711,12 +1796,15 @@
 
   const bossMesh = new THREE.Group();
   let bossPlaneMat = null;
+  let bossPoseTexture = null;
   {
     bossPlaneMat = new THREE.MeshBasicMaterial({
       map: BOSS_TEX.rootcoil || null,
       color: BOSS_TEX.rootcoil ? 0xffffff : 0x6b4a2f,
       transparent: true,
       depthWrite: false,
+      fog: false,
+      toneMapped: false,
     });
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4), bossPlaneMat);
     plane.rotation.x = -Math.PI / 2;
@@ -1725,6 +1813,49 @@
   }
   bossMesh.visible = false;
   scene.add(bossMesh);
+
+  // 凛冬冰龙龙息：贴图从左端窄口向右端展开，几何平移后以 Boss 嘴部为原点。
+  const bossBreathRig = new THREE.Group();
+  const bossBreathGeo = new THREE.PlaneGeometry(DRAGON_BREATH_RANGE, DRAGON_BREATH_RANGE * 0.56);
+  bossBreathGeo.translate(DRAGON_BREATH_RANGE / 2, 0, 0);
+  const bossBreathMat = new THREE.MeshBasicMaterial({
+    map: DRAGON_BREATH_TEX || null,
+    color: DRAGON_BREATH_TEX ? 0xffffff : 0x8de9ff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: false,
+  });
+  const bossBreathMesh = new THREE.Mesh(bossBreathGeo, bossBreathMat);
+  bossBreathMesh.rotation.x = -Math.PI / 2;
+  bossBreathMesh.position.y = 0.28;
+  bossBreathMesh.renderOrder = 4;
+  bossBreathRig.add(bossBreathMesh);
+  bossBreathRig.visible = false;
+  scene.add(bossBreathRig);
+
+  const playerFrostRig = new THREE.Group();
+  const playerFrostGeo = new THREE.PlaneGeometry(11.5, 5.2);
+  playerFrostGeo.translate(5.75, 0, 0);
+  const playerFrostMesh = new THREE.Mesh(
+    playerFrostGeo,
+    new THREE.MeshBasicMaterial({
+      map: DRAGON_BREATH_TEX || null,
+      color: DRAGON_BREATH_TEX ? 0x9beaff : 0x8de9ff,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    })
+  );
+  playerFrostMesh.rotation.x = -Math.PI / 2;
+  playerFrostMesh.position.y = 0.32;
+  playerFrostMesh.renderOrder = 4;
+  playerFrostRig.add(playerFrostMesh);
+  playerFrostRig.visible = false;
+  scene.add(playerFrostRig);
 
   const colossusShadow = new THREE.Mesh(
     new THREE.CircleGeometry(6.45, 48),
@@ -1840,6 +1971,7 @@
     rootcoil: { id: 'green', color: 0x68e7b8, core: 0xcaffea, emissive: 0x28b685 },
     pharaoh: { id: 'yellow', color: 0xf0c66c, core: 0xfff0b8, emissive: 0xc28d24 },
     magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
+    frost_dragon: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
   };
 
   // ---------- 状态 ----------
@@ -1868,6 +2000,9 @@
     shieldTimer: 0,
     shieldCooldown: 0,
     shieldFlash: 0,
+    frostCooldown: 0,
+    frostEffectTimer: 0,
+    iceSpawnTimer: ICE_SPAWN_INTERVAL,
     roomActive: false,
     roomTimer: 0,
     spawnEmerging: false,
@@ -2029,6 +2164,76 @@
     });
   }
 
+  function clearIceObstacles() {
+    dynamicIce.clear();
+    iceBlockMeshes.forEach((mesh) => {
+      mesh.visible = false;
+      mesh.scale.setScalar(1);
+    });
+  }
+
+  function spawnIceObstacle(forcedCell = null) {
+    if (dynamicIce.size >= ICE_MAX_ACTIVE) return false;
+    const mesh = iceBlockMeshes.find((item) => !item.visible);
+    if (!mesh) return false;
+    const head = state.cells[0] || { i: HALF, j: HALF };
+    let cell = forcedCell;
+    if (!cell) {
+      for (let tries = 0; tries < 500; tries++) {
+        const i = 3 + randInt(N - 6);
+        const j = 3 + randInt(N - 6);
+        if (isObstacle(i, j)) continue;
+        if (Math.abs(i - head.i) + Math.abs(j - head.j) < 4) continue;
+        if (Math.abs(i - DOOR_CELL.i) < 4 && j < 5) continue;
+        if (Math.abs(i - SPAWN_DOOR_CELL.i) < 4 && j > N - 6) continue;
+        if (state.cells.some((c) => Math.abs(c.i - i) + Math.abs(c.j - j) < 2)) continue;
+        if (state.pellets.some((p) => p.i === i && p.j === j)) continue;
+        if (state.enemies.some((e) => e.alive && Math.abs(e.i - i) + Math.abs(e.j - j) < 2)) continue;
+        if (state.boss && state.boss.alive && Math.abs(i - BOSS_CELL.i) < 6 && Math.abs(j - BOSS_CELL.j) < 6) continue;
+        cell = { i, j };
+        break;
+      }
+    }
+    if (!cell || isObstacle(cell.i, cell.j)) return false;
+    const key = `${cell.i},${cell.j}`;
+    dynamicIce.set(key, { i: cell.i, j: cell.j, mesh, age: 0 });
+    mesh.visible = true;
+    mesh.position.set(cellX(cell.i), 0.31, cellZ(cell.j));
+    mesh.rotation.z = (Math.random() - 0.5) * 0.08;
+    mesh.scale.setScalar(0.12);
+    mesh.material.opacity = 1;
+    return true;
+  }
+
+  function breakIceObstacle(i, j) {
+    const key = `${i},${j}`;
+    const ice = dynamicIce.get(key);
+    if (!ice) return false;
+    ice.mesh.visible = false;
+    dynamicIce.delete(key);
+    return true;
+  }
+
+  function updateIceObstacles(dt) {
+    for (const ice of dynamicIce.values()) {
+      ice.age += dt;
+      const grow = Math.min(1, ice.age / 0.28);
+      const pulse = 1 + Math.sin(state.time * 3.4 + ice.i + ice.j) * 0.025;
+      ice.mesh.scale.setScalar((0.12 + grow * 0.88) * pulse);
+    }
+  }
+
+  function updateIceSpawner(dt) {
+    if (ROOMS[state.level]?.theme !== 'frozen') return;
+    if (state.phase !== 'clear' && state.phase !== 'boss') return;
+    state.iceSpawnTimer -= dt;
+    if (state.iceSpawnTimer > 0) return;
+    state.iceSpawnTimer += ICE_SPAWN_INTERVAL;
+    if (spawnIceObstacle()) {
+      toast('寒潮凝晶', '单格冰障出现 · 可用烈焰弹击碎');
+    }
+  }
+
   function spawnEnemy(distFromHead = 10, isRespawn = false) {
     const h = state.cells[0] || { i: HALF, j: HALF };
     const slot = state.enemies.find((e) => !e.alive);
@@ -2055,6 +2260,7 @@
         eyeTimer: spawnStats.eyeGlowCooldown || 0,
         invulnTimer: 0,
         staffPulse: 0,
+        frozenTimer: 0,
       });
       // 复活时恢复原色/原贴图（甲虫被打灰后）
       const idx = state.enemies.indexOf(slot);
@@ -2140,7 +2346,7 @@
     const shieldText = state.shieldTimer > 0
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
-    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}`;
+    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}`;
     if (signature === lastSkillHudSignature) return;
     lastSkillHudSignature = signature;
 
@@ -2150,11 +2356,16 @@
 
     if (eSkill) {
       const red = eSkill === 'red';
-      el.eSkillName.textContent = red ? 'E · 赤核烈焰' : 'E · 翠核疾射';
-      el.eSkillDesc.textContent = red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 1 格 · 普通射击';
-      el.eSkillState.textContent = state.cells.length > (red ? 3 : 2) ? '就绪' : '身体不足';
+      const ice = eSkill === 'ice';
+      el.eSkillName.textContent = ice ? 'E · 寒冰吐息' : (red ? 'E · 赤核烈焰' : 'E · 翠核疾射');
+      el.eSkillDesc.textContent = ice
+        ? '消耗 2 格 · 冻结前方大片敌人'
+        : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 1 格 · 普通射击');
+      el.eSkillState.textContent = ice && state.frostCooldown > 0
+        ? `${state.frostCooldown.toFixed(1)}s`
+        : (state.cells.length > (red || ice ? 3 : 2) ? '就绪' : '身体不足');
       if (el.eSkillHud.style?.setProperty) {
-        el.eSkillHud.style.setProperty('--skill-color', red ? '#ff6542' : '#68e7b8');
+        el.eSkillHud.style.setProperty('--skill-color', ice ? '#8de9ff' : (red ? '#ff6542' : '#68e7b8'));
       }
     }
 
@@ -2171,6 +2382,7 @@
     green: { fog: 0x06110b, a: 0x12231a, b: 0x1a3024, hemi: 0x9cebd2, wall: 0x352d20, ea: 0x000000, eb: 0x000000 },
     temple: { fog: 0x1b1206, a: 0x3b2a17, b: 0x4a351e, hemi: 0xf0cf91, wall: 0x4a3b28, ea: 0x0a0501, eb: 0x0c0702 },
     volcano: { fog: 0x160705, a: 0x12100f, b: 0x1a1512, hemi: 0xff9a58, wall: 0x221814, ea: 0x4a1605, eb: 0x621d06 },
+    frozen: { fog: 0x07172a, a: 0x416f8b, b: 0x5786a0, hemi: 0xc9f4ff, wall: 0x84adbf, ea: 0x0b3d57, eb: 0x0d4a66 },
   };
 
   function startLevel(idx) {
@@ -2184,6 +2396,7 @@
     bossMesh.visible = false;
     if (room.theme === 'temple') layoutTemple(idx);
     else if (room.theme === 'volcano') layoutVolcano(idx);
+    else if (room.theme === 'frozen') layoutFrozen(idx);
     else layoutStumps(idx);
 
     state.enemies.forEach((e) => { e.alive = false; });
@@ -2209,8 +2422,14 @@
     state.shieldTimer = 0;
     state.shieldCooldown = 0;
     state.shieldFlash = 0;
+    state.frostCooldown = 0;
+    state.frostEffectTimer = 0;
+    state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     shieldRibbon.visible = false;
     shieldHalo.visible = false;
+    bossBreathRig.visible = false;
+    bossBreathMat.opacity = 0;
+    playerFrostRig.visible = false;
 
     // 温室关卡特性保留：第二关小怪更快，第三关会远程
 
@@ -2267,8 +2486,8 @@
     matB.color.setHex(tint.b);
     matA.emissive.setHex(tint.ea);
     matB.emissive.setHex(tint.eb);
-    matA.emissiveIntensity = room.theme === 'volcano' ? 0.72 : 0.16;
-    matB.emissiveIntensity = room.theme === 'volcano' ? 0.72 : 0.16;
+    matA.emissiveIntensity = room.theme === 'volcano' ? 0.72 : (room.theme === 'frozen' ? 0.22 : 0.16);
+    matB.emissiveIntensity = room.theme === 'volcano' ? 0.72 : (room.theme === 'frozen' ? 0.22 : 0.16);
     wallMat.color.setHex(tint.wall);
     hemi.color.setHex(tint.hemi);
     lavaUnderlay.visible = room.theme === 'volcano';
@@ -2282,13 +2501,14 @@
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
-      enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : 1);
+      enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : (type === 'frostWisp' ? 1.28 : 1));
       state.enemies[k].type = type;
       state.enemies[k].hp = enemyStats(type).hp;
       state.enemies[k].speedMul = 1;
       state.enemies[k].eyeTimer = enemyStats(type).eyeGlowCooldown || 0;
       state.enemies[k].invulnTimer = 0;
       state.enemies[k].staffPulse = 0;
+      state.enemies[k].frozenTimer = 0;
     }
 
     if (room.kind === 'clear') {
@@ -2302,7 +2522,7 @@
       );
     } else {
       spawnBoss(room.boss);
-      showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败法老 · 完成试炼' : '击败首领 · 进入下一层');
+      showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败冰龙 · 完成远征' : '击败首领 · 进入下一层');
     }
     updateHud();
   }
@@ -2310,22 +2530,23 @@
   function spawnBoss(kind = 'rootcoil') {
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
-    const isRootcoil = !isPharaoh && !isColossus;
-    const hp = isColossus ? 480 : (isPharaoh ? 380 : BOSS_HP);
+    const isDragon = kind === 'frost_dragon';
+    const isRootcoil = !isPharaoh && !isColossus && !isDragon;
+    const hp = isColossus ? 480 : (isDragon ? 440 : (isPharaoh ? 380 : BOSS_HP));
     const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isPharaoh ? 0.95 : 2),
-      bulletHitRadius: isRootcoil ? 4.6 : 2.3,
-      contactRadius: isRootcoil ? 4.8 : 2.5,
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 1.55 : (isPharaoh ? 0.95 : 2)),
+      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 3.2 : 2.3),
+      contactRadius: isRootcoil ? 4.8 : (isDragon ? 3.25 : 2.5),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
       z: start.z,
-      shootTimer: isPharaoh ? 2.4 : 3,
+      shootTimer: isPharaoh ? 2.4 : (isDragon ? 99 : 3),
       jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
       jumpFrom: null,
@@ -2336,7 +2557,13 @@
       jumpHidden: false,
       fireballTimer: isColossus ? 3 : 0,
       cool: 0,
+      breathTimer: isDragon ? 2.6 : 0,
+      breathState: isDragon ? 'idle' : 'none',
+      breathElapsed: 0,
+      breathAngle: 0,
+      breathHit: false,
     };
+    bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
     bossPlaneMat.color.setHex(bossPlaneMat.map ? 0xffffff : 0x6b4a2f);
     bossPlaneMat.needsUpdate = true;
@@ -2344,17 +2571,23 @@
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
     bossMesh.scale.setScalar(state.boss.renderScale);
     bossMesh.rotation.z = 0;
+    bossBreathRig.visible = false;
+    bossBreathMat.opacity = 0;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    el.bname.textContent = isColossus
-      ? '熔岩巨像 · MAGMA COLOSSUS'
-      : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL');
+    el.bname.textContent = isDragon
+      ? '凛冬冰龙 · FROST DRAGON'
+      : (isColossus
+        ? '熔岩巨像 · MAGMA COLOSSUS'
+        : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL'));
   }
 
   function bossDie() {
     const bossKind = state.boss?.kind || 'rootcoil';
     state.boss.alive = false;
     bossMesh.visible = false;
+    bossBreathRig.visible = false;
+    bossBreathMat.opacity = 0;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
     state.phase = 'pick';
@@ -2558,8 +2791,51 @@
     state.dir = d;
   }
 
+  function angleDistance(a, b) {
+    return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  }
+
+  function activateFrostBreath() {
+    if (state.over || state.paused || state.frostCooldown > 0) return;
+    if (activeSkillId('e') !== 'ice') return;
+    if (state.cells.length <= FROST_SKILL_COST + 1) {
+      toast('寒冰吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
+      return;
+    }
+
+    for (let k = 0; k < FROST_SKILL_COST; k++) state.cells.pop();
+    state.prevTail = null;
+    state.frostCooldown = FROST_SKILL_COOLDOWN;
+    state.frostEffectTimer = 0.92;
+
+    const head = headPosition(_tmpA).clone();
+    const angle = Math.atan2(state.dir.j, state.dir.i);
+    playerFrostRig.position.set(head.x, 0, head.z);
+    playerFrostRig.rotation.y = Math.atan2(-state.dir.j, state.dir.i);
+    playerFrostRig.visible = true;
+    playerFrostMesh.material.opacity = 0.82;
+
+    let frozen = 0;
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const dx = enemy.x - head.x;
+      const dz = enemy.z - head.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > FROST_SKILL_RANGE || distance < 0.001) continue;
+      if (angleDistance(Math.atan2(dz, dx), angle) > FROST_SKILL_HALF_ANGLE) continue;
+      enemy.frozenTimer = Math.max(enemy.frozenTimer || 0, FROST_SKILL_DURATION);
+      frozen += 1;
+    }
+    updateHud();
+    toast('寒冰吐息', frozen > 0 ? `冻结 ${frozen} 只敌人 · ${FROST_SKILL_DURATION} 秒` : '寒流席卷前方');
+  }
+
   function shoot(source = 'space') {
     if (state.over || state.paused) return;
+    if (source === 'e' && activeSkillId('e') === 'ice') {
+      activateFrostBreath();
+      return;
+    }
     if (state.shootCd > 0) return;
     const eSkill = source === 'e' ? activeSkillId('e') : null;
     if (source === 'e' && !eSkill) {
@@ -3009,6 +3285,14 @@
       const e = state.enemies[k];
       if (!e || !e.alive) { mesh.visible = false; continue; }
       mesh.visible = true;
+      if (e.frozenTimer > 0) {
+        e.frozenTimer = Math.max(0, e.frozenTimer - dt);
+        mesh.material.color.setHex(0xa9eeff);
+        mesh.position.set(e.x, 0.5 + Math.sin(state.time * 2.4 + e.bob) * 0.025, e.z);
+        mesh.rotation.z = Math.sin(state.time * 1.8 + e.bob) * 0.035;
+        continue;
+      }
+      mesh.material.color.setHex(0xffffff);
       if (spawnLocked) {
         mesh.position.set(e.x, 0.5 + Math.sin(state.time * 4 + e.bob) * 0.04, e.z);
         mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
@@ -3242,6 +3526,114 @@
     }
   }
 
+  function setFrostDragonPose(attacking) {
+    const texture = attacking
+      ? (FROST_DRAGON_ATTACK_TEX || BOSS_TEX.frost_dragon)
+      : (BOSS_TEX.frost_dragon || bossPoseTexture);
+    if (!texture || bossPlaneMat.map === texture) return;
+    bossPlaneMat.map = texture;
+    bossPlaneMat.color.setHex(0xffffff);
+    bossPlaneMat.needsUpdate = true;
+    bossPoseTexture = texture;
+  }
+
+  function bodyTouchesDragonBreath(b) {
+    const dirX = Math.cos(b.breathAngle);
+    const dirZ = Math.sin(b.breathAngle);
+    for (const cell of state.cells) {
+      const dx = cellX(cell.i) - b.x;
+      const dz = cellZ(cell.j) - b.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < 0.001 || distance > DRAGON_BREATH_RANGE) continue;
+      const dot = (dx * dirX + dz * dirZ) / distance;
+      if (Math.acos(Math.max(-1, Math.min(1, dot))) <= DRAGON_BREATH_HALF_ANGLE) return true;
+    }
+    return false;
+  }
+
+  function updateFrostDragon(b, dt, hp) {
+    const baseScale = b.renderScale || 1.55;
+    const dx = hp.x - b.x;
+    const dz = hp.z - b.z;
+    const targetAngle = Math.atan2(dz, dx);
+
+    if (b.breathState === 'idle') {
+      const distance = Math.hypot(dx, dz) || 1;
+      if (distance > 7) {
+        b.x += (dx / distance) * 0.42 * dt;
+        b.z += (dz / distance) * 0.42 * dt;
+      }
+      b.x = Math.max(-HALF + 3, Math.min(HALF - 3, b.x));
+      b.z = Math.max(-HALF + 3, Math.min(HALF - 3, b.z));
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = Math.sin(state.time * 1.5) * 0.025;
+      bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 2.1) * 0.03);
+      bossBreathRig.visible = false;
+      bossBreathMat.opacity = 0;
+      setFrostDragonPose(false);
+
+      if (b.cool > 0) b.cool -= dt;
+      if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
+        b.cool = 1.6;
+        damage(2, 'contact');
+        if (state.over) return;
+      }
+
+      b.breathTimer -= dt;
+      if (b.breathTimer <= 0) {
+        b.breathState = 'telegraph';
+        b.breathElapsed = 0;
+        b.breathAngle = targetAngle;
+        b.breathHit = false;
+        setFrostDragonPose(true);
+      }
+      return;
+    }
+
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 8) * 0.018;
+    bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 7) * 0.012);
+    setFrostDragonPose(true);
+
+    b.breathElapsed += dt;
+    if (b.breathState === 'telegraph') {
+      b.breathAngle = Math.atan2(dz, dx);
+    }
+    const dirX = Math.cos(b.breathAngle);
+    const dirZ = Math.sin(b.breathAngle);
+    bossBreathRig.position.set(b.x + dirX * 1.45, 0, b.z + dirZ * 1.45);
+    bossBreathRig.rotation.y = Math.atan2(-dirZ, dirX);
+    bossBreathRig.visible = true;
+
+    if (b.breathState === 'telegraph') {
+      const progress = Math.min(1, b.breathElapsed / DRAGON_BREATH_TELEGRAPH);
+      bossBreathMat.opacity = 0.18 + progress * 0.24;
+      if (b.breathElapsed >= DRAGON_BREATH_TELEGRAPH) {
+        b.breathState = 'active';
+        b.breathElapsed = 0;
+        bossBreathMat.opacity = 0.92;
+      }
+      return;
+    }
+
+    bossBreathMat.opacity = 0.84 + Math.sin(state.time * 19) * 0.1;
+    if (!b.breathHit && bodyTouchesDragonBreath(b)) {
+      b.breathHit = true;
+      const shielded = state.shieldTimer > 0;
+      damage(2, 'projectile');
+      if (!shielded) toast('凛冬龙息命中', '体长 -2');
+      if (state.over) return;
+    }
+    if (b.breathElapsed >= DRAGON_BREATH_ACTIVE) {
+      b.breathState = 'idle';
+      b.breathElapsed = 0;
+      b.breathTimer = DRAGON_BREATH_COOLDOWN;
+      bossBreathRig.visible = false;
+      bossBreathMat.opacity = 0;
+      setFrostDragonPose(false);
+    }
+  }
+
   function updateMagmaColossus(b, dt) {
     if (b.jumpState !== 'airborne' && bodyDistanceSq(b.x, b.z) < COLOSSUS_CRUSH_RADIUS * COLOSSUS_CRUSH_RADIUS) {
       gameOver('被熔岩巨像踩碎');
@@ -3339,6 +3731,10 @@
     const b = state.boss;
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
+    if (b.kind === 'frost_dragon') {
+      updateFrostDragon(b, dt, hp);
+      return;
+    }
     if (b.kind === 'magma_colossus') {
       updateMagmaColossus(b, dt);
       return;
@@ -3596,8 +3992,13 @@
 
       const ci = Math.round(b.x + HALF);
       const cj = Math.round(b.z + HALF);
-      let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
       let burstSpawned = false;
+      if (b.fire && dynamicIce.has(`${ci},${cj}`)) {
+        breakIceObstacle(ci, cj);
+        spawnFireBurst(b.x, b.z);
+        burstSpawned = true;
+      }
+      let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
 
       // 命中小怪
       if (!dead && state.phase === 'clear') {
@@ -3825,6 +4226,8 @@
     if (startRoom) startRoom.visible = false;
     if (spawnDoorGroup) spawnDoorGroup.visible = false;
     if (doorPlug) doorPlug.visible = false;
+    bossBreathRig.visible = false;
+    playerFrostRig.visible = false;
     state.time = 0;
     state.shotDamage = 6;
     state.shootCdMul = 1;
@@ -3867,7 +4270,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老与熔岩巨像，三座遗迹都成了你的巢。';
+    el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老、熔岩巨像与凛冬冰龙，四片疆域都成了你的巢。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
@@ -3902,6 +4305,12 @@
       state.shieldTimer = Math.max(0, state.shieldTimer - dt);
       state.shieldCooldown = Math.max(0, state.shieldCooldown - dt);
       state.shieldFlash = Math.max(0, state.shieldFlash - dt);
+      state.frostCooldown = Math.max(0, state.frostCooldown - dt);
+      state.frostEffectTimer = Math.max(0, state.frostEffectTimer - dt);
+      playerFrostRig.visible = state.frostEffectTimer > 0;
+      if (playerFrostRig.visible) {
+        playerFrostMesh.material.opacity = Math.min(0.82, state.frostEffectTimer * 1.4);
+      }
       updateSkillHud();
 
       // 受击时身体整体闪一下（包括被身体挡下的伤害）
@@ -3930,6 +4339,8 @@
 
       updateBullets(dt);
       updateFireBursts(dt);
+      updateIceObstacles(dt);
+      updateIceSpawner(dt);
       updatePellets();
       updateSkillOrb(dt);
       updateDoor(dt);
@@ -3958,6 +4369,7 @@
     spawnSkillOrb,
     shoot,
     activateShield,
+    activateFrostBreath,
     damage,
     damageEnemiesInFireAoe,
     resetGame,
@@ -3967,6 +4379,9 @@
     getEnemyStats: (type) => ({ ...enemyStats(type) }),
     chooseRespawnEnemyType,
     clearObstacles: () => obstacles.clear(),
+    spawnIceObstacle,
+    breakIceObstacle,
+    getIceObstacles: () => [...dynamicIce.values()].map(({ i, j }) => ({ i, j })),
   };
   window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {
     resetGame(levelIndex);
