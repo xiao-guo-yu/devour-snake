@@ -77,7 +77,7 @@
     mummy: {
       hp: 1, speed: 1.2, contactDamage: 2, contactCooldown: 1.3,
       contactRadius: 0.74, retreatSpeedMul: 0.38,
-      eyeGlowCooldown: 6, eyeInvulnDuration: 2,
+      eyeGlowCooldown: 5, eyeInvulnDuration: 2,
     },
     anubis: {
       hp: 1, speed: 1.35, contactDamage: 2, contactCooldown: 1.2,
@@ -1821,6 +1821,7 @@
     time: 0,
     levelTime: 0,
     timerDisplayedSecond: -1,
+    roomEnemyTypes: [],
     shotDamage: 6,
     shootCdMul: 1,
     spawnGrace: 0,
@@ -1952,24 +1953,26 @@
     const h = state.cells[0] || { i: HALF, j: HALF };
     const slot = state.enemies.find((e) => !e.alive);
     if (!slot) return;
+    const spawnType = isRespawn ? chooseRespawnEnemyType() : (slot.type || 'spore');
+    const spawnStats = enemyStats(spawnType);
     for (let tries = 0; tries < 300; tries++) {
       const i = randInt(N), j = randInt(N);
       if (isObstacle(i, j)) continue;
       if (Math.abs(i - h.i) + Math.abs(j - h.j) < distFromHead) continue;
       if (state.enemies.some((e) => e.alive && e.i === i && e.j === j)) continue;
       Object.assign(slot, {
-        alive: true, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
+        alive: true, type: spawnType, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
         shootTimer: 0.8 + Math.random() * 1.4,
-        jumpTimer: enemyStats(slot.type).jumpInterval || 0,
+        jumpTimer: spawnStats.jumpInterval || 0,
         jumpElapsed: 0,
         jumpFrom: null,
         jumpTo: null,
         trailTimer: 0.2,
         hidden: false,
         revealTimer: 0,
-        hp: enemyStats(slot.type).hp,
+        hp: spawnStats.hp,
         speedMul: 1,
-        eyeTimer: enemyStats(slot.type).eyeGlowCooldown || 0,
+        eyeTimer: spawnStats.eyeGlowCooldown || 0,
         invulnTimer: 0,
         staffPulse: 0,
       });
@@ -2006,6 +2009,12 @@
 
   function enemyStats(type) {
     return ENEMY_STATS[type] || ENEMY_STATS.spore;
+  }
+
+  function chooseRespawnEnemyType() {
+    const types = state.roomEnemyTypes;
+    if (!types || types.length === 0) return 'spore';
+    return types[randInt(types.length)];
   }
 
   function updateHud() {
@@ -2146,6 +2155,7 @@
     // 敌人外观 / 类型按关卡轮换
     const roomTypes = roomEnemyTypes(room);
     const types = roomTypes.length ? roomTypes : ['spore'];
+    state.roomEnemyTypes = [...new Set(types)];
     for (let k = 0; k < enemyPool.length; k++) {
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
@@ -3807,6 +3817,7 @@
     isObstacle,
     evaluateLevelStars,
     getEnemyStats: (type) => ({ ...enemyStats(type) }),
+    chooseRespawnEnemyType,
     clearObstacles: () => obstacles.clear(),
   };
   window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {
