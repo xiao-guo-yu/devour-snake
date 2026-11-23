@@ -3,6 +3,7 @@
   'use strict';
 
   const STORAGE_KEY = 'devour-skills-v2';
+  const TEST_SHIELD_FIRE = new URLSearchParams(window.location.search).get('skills') === 'shield-fire';
   const SKILLS = {
     green: {
       id: 'green',
@@ -254,6 +255,13 @@
   });
 
   // The skill UI is created here so locked cards can still explain their reward.
+  if (TEST_SHIELD_FIRE) {
+    data.unlocked.yellow = true;
+    data.unlocked.red = true;
+    data.equipped.q = 'yellow';
+    data.equipped.e = 'red';
+    save();
+  }
   render();
   if (settingsScreen) activateTab(activeTab);
 
