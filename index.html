@@ -192,6 +192,10 @@
   #bossbar {
     display: none; top: 22px; left: 50%; transform: translateX(-50%);
     width: min(540px, 56vw); text-align: center; padding: 11px 18px 13px;
+    background: transparent;
+    border-color: rgba(239,106,89,.16);
+    box-shadow: none;
+    backdrop-filter: none;
   }
   #bossbar .bname {
     margin-bottom: 8px;
@@ -199,18 +203,20 @@
     font-family: var(--display);
     font-size: 14px;
     letter-spacing: .2em;
+    text-shadow: 0 1px 9px rgba(22,5,3,.78);
   }
   #bossbar .bbar {
     height: 10px;
     overflow: hidden;
-    border: 1px solid rgba(239,106,89,.3);
-    background: rgba(26,5,5,.92);
+    border: 1px solid rgba(239,106,89,.2);
+    background: rgba(26,5,5,.12);
   }
   #bfill {
     height: 100%;
     width: 100%;
     background: linear-gradient(90deg, #671d19, #d94b3d 64%, #efaa60);
-    box-shadow: 0 0 18px rgba(239,106,89,.24);
+    box-shadow: 0 0 14px rgba(239,106,89,.16);
+    opacity: .74;
     transition: width .15s linear;
   }
 
