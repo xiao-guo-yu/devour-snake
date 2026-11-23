@@ -24,6 +24,9 @@
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
   const FIRE_BULLET_SCALE = 1.9;
+  const ENERGY_BALL_COST = 3;
+  const ENERGY_BALL_COOLDOWN = 3;
+  const ENERGY_BALL_DAMAGE = 45;
   const GHOST_BULLET_RADIUS = 0.56;
   // 原命中半径 0.62，攻击整体放大为两倍
   const GHOST_BULLET_HIT_RADIUS = 1.24;
@@ -1794,6 +1797,37 @@
     fireBurstPool.push(mesh);
   }
 
+  // Green core restores the original large energy wave.
+  const energyOrbPool = [];
+  for (let i = 0; i < 3; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.0, 20, 16),
+      new THREE.MeshBasicMaterial({ color: 0x9dffe0, transparent: true, opacity: 0.92, fog: false })
+    );
+    mesh.visible = false;
+    scene.add(mesh);
+    energyOrbPool.push(mesh);
+  }
+
+  const energyBoomPool = [];
+  for (let i = 0; i < 4; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 1.0, 40),
+      new THREE.MeshBasicMaterial({
+        color: 0xa6ffe0,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.5;
+    mesh.visible = false;
+    scene.add(mesh);
+    energyBoomPool.push(mesh);
+  }
+
   const bossMesh = new THREE.Group();
   let bossPlaneMat = null;
   let bossPoseTexture = null;
@@ -1997,6 +2031,9 @@
     lavaPools: [],
     skillOrb: null,
     fireBursts: [],
+    orbs: [],
+    booms: [],
+    energyCd: 0,
     shieldTimer: 0,
     shieldCooldown: 0,
     shieldFlash: 0,
@@ -2346,7 +2383,7 @@
     const shieldText = state.shieldTimer > 0
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
-    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}`;
+    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}`;
     if (signature === lastSkillHudSignature) return;
     lastSkillHudSignature = signature;
 
@@ -2357,13 +2394,16 @@
     if (eSkill) {
       const red = eSkill === 'red';
       const ice = eSkill === 'ice';
-      el.eSkillName.textContent = ice ? 'E · 寒冰吐息' : (red ? 'E · 赤核烈焰' : 'E · 翠核疾射');
+      const green = eSkill === 'green';
+      el.eSkillName.textContent = ice ? 'E · 寒冰吐息' : (red ? 'E · 赤核烈焰' : 'E · 翠核能量波');
       el.eSkillDesc.textContent = ice
         ? '消耗 2 格 · 冻结前方大片敌人'
-        : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 1 格 · 普通射击');
+        : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 3 格 · 3×3 能量爆发');
       el.eSkillState.textContent = ice && state.frostCooldown > 0
         ? `${state.frostCooldown.toFixed(1)}s`
-        : (state.cells.length > (red || ice ? 3 : 2) ? '就绪' : '身体不足');
+        : (green && state.energyCd > 0
+          ? `${state.energyCd.toFixed(1)}s`
+          : (state.cells.length > (green ? 4 : (red || ice ? 3 : 2)) ? '就绪' : '身体不足'));
       if (el.eSkillHud.style?.setProperty) {
         el.eSkillHud.style.setProperty('--skill-color', ice ? '#8de9ff' : (red ? '#ff6542' : '#68e7b8'));
       }
@@ -2417,6 +2457,11 @@
     state.pellets.length = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.fireBursts.length = 0;
+    state.orbs.forEach((orb) => { orb.mesh.visible = false; });
+    state.orbs.length = 0;
+    state.booms.forEach((boom) => { boom.mesh.visible = false; });
+    state.booms.length = 0;
+    state.energyCd = 0;
     state.skillOrb = null;
     rewardOrbGroup.visible = false;
     state.shieldTimer = 0;
@@ -2541,6 +2586,7 @@
       max: hp,
       renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 1.55 : (isPharaoh ? 0.95 : 2)),
       bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 3.2 : 2.3),
+      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : 2.6),
       contactRadius: isRootcoil ? 4.8 : (isDragon ? 3.25 : 2.5),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
@@ -2836,10 +2882,14 @@
       activateFrostBreath();
       return;
     }
+    if (source === 'e' && activeSkillId('e') === 'green') {
+      fireEnergy();
+      return;
+    }
     if (state.shootCd > 0) return;
     const eSkill = source === 'e' ? activeSkillId('e') : null;
     if (source === 'e' && !eSkill) {
-      toast('未安装 E 技能', '击败枯树或魔像后吞噬核心，并在设置中安装');
+      toast('未安装 E 技能', '击败 Boss 后吞噬核心，并在设置中安装');
       return;
     }
     const isFire = eSkill === 'red';
@@ -3934,6 +3984,119 @@
     }
   }
 
+  function fireEnergy() {
+    if (state.over || state.paused) return;
+    if (state.cells.length <= 4) {
+      toast('体长不足', '超过 4 节才能释放能量波（消耗 3 节）');
+      return;
+    }
+    if (state.energyCd > 0) return;
+    const mesh = energyOrbPool.find((item) => !item.visible);
+    if (!mesh) return;
+
+    state.energyCd = ENERGY_BALL_COOLDOWN;
+    for (let k = 0; k < ENERGY_BALL_COST; k++) state.cells.pop();
+    state.prevTail = null;
+    updateHud();
+
+    const from = headPosition();
+    const d = state.dir;
+    mesh.visible = true;
+    mesh.position.set(from.x, 0.6, from.z);
+    state.orbs.push({
+      mesh,
+      x: from.x,
+      z: from.z,
+      vx: d.i * 9,
+      vz: d.j * 9,
+      life: 2.6,
+    });
+    toast('翠核能量波', '消耗 3 节 · 命中后 3×3 范围清场');
+  }
+
+  function explodeEnergyAt(x, z) {
+    const ci = Math.round(x + HALF);
+    const cj = Math.round(z + HALF);
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || isEnemyInvulnerable(enemy)) continue;
+      if (Math.abs(enemy.i - ci) <= 1 && Math.abs(enemy.j - cj) <= 1) {
+        enemy.alive = false;
+        state.kills += 1;
+        state.score += 30;
+      }
+    }
+
+    const mesh = energyBoomPool.find((item) => !item.visible) || energyBoomPool[0];
+    mesh.visible = true;
+    mesh.position.set(x, 0.52, z);
+    mesh.scale.setScalar(0.6);
+    mesh.material.opacity = 0.95;
+    state.booms.push({ mesh, t: 0 });
+    updateHud();
+  }
+
+  function updateEnergyOrbs(dt) {
+    state.energyCd = Math.max(0, state.energyCd - dt);
+    for (let k = state.orbs.length - 1; k >= 0; k--) {
+      const orb = state.orbs[k];
+      orb.life -= dt;
+      orb.x += orb.vx * dt;
+      orb.z += orb.vz * dt;
+      orb.mesh.position.set(orb.x, 0.6, orb.z);
+      orb.mesh.rotation.y += dt * 3;
+
+      const ci = Math.round(orb.x + HALF);
+      const cj = Math.round(orb.z + HALF);
+      let boom = orb.life <= 0 || Math.abs(orb.x) > HALF + 1 || Math.abs(orb.z) > HALF + 1 ||
+        !inBounds(ci, cj) || isObstacle(ci, cj);
+
+      if (!boom) {
+        for (const enemy of state.enemies) {
+          if (!enemy.alive) continue;
+          if (Math.hypot(enemy.x - orb.x, enemy.z - orb.z) < 1.15) {
+            boom = true;
+            orb.boomX = enemy.x;
+            orb.boomZ = enemy.z;
+            break;
+          }
+        }
+      }
+
+      if (!boom && state.boss && state.boss.alive &&
+        Math.hypot(state.boss.x - orb.x, state.boss.z - orb.z) < state.boss.orbHitRadius) {
+        boom = true;
+        orb.boomX = state.boss.x;
+        orb.boomZ = state.boss.z;
+        state.boss.hp -= ENERGY_BALL_DAMAGE;
+        updateHud();
+        if (state.boss.hp <= 0) bossDie();
+      }
+
+      if (boom) {
+        orb.mesh.visible = false;
+        state.orbs.splice(k, 1);
+        explodeEnergyAt(
+          orb.boomX !== undefined ? orb.boomX : orb.x,
+          orb.boomZ !== undefined ? orb.boomZ : orb.z
+        );
+      }
+    }
+  }
+
+  function updateEnergyBooms(dt) {
+    for (let k = state.booms.length - 1; k >= 0; k--) {
+      const boom = state.booms[k];
+      boom.t += dt;
+      const progress = Math.min(1, boom.t / 0.45);
+      boom.mesh.scale.setScalar(0.6 + progress * 2.2);
+      boom.mesh.material.opacity = 0.95 * (1 - progress);
+      if (progress >= 1) {
+        boom.mesh.visible = false;
+        state.booms.splice(k, 1);
+      }
+    }
+  }
+
   function spawnFireBurst(x, z) {
     const mesh = fireBurstPool.find((item) => !item.visible);
     if (!mesh) return;
@@ -4215,6 +4378,11 @@
     state.shieldFlash = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.fireBursts.length = 0;
+    state.orbs.forEach((orb) => { orb.mesh.visible = false; });
+    state.orbs.length = 0;
+    state.booms.forEach((boom) => { boom.mesh.visible = false; });
+    state.booms.length = 0;
+    state.energyCd = 0;
     state.slowTimer = 0;
     state.clearedNotified.clear();
     state.roomActive = false;
@@ -4338,6 +4506,8 @@
       }
 
       updateBullets(dt);
+      updateEnergyOrbs(dt);
+      updateEnergyBooms(dt);
       updateFireBursts(dt);
       updateIceObstacles(dt);
       updateIceSpawner(dt);

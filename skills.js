@@ -8,9 +8,9 @@
       id: 'green',
       slot: 'e',
       color: '#68e7b8',
-      name: '翠核疾射',
+      name: '翠核能量波',
       subtitle: 'GREEN CORE · E',
-      desc: '按 E 发射普通獠牙弹，消耗 1 格身体。',
+      desc: '按 E 消耗 3 格身体，发射大能量球；命中后对 3×3 范围清场。',
     },
     yellow: {
       id: 'yellow',
