@@ -21,6 +21,8 @@
   const ENEMY_HIT_RADIUS = 1.5;
   const SHIELD_DURATION = 2;
   const SHIELD_COOLDOWN = 5;
+  const SHIELD_HALO_SCALE_X = 0.94;
+  const SHIELD_HALO_SCALE_Y = 0.72;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
   const FIRE_BULLET_SCALE = 1.9;
@@ -1560,7 +1562,7 @@
     })
   );
   shieldHalo.rotation.x = -Math.PI / 2;
-  shieldHalo.scale.set(1.28, 0.8, 1);
+  shieldHalo.scale.set(SHIELD_HALO_SCALE_X, SHIELD_HALO_SCALE_Y, 1);
   const shieldHaloRig = new THREE.Group();
   shieldHaloRig.add(shieldHalo);
   shieldHaloRig.visible = false;
@@ -3193,7 +3195,11 @@
       shieldHaloRig.position.set(pos.x, 0.64, pos.z);
       shieldHaloRig.rotation.y = Math.atan2(-dj, di);
       const pulse = 1 + Math.sin(state.time * 8) * 0.05;
-      shieldHalo.scale.set(1.28 * pulse, 0.8 * pulse, 1);
+      shieldHalo.scale.set(
+        SHIELD_HALO_SCALE_X * pulse,
+        SHIELD_HALO_SCALE_Y * pulse,
+        1
+      );
       shieldHalo.material.opacity = 0.42 + state.shieldFlash;
     }
     headPivot.visible = state.invuln > 0 ? (Math.floor(state.time * 14) % 2 === 0) : true;
