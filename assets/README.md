@@ -38,11 +38,12 @@ Original conversation attachment paths:
 
 ## Frozen Wastes Asset Sources
 
-The Chapter 4 enemy, boss, ice-block, map, and breath artwork was supplied by the project owner on 2026-11-21.
+The Chapter 4 enemy, boss, obstacle, map, and breath artwork was supplied by the project owner.
 
 - `ice-slug.png`, `frost-wolf.png`, and `frost-wisp.png`
 - `frost-dragon-idle.png` and `frost-dragon-attack.png`
-- `ice-block.png`
+- `ice-block.png` uses the supplied 2×2 transparent glacier obstacle.
+- `ice-pillar.png` uses the supplied 1×2 transparent ice pillar.
 - `dragon-breath.png`
 - `frozen-wastes-map.jpg`
 

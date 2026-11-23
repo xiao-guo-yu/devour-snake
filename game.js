@@ -37,7 +37,8 @@
   const GHOST_BULLET_HIT_RADIUS = 1.24;
   const GHOST_BULLET_SPEED = 2;
   const ICE_SPAWN_INTERVAL = 15;
-  const ICE_MAX_ACTIVE = 72;
+  const ICE_PILLARS_PER_WAVE = 5;
+  const ICE_MAX_PILLARS = 80;
   const DRAGON_BREATH_TELEGRAPH = 0.85;
   const DRAGON_BREATH_ACTIVE = 1.15;
   const DRAGON_BREATH_COOLDOWN = 6.2;
@@ -345,6 +346,7 @@
   const obstacles = new Set();
   const dynamicIce = new Map();
   const STUMP_COUNT = 8;
+  const FROZEN_OBSTACLE_COUNT = 8;
 
   const inBounds = (i, j) => i >= 0 && j >= 0 && i < N && j < N;
   const isObstacle = (i, j) => obstacles.has(`${i},${j}`) || dynamicIce.has(`${i},${j}`);
@@ -1284,7 +1286,7 @@
     : null;
   const loadCharacterTexture = (file, fallback) => (
     imageTextureLoader
-      ? imageTextureLoader.load(`assets/${file}?v=20261122-frozen2`)
+      ? imageTextureLoader.load(`assets/${file}?v=20261124-frozenpillars1`)
       : fallback
   );
   const loadPixelTexture = (file, fallback) => {
@@ -1378,17 +1380,18 @@
     }
   }
 
-  // 第四章冰障：每个实例严格占 1×1 格，由计时器动态追加。
-  const iceBlockMeshes = [];
+  // 第四章动态冰柱：每个实例占纵向 1×2 格，由计时器按波次追加。
+  const icePillarMeshes = [];
   const ICE_BLOCK_TEX = loadCharacterTexture('ice-block.png', null);
+  const ICE_PILLAR_TEX = loadCharacterTexture('ice-pillar.png', null);
   {
-    const geo = new THREE.PlaneGeometry(1.02, 1.02);
-    for (let k = 0; k < ICE_MAX_ACTIVE; k++) {
+    const geo = new THREE.PlaneGeometry(1.48, 2.08);
+    for (let k = 0; k < ICE_MAX_PILLARS; k++) {
       const mesh = new THREE.Mesh(
         geo,
         new THREE.MeshBasicMaterial({
-          map: ICE_BLOCK_TEX || null,
-          color: ICE_BLOCK_TEX ? 0xffffff : 0x8bdcff,
+          map: ICE_PILLAR_TEX || null,
+          color: ICE_PILLAR_TEX ? 0xffffff : 0x8bdcff,
           transparent: true,
           opacity: 0.98,
           depthWrite: false,
@@ -1396,11 +1399,11 @@
         })
       );
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.y = 0.31;
+      mesh.position.y = 0.34;
       mesh.visible = false;
       mesh.renderOrder = 2;
       scene.add(mesh);
-      iceBlockMeshes.push(mesh);
+      icePillarMeshes.push(mesh);
     }
   }
 
@@ -1504,9 +1507,28 @@
     placeObstacles(seeds, LAVA_PIT_TEX);
   }
 
-  /** 第四章：不铺设固定障碍，冰晶由独立计时器生成。 */
-  function layoutFrozen() {
-    placeObstacles([], null);
+  /** 第四章：8 组固定 2×2 冰川块，另有纵向 1×2 冰柱由计时器生成。 */
+  function layoutFrozen(level) {
+    const seeds = [];
+    const fits = (i, j) => {
+      if (i < 4 || j < 4 || i > N - 6 || j > N - 6) return false;
+      if (Math.abs(i - 22) < 6 && j < 9) return false;
+      if (Math.abs(i - 22) < 7 && j > 32) return false;
+      if (Math.abs(i - 22) < 7 && Math.abs(j - 22) < 7) return false;
+      if (level === 24 && i < 24 && Math.abs(j - START_ROOM.doorJ) < 5) return false;
+      for (const [si, sj] of seeds) {
+        if (Math.abs(si - i) < 7 && Math.abs(sj - j) < 7) return false;
+      }
+      return true;
+    };
+    let attempts = 0;
+    while (seeds.length < FROZEN_OBSTACLE_COUNT && attempts++ < 600) {
+      const i = 4 + randInt(N - 10);
+      const j = 4 + randInt(N - 10);
+      if (!fits(i, j)) continue;
+      seeds.push([i, j]);
+    }
+    placeObstacles(seeds, ICE_BLOCK_TEX);
     clearIceObstacles();
   }
 
@@ -2349,39 +2371,62 @@
 
   function clearIceObstacles() {
     dynamicIce.clear();
-    iceBlockMeshes.forEach((mesh) => {
+    icePillarMeshes.forEach((mesh) => {
       mesh.visible = false;
       mesh.scale.setScalar(1);
     });
   }
 
+  function icePillarFits(cell, head) {
+    if (!cell || !inBounds(cell.i, cell.j) || !inBounds(cell.i, cell.j + 1)) return false;
+    const cells = [
+      { i: cell.i, j: cell.j },
+      { i: cell.i, j: cell.j + 1 },
+    ];
+    if (cells.some(({ i, j }) => isObstacle(i, j))) return false;
+    if (cells.some(({ i, j }) => Math.abs(i - head.i) + Math.abs(j - head.j) < 4)) return false;
+    if (cells.some(({ i, j }) => Math.abs(i - DOOR_CELL.i) < 4 && j < 5)) return false;
+    if (cells.some(({ i, j }) => Math.abs(i - SPAWN_DOOR_CELL.i) < 4 && j > N - 6)) return false;
+    if (cells.some(({ i, j }) => state.cells.some((c) => Math.abs(c.i - i) + Math.abs(c.j - j) < 2))) {
+      return false;
+    }
+    if (cells.some(({ i, j }) => state.pellets.some((p) => p.i === i && p.j === j))) return false;
+    if (cells.some(({ i, j }) => (
+      state.enemies.some((e) => e.alive && Math.abs(e.i - i) + Math.abs(e.j - j) < 2)
+    ))) return false;
+    if (state.boss && state.boss.alive &&
+      cells.some(({ i, j }) => Math.abs(i - BOSS_CELL.i) < 6 && Math.abs(j - BOSS_CELL.j) < 6)) {
+      return false;
+    }
+    return true;
+  }
+
   function spawnIceObstacle(forcedCell = null) {
-    if (dynamicIce.size >= ICE_MAX_ACTIVE) return false;
-    const mesh = iceBlockMeshes.find((item) => !item.visible);
+    if (dynamicIce.size >= ICE_MAX_PILLARS * 2) return false;
+    const mesh = icePillarMeshes.find((item) => !item.visible);
     if (!mesh) return false;
     const head = state.cells[0] || { i: HALF, j: HALF };
     let cell = forcedCell;
     if (!cell) {
       for (let tries = 0; tries < 500; tries++) {
-        const i = 3 + randInt(N - 6);
-        const j = 3 + randInt(N - 6);
-        if (isObstacle(i, j)) continue;
-        if (Math.abs(i - head.i) + Math.abs(j - head.j) < 4) continue;
-        if (Math.abs(i - DOOR_CELL.i) < 4 && j < 5) continue;
-        if (Math.abs(i - SPAWN_DOOR_CELL.i) < 4 && j > N - 6) continue;
-        if (state.cells.some((c) => Math.abs(c.i - i) + Math.abs(c.j - j) < 2)) continue;
-        if (state.pellets.some((p) => p.i === i && p.j === j)) continue;
-        if (state.enemies.some((e) => e.alive && Math.abs(e.i - i) + Math.abs(e.j - j) < 2)) continue;
-        if (state.boss && state.boss.alive && Math.abs(i - BOSS_CELL.i) < 6 && Math.abs(j - BOSS_CELL.j) < 6) continue;
-        cell = { i, j };
+        const candidate = { i: 3 + randInt(N - 6), j: 3 + randInt(N - 6) };
+        if (!icePillarFits(candidate, head)) continue;
+        cell = candidate;
         break;
       }
     }
-    if (!cell || isObstacle(cell.i, cell.j)) return false;
-    const key = `${cell.i},${cell.j}`;
-    dynamicIce.set(key, { i: cell.i, j: cell.j, mesh, age: 0 });
+    if (!icePillarFits(cell, head)) return false;
+    const pillar = {
+      i: cell.i,
+      j: cell.j,
+      cells: [cell.i, cell.j, cell.i, cell.j + 1],
+      mesh,
+      age: 0,
+    };
+    dynamicIce.set(`${cell.i},${cell.j}`, pillar);
+    dynamicIce.set(`${cell.i},${cell.j + 1}`, pillar);
     mesh.visible = true;
-    mesh.position.set(cellX(cell.i), 0.31, cellZ(cell.j));
+    mesh.position.set(cellX(cell.i), 0.34, (cellZ(cell.j) + cellZ(cell.j + 1)) / 2);
     mesh.rotation.z = (Math.random() - 0.5) * 0.08;
     mesh.scale.setScalar(0.12);
     mesh.material.opacity = 1;
@@ -2393,12 +2438,14 @@
     const ice = dynamicIce.get(key);
     if (!ice) return false;
     ice.mesh.visible = false;
-    dynamicIce.delete(key);
+    for (let k = 0; k < ice.cells.length; k += 2) {
+      dynamicIce.delete(`${ice.cells[k]},${ice.cells[k + 1]}`);
+    }
     return true;
   }
 
   function updateIceObstacles(dt) {
-    for (const ice of dynamicIce.values()) {
+    for (const ice of new Set(dynamicIce.values())) {
       ice.age += dt;
       const grow = Math.min(1, ice.age / 0.28);
       const pulse = 1 + Math.sin(state.time * 3.4 + ice.i + ice.j) * 0.025;
@@ -2413,8 +2460,12 @@
     state.iceSpawnTimer -= dt;
     if (state.iceSpawnTimer > 0) return;
     state.iceSpawnTimer += ICE_SPAWN_INTERVAL;
-    if (spawnIceObstacle()) {
-      toast('寒潮凝晶', '单格冰障出现 · 可用烈焰弹击碎');
+    let spawned = 0;
+    for (let k = 0; k < ICE_PILLARS_PER_WAVE; k++) {
+      if (spawnIceObstacle()) spawned += 1;
+    }
+    if (spawned > 0) {
+      toast('寒潮凝晶', `${spawned} 根双格冰柱破土而出 · 可用烈焰弹击碎`);
     }
   }
 
@@ -4922,8 +4973,16 @@
     chooseRespawnEnemyType,
     clearObstacles: () => obstacles.clear(),
     spawnIceObstacle,
+    spawnIcePillar: spawnIceObstacle,
     breakIceObstacle,
-    getIceObstacles: () => [...dynamicIce.values()].map(({ i, j }) => ({ i, j })),
+    getIceObstacles: () => [...new Set(dynamicIce.values())].map(({ i, j, cells }) => ({
+      i,
+      j,
+      cells: [
+        { i: cells[0], j: cells[1] },
+        { i: cells[2], j: cells[3] },
+      ],
+    })),
   };
   window.startDevour = (levelIndex = DEBUG_START_LEVEL) => {
     resetGame(levelIndex);

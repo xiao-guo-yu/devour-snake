@@ -27,7 +27,7 @@
       color: '#ff6542',
       name: '赤核烈焰',
       subtitle: 'RED CORE · E',
-      desc: '按 E 消耗 2 格身体，发射伤害 2、覆盖 2×2 格并灼烧 Boss 的烈焰弹。',
+      desc: '按 E 消耗 2 格身体，发射伤害 2、覆盖 2×2 格并灼烧 Boss 的烈焰弹；可击碎冰柱并继续穿透。',
     },
     ice: {
       id: 'ice',
