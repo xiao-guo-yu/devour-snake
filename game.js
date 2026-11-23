@@ -74,7 +74,7 @@
   const COLOSSUS_POOL_DURATION = 10;
   const ROOT_SUMMON_INTERVAL = 15;
   const PHARAOH_SHIELD_HP = 3;
-  const PHARAOH_SHIELD_RESPAWN = 15;
+  const PHARAOH_SHIELD_RESPAWN = 20;
   const TWO_STAR_MIN_LENGTH = 8;
   const THREE_STAR_TIME_LIMIT = 180;
 
@@ -2752,7 +2752,7 @@
       b.shieldRespawnTimer = PHARAOH_SHIELD_RESPAWN;
       b.shieldHudSecond = -1;
       pharaohShieldRig.visible = false;
-      toast(instantBreak ? '能量波击碎黄金护盾' : '黄金护盾破裂', '15 秒后重新生成');
+      toast(instantBreak ? '能量波击碎黄金护盾' : '黄金护盾破裂', '20 秒后重新生成');
     }
     updateHud();
     return true;
