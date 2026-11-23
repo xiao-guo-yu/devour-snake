@@ -25,7 +25,10 @@
   const SHIELD_HALO_SCALE_Y = 0.72;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
-  const FIRE_BULLET_SCALE = 1.9;
+  const FIRE_BULLET_IMAGE_WIDTH = 2.65;
+  const FIRE_BULLET_IMAGE_HEIGHT = 1.37;
+  const FIRE_BULLET_TRAIL_INTERVAL = 0.055;
+  const FIRE_BULLET_TRAIL_LIFE = 0.34;
   const ENERGY_BALL_COST = 3;
   const ENERGY_BALL_COOLDOWN = 3;
   const ENERGY_BALL_DAMAGE = 45;
@@ -1295,6 +1298,15 @@
     }
     return texture;
   };
+  const FIRE_BULLET_TEX = imageTextureLoader
+    ? imageTextureLoader.load('assets/fireball-bullet.png?v=20261124-fireball-image1')
+    : null;
+  if (FIRE_BULLET_TEX) {
+    FIRE_BULLET_TEX.colorSpace = THREE.SRGBColorSpace || 'srgb';
+    if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
+      FIRE_BULLET_TEX.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    }
+  }
   const TEX = {
     spore: loadCharacterTexture('spore.png', spriteTexture(192, drawSpore)),
     vine: loadCharacterTexture('vine.png', spriteTexture(192, drawVine)),
@@ -1692,6 +1704,57 @@
     mesh.visible = false;
     scene.add(mesh);
     bulletPool.push(mesh);
+  }
+
+  const fireBulletPool = [];
+  for (let i = 0; i < 14; i++) {
+    const group = new THREE.Group();
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(FIRE_BULLET_IMAGE_WIDTH, FIRE_BULLET_IMAGE_HEIGHT),
+      new THREE.MeshBasicMaterial({
+        map: FIRE_BULLET_TEX || null,
+        color: FIRE_BULLET_TEX ? 0xffffff : 0xff8b3d,
+        transparent: true,
+        opacity: 0.98,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    // The flame head sits at the right edge of the source image.
+    plane.position.x = -FIRE_BULLET_IMAGE_WIDTH * 0.34;
+    group.add(plane);
+    group.userData.firePlane = plane;
+    group.visible = false;
+    scene.add(group);
+    fireBulletPool.push(group);
+  }
+
+  const fireTrailPool = [];
+  for (let i = 0; i < 40; i++) {
+    const group = new THREE.Group();
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.05, 0.54),
+      new THREE.MeshBasicMaterial({
+        map: FIRE_BULLET_TEX || null,
+        color: 0xff8f4a,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.x = -0.14;
+    group.add(plane);
+    group.userData.trailPlane = plane;
+    group.visible = false;
+    scene.add(group);
+    fireTrailPool.push(group);
   }
 
   // ---------- Boss 弹幕 ----------
@@ -2109,6 +2172,7 @@
     lavaPools: [],
     skillOrb: null,
     fireBursts: [],
+    fireTrails: [],
     orbs: [],
     booms: [],
     energyCd: 0,
@@ -2561,6 +2625,8 @@
     state.pellets.length = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.fireBursts.length = 0;
+    state.fireTrails.forEach((trail) => { trail.mesh.visible = false; });
+    state.fireTrails.length = 0;
     state.orbs.forEach((orb) => { orb.mesh.visible = false; });
     state.orbs.length = 0;
     state.booms.forEach((boom) => { boom.mesh.visible = false; });
@@ -3093,17 +3159,28 @@
     state.prevTail = null;
     const from = headPosition();
     const d = state.dir;
-    const mesh = bulletPool.find((m) => !m.visible) || bulletPool[0];
+    const mesh = isFire
+      ? (fireBulletPool.find((m) => !m.visible) || fireBulletPool[0])
+      : (bulletPool.find((m) => !m.visible) || bulletPool[0]);
     mesh.visible = true;
     mesh.position.copy(from);
-    mesh.scale.setScalar(isFire ? FIRE_BULLET_SCALE : 1);
-    mesh.material.color.setHex(isFire ? 0xffa070 : 0x9ff5d8);
-    mesh.material.emissive.setHex(isFire ? 0xff2f0b : 0x2ee6a8);
-    mesh.material.emissiveIntensity = isFire ? 2.4 : 1.6;
+    if (isFire) {
+      mesh.rotation.y = Math.atan2(-d.j, d.i);
+      const plane = mesh.userData.firePlane;
+      if (plane) plane.material.opacity = 0.98;
+    } else {
+      mesh.scale.setScalar(1);
+      mesh.material.color.setHex(0x9ff5d8);
+      mesh.material.emissive.setHex(0x2ee6a8);
+      mesh.material.emissiveIntensity = 1.6;
+    }
     state.bullets.push({
       mesh, x: from.x, z: from.z,
       vx: d.i * BULLET_SPEED, vz: d.j * BULLET_SPEED, life: 1.8,
       fire: isFire,
+      dirX: d.i,
+      dirZ: d.j,
+      trailTimer: FIRE_BULLET_TRAIL_INTERVAL,
       enemyDamage: isFire ? FIRE_BULLET_DAMAGE : 1,
       bossDamage: isFire ? state.shotDamage * 2 : state.shotDamage,
     });
@@ -4306,6 +4383,41 @@
     }
   }
 
+  function spawnFireTrailSegment(bullet) {
+    const mesh = fireTrailPool.find((item) => !item.visible);
+    if (!mesh) return;
+    const plane = mesh.userData.trailPlane;
+    mesh.visible = true;
+    mesh.position.set(
+      bullet.x - bullet.dirX * 1.05,
+      0.54,
+      bullet.z - bullet.dirZ * 1.05
+    );
+    mesh.rotation.y = Math.atan2(-bullet.dirZ, bullet.dirX);
+    mesh.scale.setScalar(0.72);
+    if (plane) plane.material.opacity = 0.18;
+    state.fireTrails.push({
+      mesh,
+      life: FIRE_BULLET_TRAIL_LIFE,
+      maxLife: FIRE_BULLET_TRAIL_LIFE,
+    });
+  }
+
+  function updateFireTrails(dt) {
+    for (let k = state.fireTrails.length - 1; k >= 0; k--) {
+      const trail = state.fireTrails[k];
+      trail.life -= dt;
+      const remaining = Math.max(0, trail.life / trail.maxLife);
+      const plane = trail.mesh.userData.trailPlane;
+      if (plane) plane.material.opacity = 0.18 * remaining * remaining;
+      trail.mesh.scale.setScalar(0.72 + (1 - remaining) * 0.16);
+      if (trail.life <= 0) {
+        trail.mesh.visible = false;
+        state.fireTrails.splice(k, 1);
+      }
+    }
+  }
+
   function spawnFireBurst(x, z) {
     const mesh = fireBurstPool.find((item) => !item.visible);
     if (!mesh) return;
@@ -4360,7 +4472,14 @@
       b.life -= dt;
       b.x += b.vx * dt;
       b.z += b.vz * dt;
-      b.mesh.position.set(b.x, 0.4, b.z);
+      b.mesh.position.set(b.x, b.fire ? 0.58 : 0.4, b.z);
+      if (b.fire) {
+        b.trailTimer -= dt;
+        if (b.trailTimer <= 0) {
+          b.trailTimer += FIRE_BULLET_TRAIL_INTERVAL;
+          spawnFireTrailSegment(b);
+        }
+      }
 
       const ci = Math.round(b.x + HALF);
       const cj = Math.round(b.z + HALF);
@@ -4537,6 +4656,7 @@
       state.orbs,
       state.booms,
       state.fireBursts,
+      state.fireTrails,
     ];
     projectileLists.forEach((list) => {
       list.forEach((entry) => {
@@ -4618,6 +4738,8 @@
     state.shieldFlash = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.fireBursts.length = 0;
+    state.fireTrails.forEach((trail) => { trail.mesh.visible = false; });
+    state.fireTrails.length = 0;
     state.orbs.forEach((orb) => { orb.mesh.visible = false; });
     state.orbs.length = 0;
     state.booms.forEach((boom) => { boom.mesh.visible = false; });
@@ -4753,6 +4875,7 @@
       }
 
       updateBullets(dt);
+      updateFireTrails(dt);
       updateEnergyOrbs(dt);
       updateEnergyBooms(dt);
       updateFireBursts(dt);
