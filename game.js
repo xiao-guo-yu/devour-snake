@@ -73,6 +73,7 @@
   const COLOSSUS_POOL_SIZE = 7;
   const COLOSSUS_POOL_DURATION = 10;
   const ROOT_SUMMON_INTERVAL = 15;
+  const ROOT_BULLET_INTERVAL = 7;
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
   const TWO_STAR_DAMAGE_LIMIT = 20;
@@ -2674,7 +2675,7 @@
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
       z: start.z,
-      shootTimer: isPharaoh ? 2.4 : (isDragon ? 99 : 3),
+      shootTimer: isPharaoh ? 2.4 : (isDragon ? 99 : (isRootcoil ? ROOT_BULLET_INTERVAL : 3)),
       jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
       jumpFrom: null,
@@ -4015,7 +4016,7 @@
           }
         }
       } else {
-        b.shootTimer = 2.2;
+        b.shootTimer = ROOT_BULLET_INTERVAL;
         const count = 10;
         const spd = 6;
         for (let k = 0; k < count; k++) {
