@@ -146,7 +146,7 @@
     { theme: 'green', kind: 'clear', composition: { spore: 3, vine: 2, trap: 3 }, name: '腐殖温室 · 根脉交叉' },
     { theme: 'green', kind: 'clear', composition: { vine: 5, trap: 3 }, name: '腐殖温室 · 捕食花圃' },
     { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
-    { theme: 'green', kind: 'boss', boss: 'rootcoil', name: '腐根盘蛇 · ROOTCOIL' },
+    { theme: 'green', kind: 'boss', boss: 'rootcoil', name: '枯树 · ROOTCOIL' },
 
     { theme: 'temple', kind: 'clear', composition: { scarab: 8 }, name: '沙海神庙 · 柱厅' },
     { theme: 'temple', kind: 'clear', composition: { scarab: 5, mummy: 3 }, name: '沙海神庙 · 供奉廊' },
@@ -2716,7 +2716,7 @@
       ? '凛冬冰龙 · FROST DRAGON'
       : (isColossus
         ? '熔岩巨像 · MAGMA COLOSSUS'
-        : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL'));
+        : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL'));
   }
 
   function summonGreenhouseMinions() {
@@ -4623,7 +4623,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老、熔岩巨像与凛冬冰龙，四片疆域都成了你的巢。';
+    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像与凛冬冰龙，四片疆域都成了你的巢。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;

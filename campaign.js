@@ -21,7 +21,7 @@
         { n: 5, room: 4, name: '根脉交叉', icon: 'assets/trap.png' },
         { n: 6, room: 5, name: '捕食花圃', icon: 'assets/vine.png' },
         { n: 7, room: 6, name: '圣所深处', icon: 'assets/trap.png' },
-        { n: 8, room: 7, name: '腐根盘蛇', boss: true, icon: 'assets/rootcoil.png' },
+        { n: 8, room: 7, name: '枯树', boss: true, icon: 'assets/rootcoil.png' },
       ],
     },
     {
