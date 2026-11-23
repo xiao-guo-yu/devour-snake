@@ -75,8 +75,9 @@
   const ROOT_SUMMON_INTERVAL = 15;
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
-  const TWO_STAR_MIN_LENGTH = 8;
+  const TWO_STAR_DAMAGE_LIMIT = 20;
   const THREE_STAR_TIME_LIMIT = 180;
+  const DAMAGE_SCORE_PENALTY = 25;
 
   // 小怪数值按类型读取；速度单位为格/秒。
   const ENEMY_STATS = {
@@ -2082,6 +2083,7 @@
     progress: 1,
     invuln: 0,
     score: 0,
+    damageTaken: 0,
     kills: 0,
     eaten: 0,
     over: false,
@@ -2203,11 +2205,11 @@
     levelIntroTimer = window.setTimeout(() => el.levelIntro.classList.remove('show'), 3200);
   }
 
-  function evaluateLevelStars(bodyLength, elapsed) {
-    const lengthBonus = bodyLength >= TWO_STAR_MIN_LENGTH;
+  function evaluateLevelStars(bodyLength, elapsed, damageTaken = state.damageTaken) {
+    const damageBonus = damageTaken < TWO_STAR_DAMAGE_LIMIT;
     const timeBonus = elapsed < THREE_STAR_TIME_LIMIT;
-    const stars = lengthBonus && timeBonus ? 3 : (lengthBonus ? 2 : 1);
-    return { stars, lengthBonus, timeBonus };
+    const stars = damageBonus && timeBonus ? 3 : (damageBonus ? 2 : 1);
+    return { stars, damageBonus, timeBonus };
   }
 
   function notifyLevelCleared(levelIndex) {
@@ -2215,18 +2217,20 @@
     state.clearedNotified.add(levelIndex);
     const bodyLength = state.cells.length;
     const elapsed = state.levelTime;
-    const evaluation = evaluateLevelStars(bodyLength, elapsed);
+    const damageTaken = state.damageTaken;
+    const evaluation = evaluateLevelStars(bodyLength, elapsed, damageTaken);
     if (typeof window.onDevourLevelCleared === 'function') {
       window.onDevourLevelCleared({
         level: levelIndex,
         stars: evaluation.stars,
         bodyLength,
         elapsed,
-        lengthBonus: evaluation.lengthBonus,
+        damageTaken,
+        damageBonus: evaluation.damageBonus,
         timeBonus: evaluation.timeBonus,
       });
     }
-    return { stars: evaluation.stars, bodyLength, elapsed };
+    return { stars: evaluation.stars, bodyLength, elapsed, damageTaken };
   }
 
   function formatLevelTime(sec) {
@@ -2504,6 +2508,7 @@
     const room = ROOMS[idx] || ROOMS[0];
     state.level = idx;
     state.levelTime = 0;
+    state.damageTaken = 0;
     state.timerDisplayedSecond = -1;
     state.phase = room.kind === 'boss' ? 'boss' : 'clear';
     state.doorOpen = false;
@@ -2914,6 +2919,8 @@
       state.shieldFlash = 0.16;
       return;
     }
+    state.damageTaken += 1;
+    state.score = Math.max(0, state.score - DAMAGE_SCORE_PENALTY);
     state.prevTail = null;
     state.hitFlash = 0.18;
     for (let k = 0; k < n && state.cells.length > 1; k++) state.cells.pop();
@@ -4475,13 +4482,13 @@
     if (state.phase === 'clear') {
       const award = notifyLevelCleared(state.level);
       if (award) {
-        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `长度 ${award.bodyLength} · 用时 ${formatLevelTime(award.elapsed)}`);
+        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `受伤 ${award.damageTaken} 次 · 用时 ${formatLevelTime(award.elapsed)}`);
       }
       startLevel(Math.min(state.level + 1, ROOM_COUNT - 1));
     } else if (state.phase === 'exit') {
       const award = notifyLevelCleared(state.level);
       if (award) {
-        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `长度 ${award.bodyLength} · 用时 ${formatLevelTime(award.elapsed)}`);
+        toast(`关卡完成 · ${'★'.repeat(award.stars)}`, `受伤 ${award.damageTaken} 次 · 用时 ${formatLevelTime(award.elapsed)}`);
       }
       if (state.level + 1 < ROOM_COUNT) startLevel(state.level + 1);
       else victory();
@@ -4543,6 +4550,7 @@
     state.prevTail = null;
     state.invuln = 1;
     state.score = 0;
+    state.damageTaken = 0;
     state.kills = 0;
     state.eaten = 0;
     state.over = false;
@@ -4607,7 +4615,7 @@
     el.ovsub.textContent = reason;
     showResultRating(0, state.levelTime);
     const position = campaignPosition(state.level);
-    el.ovdetail.textContent = `抵达 ${position.region + 1}-${position.node} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
+    el.ovdetail.textContent = `抵达 ${position.region + 1}-${position.node} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
     el.overlay.classList.add('show');
   }
 
@@ -4618,7 +4626,7 @@
     el.ovsub.textContent = '你吞掉了腐根盘蛇、黄金法老、熔岩巨像与凛冬冰龙，四片疆域都成了你的巢。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
-    el.ovdetail.textContent = `体长 ${state.cells.length} · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
+    el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
     el.overlay.classList.add('show');
   }
 
