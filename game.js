@@ -2453,6 +2453,7 @@
   }
 
   let lastSkillHudSignature = '';
+  let skillHudRevealTimer = 0;
   function activeSkillId(slot) {
     return window.DevourSkills?.getEquipped?.(slot) || null;
   }
@@ -2465,10 +2466,12 @@
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
     const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}`;
+    const showSkillHud = Boolean(eSkill || qSkill) && skillHudRevealTimer > 0;
+    el.skillHud.hidden = !showSkillHud;
+    el.skillHud.classList.toggle('is-fading', showSkillHud && skillHudRevealTimer <= 0.45);
     if (signature === lastSkillHudSignature) return;
     lastSkillHudSignature = signature;
 
-    el.skillHud.hidden = !eSkill && !qSkill;
     el.eSkillHud.hidden = !eSkill;
     el.qSkillHud.hidden = !qSkill;
 
@@ -2496,6 +2499,12 @@
       el.qSkillState.textContent = shieldText;
       el.qSkillHud.classList.toggle('is-cooling', state.shieldCooldown > 0 || state.shieldTimer > 0);
     }
+  }
+
+  function revealSkillHud(duration = 4) {
+    skillHudRevealTimer = duration;
+    lastSkillHudSignature = '';
+    updateSkillHud();
   }
 
   // ---------- 关卡 ----------
@@ -2654,6 +2663,7 @@
       showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败冰龙 · 完成远征' : '击败首领 · 进入下一层');
     }
     updateHud();
+    revealSkillHud(4);
   }
 
   function spawnBoss(kind = 'rootcoil') {
@@ -3145,7 +3155,7 @@
   window.addEventListener('blur', () => held.clear());
   document.addEventListener('devour:skills-changed', () => {
     lastSkillHudSignature = '';
-    updateSkillHud();
+    revealSkillHud(4);
   });
 
   // ---------- 更新 ----------
@@ -4662,6 +4672,7 @@
       state.shieldFlash = Math.max(0, state.shieldFlash - dt);
       state.frostCooldown = Math.max(0, state.frostCooldown - dt);
       state.frostEffectTimer = Math.max(0, state.frostEffectTimer - dt);
+      skillHudRevealTimer = Math.max(0, skillHudRevealTimer - dt);
       playerFrostRig.visible = state.frostEffectTimer > 0;
       if (playerFrostRig.visible) {
         playerFrostMesh.material.opacity = Math.min(0.82, state.frostEffectTimer * 1.4);
