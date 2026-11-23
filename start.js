@@ -232,7 +232,10 @@
 
   function restartGame() {
     if (window.__devourApi && typeof window.__devourApi.resetGame === 'function') {
-      window.__devourApi.resetGame();
+      const currentLevel = window.__devour && Number.isInteger(window.__devour.level)
+        ? window.__devour.level
+        : undefined;
+      window.__devourApi.resetGame(currentLevel);
       return;
     }
     sendKey('keydown', 'r');

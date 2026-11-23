@@ -2940,7 +2940,7 @@
     if (document.body.classList.contains('settings-open')) return;
     const k = e.key.toLowerCase();
     if (k === ' ' || k === 'spacebar') { e.preventDefault(); shoot(); return; }
-    if (k === 'r') { resetGame(); return; }
+    if (k === 'r') { resetGame(state.level); return; }
     if (k === 'f') {
       viewMode = viewMode === 'full' ? 'follow' : 'full';
       el.mode.textContent = viewMode === 'full' ? '视角：全图（F 切换）' : '视角：跟随（F 切换）';
