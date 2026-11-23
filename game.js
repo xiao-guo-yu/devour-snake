@@ -78,6 +78,9 @@
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
   const SKILL_HUD_REVEAL_SECONDS = 6.5;
+  const NORMAL_PELLET_COUNT = 10;
+  const BOSS_PELLET_BONUS = 6;
+  const ENERGY_PELLET_CHANCE = 0.15;
   const TWO_STAR_DAMAGE_LIMIT = 20;
   const THREE_STAR_TIME_LIMIT = 180;
   const DAMAGE_SCORE_PENALTY = 25;
@@ -2270,7 +2273,7 @@
       i: c.i,
       j: c.j,
       phase: Math.random() * Math.PI * 2,
-      energy: Math.random() < 0.05,
+      energy: Math.random() < ENERGY_PELLET_CHANCE,
     });
   }
 
@@ -2617,7 +2620,8 @@
     state.slowTimer = 0;
     state.pelletsOff = false; // 新关卡重新开始刷豆
 
-    for (let k = 0; k < 10; k++) spawnPellet();
+    const initialPellets = NORMAL_PELLET_COUNT + (room.kind === 'boss' ? BOSS_PELLET_BONUS : 0);
+    for (let k = 0; k < initialPellets; k++) spawnPellet();
 
     const tint = THEMES[room.theme] || THEMES.green;
     scene.fog.color.setHex(tint.fog);
