@@ -1560,8 +1560,11 @@
     })
   );
   shieldHalo.rotation.x = -Math.PI / 2;
-  shieldHalo.visible = false;
-  scene.add(shieldHalo);
+  shieldHalo.scale.set(1.28, 0.8, 1);
+  const shieldHaloRig = new THREE.Group();
+  shieldHaloRig.add(shieldHalo);
+  shieldHaloRig.visible = false;
+  scene.add(shieldHaloRig);
 
   // 尾端封口：实心圆片，保证尾巴是同色而不是透出地板
   const tailCap = new THREE.Mesh(
@@ -2171,6 +2174,7 @@
     levelIntroTitle: document.getElementById('levelIntroTitle'),
     levelIntroMeta: document.getElementById('levelIntroMeta'),
     overlay: document.getElementById('overlay'),
+    overlayContinue: document.getElementById('btnOverlayContinue'),
     ovtitle: document.getElementById('ovtitle'),
     ovsub: document.getElementById('ovsub'),
     ovscore: document.getElementById('ovscore'),
@@ -2569,7 +2573,7 @@
     state.frostEffectTimer = 0;
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     shieldRibbon.visible = false;
-    shieldHalo.visible = false;
+    shieldHaloRig.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
     playerFrostRig.visible = false;
@@ -3142,6 +3146,7 @@
       el.ovtime.textContent = '';
       el.ovdetail.textContent = '';
       el.overlay.classList.toggle('show', state.paused);
+      el.overlayContinue.hidden = !state.paused;
       if (state.paused) showHelp();
       return;
     }
@@ -3182,11 +3187,13 @@
     updateRibbon();
     const shieldActive = state.shieldTimer > 0;
     shieldRibbon.visible = shieldActive;
-    shieldHalo.visible = shieldActive;
+    shieldHaloRig.visible = shieldActive;
     if (shieldActive) {
       shieldRibbon.material.opacity = 0.2 + Math.sin(state.time * 9) * 0.05 + state.shieldFlash;
-      shieldHalo.position.set(pos.x, 0.64, pos.z);
-      shieldHalo.scale.setScalar(1 + Math.sin(state.time * 8) * 0.05);
+      shieldHaloRig.position.set(pos.x, 0.64, pos.z);
+      shieldHaloRig.rotation.y = Math.atan2(-dj, di);
+      const pulse = 1 + Math.sin(state.time * 8) * 0.05;
+      shieldHalo.scale.set(1.28 * pulse, 0.8 * pulse, 1);
       shieldHalo.material.opacity = 0.42 + state.shieldFlash;
     }
     headPivot.visible = state.invuln > 0 ? (Math.floor(state.time * 14) % 2 === 0) : true;
@@ -4660,6 +4667,7 @@
     showResultRating(0, state.levelTime);
     const position = campaignPosition(state.level);
     el.ovdetail.textContent = `抵达 ${position.region + 1}-${position.node} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
+    el.overlayContinue.hidden = true;
     el.overlay.classList.add('show');
   }
 
@@ -4671,6 +4679,7 @@
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
+    el.overlayContinue.hidden = true;
     el.overlay.classList.add('show');
   }
 

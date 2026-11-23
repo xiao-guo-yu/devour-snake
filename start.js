@@ -241,6 +241,13 @@
     sendKey('keydown', 'r');
   }
 
+  function continuePausedGame() {
+    if (!window.__devour || !window.__devour.paused) return;
+    window.__devour.paused = false;
+    document.getElementById('btnOverlayContinue').hidden = true;
+    document.getElementById('overlay').classList.remove('show');
+  }
+
   function returnToMenu() {
     if (window.__devour) window.__devour.paused = true;
     if (window.DevourAudio) window.DevourAudio.playMenu();
@@ -273,6 +280,7 @@
   document.getElementById('btnGameMap').addEventListener('click', returnToCampaignMap);
   document.getElementById('btnMainMenu').addEventListener('click', returnToMenu);
   document.getElementById('btnOverlayRestart').addEventListener('click', restartGame);
+  document.getElementById('btnOverlayContinue').addEventListener('click', continuePausedGame);
   document.getElementById('btnOverlayMap').addEventListener('click', returnToCampaignMap);
   document.getElementById('btnOverlayMenu').addEventListener('click', returnToMenu);
   document.getElementById('btnOverlaySettings').addEventListener('click', () => {
