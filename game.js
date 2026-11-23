@@ -72,6 +72,9 @@
   const COLOSSUS_FIREBALL_WALL_RADIUS = 3.6;
   const COLOSSUS_POOL_SIZE = 7;
   const COLOSSUS_POOL_DURATION = 10;
+  const ROOT_SUMMON_INTERVAL = 15;
+  const PHARAOH_SHIELD_HP = 3;
+  const PHARAOH_SHIELD_RESPAWN = 15;
   const TWO_STAR_MIN_LENGTH = 8;
   const THREE_STAR_TIME_LIMIT = 180;
 
@@ -1848,6 +1851,68 @@
   bossMesh.visible = false;
   scene.add(bossMesh);
 
+  const pharaohShieldRig = new THREE.Group();
+  const pharaohShieldDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(4.35, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd268,
+      transparent: true,
+      opacity: 0.11,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    })
+  );
+  pharaohShieldDisc.rotation.x = -Math.PI / 2;
+  pharaohShieldDisc.position.y = 0.18;
+  pharaohShieldRig.add(pharaohShieldDisc);
+  const pharaohShieldRing = new THREE.Mesh(
+    new THREE.TorusGeometry(4.35, 0.105, 8, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xffe39a,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  pharaohShieldRing.rotation.x = Math.PI / 2;
+  pharaohShieldRing.position.y = 0.3;
+  pharaohShieldRig.add(pharaohShieldRing);
+  pharaohShieldRig.visible = false;
+  scene.add(pharaohShieldRig);
+
+  const rootSummonRig = new THREE.Group();
+  const rootEyeGlowMat = new THREE.MeshBasicMaterial({
+    color: 0xff3b25,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    fog: false,
+  });
+  for (const x of [-0.24, 0.24]) {
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.11, 18), rootEyeGlowMat);
+    eye.rotation.x = -Math.PI / 2;
+    eye.position.set(x, 0.72, -0.16);
+    rootSummonRig.add(eye);
+  }
+  const rootSummonRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.55, 0.95, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xff4428,
+      transparent: true,
+      opacity: 0.42,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  rootSummonRing.rotation.x = -Math.PI / 2;
+  rootSummonRing.position.y = 0.25;
+  rootSummonRig.add(rootSummonRing);
+  rootSummonRig.visible = false;
+  scene.add(rootSummonRig);
+
   // 凛冬冰龙龙息：贴图从左端窄口向右端展开，几何平移后以 Boss 嘴部为原点。
   const bossBreathRig = new THREE.Group();
   const bossBreathGeo = new THREE.PlaneGeometry(DRAGON_BREATH_RANGE, DRAGON_BREATH_RANGE * 0.56);
@@ -2079,6 +2144,7 @@
     bossbar: document.getElementById('bossbar'),
     bfill: document.getElementById('bfill'),
     bname: document.getElementById('bname'),
+    bshield: document.getElementById('bshield'),
     mode: document.getElementById('mode'),
     skillHud: document.getElementById('skillHud'),
     eSkillHud: document.getElementById('eSkillHud'),
@@ -2271,11 +2337,11 @@
     }
   }
 
-  function spawnEnemy(distFromHead = 10, isRespawn = false) {
+  function spawnEnemy(distFromHead = 10, isRespawn = false, forcedType = null) {
     const h = state.cells[0] || { i: HALF, j: HALF };
     const slot = state.enemies.find((e) => !e.alive);
     if (!slot) return;
-    const spawnType = isRespawn ? chooseRespawnEnemyType() : (slot.type || 'spore');
+    const spawnType = forcedType || (isRespawn ? chooseRespawnEnemyType() : (slot.type || 'spore'));
     const spawnStats = enemyStats(spawnType);
     for (let tries = 0; tries < 300; tries++) {
       const i = randInt(N), j = randInt(N);
@@ -2298,6 +2364,7 @@
         invulnTimer: 0,
         staffPulse: 0,
         frozenTimer: 0,
+        frozenTimer: 0,
       });
       // 复活时恢复原色/原贴图（甲虫被打灰后）
       const idx = state.enemies.indexOf(slot);
@@ -2309,7 +2376,7 @@
       if (isRespawn && slot.type === 'obsidianBeetle') {
         spawnLavaHazard(cellX(i), cellZ(j));
       }
-      return;
+      return slot;
     }
   }
 
@@ -2352,8 +2419,16 @@
     if (state.phase === 'boss' && state.boss && state.boss.alive) {
       el.bossbar.style.display = 'block';
       el.bfill.style.width = `${Math.max(0, (state.boss.hp / state.boss.max) * 100)}%`;
+      const showShield = state.boss.kind === 'pharaoh';
+      el.bshield.hidden = !showShield;
+      if (showShield) {
+        el.bshield.textContent = state.boss.shieldActive
+          ? `金盾 ${state.boss.shieldHp} / ${PHARAOH_SHIELD_HP}`
+          : `金盾重筑 ${Math.max(0, Math.ceil(state.boss.shieldRespawnTimer))}s`;
+      }
     } else {
       el.bossbar.style.display = 'none';
+      el.bshield.hidden = true;
     }
 
     let obj = '';
@@ -2434,6 +2509,8 @@
     state.doorOpen = false;
     state.boss = null;
     bossMesh.visible = false;
+    pharaohShieldRig.visible = false;
+    rootSummonRig.visible = false;
     if (room.theme === 'temple') layoutTemple(idx);
     else if (room.theme === 'volcano') layoutVolcano(idx);
     else if (room.theme === 'frozen') layoutFrozen(idx);
@@ -2584,10 +2661,10 @@
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 1.55 : (isPharaoh ? 0.95 : 2)),
-      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 3.2 : 2.3),
-      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : 2.6),
-      contactRadius: isRootcoil ? 4.8 : (isDragon ? 3.25 : 2.5),
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 1.55 : (isPharaoh ? 1.425 : 2)),
+      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 3.2 : (isPharaoh ? 3.45 : 2.3)),
+      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : (isPharaoh ? 3.9 : 2.6)),
+      contactRadius: isRootcoil ? 4.8 : (isDragon ? 3.25 : (isPharaoh ? 3.75 : 2.5)),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
@@ -2608,6 +2685,13 @@
       breathElapsed: 0,
       breathAngle: 0,
       breathHit: false,
+      summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
+      summonFlash: 0,
+      shieldActive: isPharaoh,
+      shieldHp: isPharaoh ? PHARAOH_SHIELD_HP : 0,
+      shieldRespawnTimer: 0,
+      shieldFlash: 0,
+      shieldHudSecond: -1,
     };
     bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -2619,6 +2703,8 @@
     bossMesh.rotation.z = 0;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
+    pharaohShieldRig.visible = false;
+    rootSummonRig.visible = false;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
     el.bname.textContent = isDragon
@@ -2628,10 +2714,85 @@
         : (isPharaoh ? '黄金法老 · PHARAOH' : '腐根盘蛇 · ROOTCOIL'));
   }
 
+  function summonGreenhouseMinions() {
+    const types = ['spore', 'vine', 'trap'];
+    let summoned = 0;
+    for (let k = 0; k < 2; k++) {
+      if (spawnEnemy(9, false, types[randInt(types.length)])) summoned += 1;
+    }
+    if (summoned > 0) toast('腐根召唤', `红光唤醒 ${summoned} 只温室小怪`);
+  }
+
+  function updateRootcoilSummon(b, dt) {
+    b.summonTimer -= dt;
+    if (b.summonTimer <= 0) {
+      b.summonTimer = ROOT_SUMMON_INTERVAL;
+      b.summonFlash = 0.85;
+      summonGreenhouseMinions();
+    }
+    b.summonFlash = Math.max(0, b.summonFlash - dt);
+    rootSummonRig.visible = b.summonFlash > 0;
+    rootSummonRig.position.set(b.x, 0, b.z);
+    rootSummonRig.scale.setScalar(b.renderScale);
+    if (rootSummonRig.visible) {
+      const pulse = 1 + Math.sin(state.time * 18) * 0.16;
+      rootEyeGlowMat.opacity = 0.55 + Math.min(1, b.summonFlash * 2) * 0.4;
+      rootSummonRing.scale.setScalar(pulse * 1.5);
+      rootSummonRing.material.opacity = b.summonFlash * 0.62;
+    }
+  }
+
+  function damagePharaohShield(instantBreak = false) {
+    const b = state.boss;
+    if (!b || !b.alive || b.kind !== 'pharaoh' || !b.shieldActive) return false;
+    b.shieldFlash = 0.22;
+    b.shieldHp = instantBreak ? 0 : Math.max(0, b.shieldHp - 1);
+    if (b.shieldHp <= 0) {
+      b.shieldActive = false;
+      b.shieldRespawnTimer = PHARAOH_SHIELD_RESPAWN;
+      b.shieldHudSecond = -1;
+      pharaohShieldRig.visible = false;
+      toast(instantBreak ? '能量波击碎黄金护盾' : '黄金护盾破裂', '15 秒后重新生成');
+    }
+    updateHud();
+    return true;
+  }
+
+  function updatePharaohShield(b, dt) {
+    b.shieldFlash = Math.max(0, b.shieldFlash - dt);
+    if (!b.shieldActive) {
+      b.shieldRespawnTimer = Math.max(0, b.shieldRespawnTimer - dt);
+      const second = Math.ceil(b.shieldRespawnTimer);
+      if (second !== b.shieldHudSecond) {
+        b.shieldHudSecond = second;
+        updateHud();
+      }
+      if (b.shieldRespawnTimer <= 0) {
+        b.shieldActive = true;
+        b.shieldHp = PHARAOH_SHIELD_HP;
+        b.shieldHudSecond = -1;
+        toast('黄金护盾重塑', '连续 3 次射击或 1 次能量波可击破');
+        updateHud();
+      }
+    }
+
+    pharaohShieldRig.visible = b.shieldActive;
+    pharaohShieldRig.position.set(b.x, 0, b.z);
+    if (b.shieldActive) {
+      const pulse = 1 + Math.sin(state.time * 3.4) * 0.035;
+      pharaohShieldRig.scale.setScalar(pulse);
+      pharaohShieldDisc.material.opacity = 0.08 + b.shieldFlash * 1.4 +
+        (1 - b.shieldHp / PHARAOH_SHIELD_HP) * 0.04;
+      pharaohShieldRing.material.opacity = 0.62 + b.shieldFlash * 1.5;
+    }
+  }
+
   function bossDie() {
     const bossKind = state.boss?.kind || 'rootcoil';
     state.boss.alive = false;
     bossMesh.visible = false;
+    pharaohShieldRig.visible = false;
+    rootSummonRig.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
     colossusShadow.visible = false;
@@ -2649,6 +2810,8 @@
     state.lavaBalls.length = 0;
     state.lavaPools.forEach((p) => { p.mesh.visible = false; });
     state.lavaPools.length = 0;
+    state.enemies.forEach((enemy) => { enemy.alive = false; });
+    enemyPool.forEach((mesh) => { mesh.visible = false; });
     spawnSkillOrb(bossKind);
     updateHud();
     toast('Boss 倒下', '吞噬场地中央的发光核心，获得技能');
@@ -3801,6 +3964,8 @@
     b.z += (dz / len) * BOSS_SPEED * dt;
     b.x = Math.max(-HALF + 2, Math.min(HALF - 2, b.x));
     b.z = Math.max(-HALF + 2, Math.min(HALF - 2, b.z));
+    if (b.kind === 'rootcoil') updateRootcoilSummon(b, dt);
+    if (b.kind === 'pharaoh') updatePharaohShield(b, dt);
 
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.2) * 0.04;
@@ -3823,9 +3988,9 @@
         const base = Math.atan2(hp.z - b.z, hp.x - b.x);
         const fans = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
         const rings = [
-          { r: 3.8, n: 18, spd: 4.4 }, // 外圈最多、最慢
-          { r: 2.4, n: 12, spd: 5.4 },
-          { r: 1.2, n: 7, spd: 6.4 },  // 内圈最少、最快
+          { r: 3.8, n: 10, spd: 4.4 }, // 外圈最多、最慢
+          { r: 2.4, n: 6, spd: 5.4 },
+          { r: 1.2, n: 3, spd: 6.4 },  // 内圈最少、最快
         ];
         for (const off of fans) {
           const a0 = base + off;
@@ -4072,9 +4237,11 @@
         boom = true;
         orb.boomX = state.boss.x;
         orb.boomZ = state.boss.z;
-        state.boss.hp -= ENERGY_BALL_DAMAGE;
-        updateHud();
-        if (state.boss.hp <= 0) bossDie();
+        if (!damagePharaohShield(true)) {
+          state.boss.hp -= ENERGY_BALL_DAMAGE;
+          updateHud();
+          if (state.boss.hp <= 0) bossDie();
+        }
       }
 
       if (boom) {
@@ -4169,7 +4336,7 @@
       let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
 
       // 命中小怪
-      if (!dead && state.phase === 'clear') {
+      if (!dead && (state.phase === 'clear' || state.phase === 'boss')) {
         for (let e = 0; e < state.enemies.length; e++) {
           const en = state.enemies[e];
           if (!en.alive) continue;
@@ -4209,15 +4376,18 @@
       // 命中 Boss
       if (!dead && state.phase === 'boss' && state.boss && state.boss.alive) {
         if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < state.boss.bulletHitRadius) {
-          state.boss.hp -= b.bossDamage;
-          state.score += 10;
-          updateHud();
+          const shieldBlocked = damagePharaohShield(false);
+          if (!shieldBlocked) {
+            state.boss.hp -= b.bossDamage;
+            state.score += 10;
+            updateHud();
+          }
           dead = true;
           if (b.fire) {
             spawnFireBurst(b.x, b.z);
             burstSpawned = true;
           }
-          if (state.boss.hp <= 0) bossDie();
+          if (!shieldBlocked && state.boss.hp <= 0) bossDie();
         }
       }
 
@@ -4399,6 +4569,8 @@
     if (startRoom) startRoom.visible = false;
     if (spawnDoorGroup) spawnDoorGroup.visible = false;
     if (doorPlug) doorPlug.visible = false;
+    pharaohShieldRig.visible = false;
+    rootSummonRig.visible = false;
     bossBreathRig.visible = false;
     playerFrostRig.visible = false;
     state.time = 0;
@@ -4505,6 +4677,8 @@
       }
       if (state.phase === 'boss') {
         updateBoss(dt);
+        updateEnemies(dt);
+        updatePods(dt);
         updateBossBullets(dt);
         updateColossusFireballs(dt);
         updateColossusLavaPools(dt);

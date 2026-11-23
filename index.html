@@ -205,6 +205,14 @@
     letter-spacing: .2em;
     text-shadow: 0 1px 9px rgba(22,5,3,.78);
   }
+  #bossbar .bshield {
+    margin: -3px 0 7px;
+    color: #ffe39a;
+    font-size: 9px;
+    letter-spacing: .16em;
+    text-shadow: 0 1px 8px rgba(40,20,2,.82);
+  }
+  #bossbar .bshield[hidden] { display: none !important; }
   #bossbar .bbar {
     height: 10px;
     overflow: hidden;
@@ -2335,6 +2343,7 @@
 
 <div class="hud panel" id="bossbar">
   <div class="bname" id="bname">腐根盘蛇 · ROOTCOIL</div>
+  <div class="bshield" id="bshield" hidden>金盾 3 / 3</div>
   <div class="bbar"><div id="bfill"></div></div>
 </div>
 
@@ -2512,7 +2521,7 @@
 
 <script src="vendor/three.min.js?v=20261117"></script>
 <script src="skills.js?v=20261123-greenwave1"></script>
-<script src="game.js?v=20261123-restartcurrent1"></script>
+<script src="game.js?v=20261123-bossmechanics1"></script>
 <script src="campaign.js?v=20261123-levelswap1"></script>
 <script src="audio.js?v=20261121-settings2"></script>
 <script src="start.js?v=20261123-restartcurrent1"></script>
