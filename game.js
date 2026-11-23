@@ -25,8 +25,8 @@
   const SHIELD_HALO_SCALE_Y = 0.72;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
-  const FIRE_BULLET_IMAGE_WIDTH = 2.65;
-  const FIRE_BULLET_IMAGE_HEIGHT = 1.37;
+  const FIRE_BULLET_IMAGE_WIDTH = 3.0;
+  const FIRE_BULLET_IMAGE_HEIGHT = 1.55;
   const FIRE_BULLET_TRAIL_INTERVAL = 0.055;
   const FIRE_BULLET_TRAIL_LIFE = 0.34;
   const ENERGY_BALL_COST = 3;
@@ -1736,7 +1736,7 @@
   for (let i = 0; i < 40; i++) {
     const group = new THREE.Group();
     const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.05, 0.54),
+      new THREE.PlaneGeometry(1.16, 0.6),
       new THREE.MeshBasicMaterial({
         map: FIRE_BULLET_TEX || null,
         color: 0xff8f4a,
@@ -4498,8 +4498,8 @@
           if (!en.alive) continue;
           if (Math.hypot(en.x - b.x, en.z - b.z) < ENEMY_HIT_RADIUS) {
             if (b.fire) {
-              damageEnemiesInFireAoe(b.x, b.z, b.enemyDamage);
-              spawnFireBurst(b.x, b.z);
+              damageEnemiesInFireAoe(en.x, en.z, b.enemyDamage);
+              spawnFireBurst(en.x, en.z);
               burstSpawned = true;
               dead = true;
               break;
