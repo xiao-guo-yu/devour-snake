@@ -137,11 +137,11 @@
   const ROOMS = [
     { theme: 'green', kind: 'clear', composition: { spore: 8 }, name: '腐殖温室 · 前厅' },
     { theme: 'green', kind: 'clear', composition: { spore: 5, vine: 3 }, name: '腐殖温室 · 根礼拜堂' },
-    { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
+    { theme: 'green', kind: 'clear', composition: { vine: 8 }, name: '腐殖温室 · 根之圣所' },
     { theme: 'green', kind: 'clear', composition: { spore: 5, trap: 3 }, name: '腐殖温室 · 腐生苗床' },
     { theme: 'green', kind: 'clear', composition: { spore: 3, vine: 2, trap: 3 }, name: '腐殖温室 · 根脉交叉' },
     { theme: 'green', kind: 'clear', composition: { vine: 5, trap: 3 }, name: '腐殖温室 · 捕食花圃' },
-    { theme: 'green', kind: 'clear', composition: { vine: 8 }, name: '腐殖温室 · 根之圣所' },
+    { theme: 'green', kind: 'clear', composition: { trap: 8 }, name: '腐殖温室 · 圣所深处' },
     { theme: 'green', kind: 'boss', boss: 'rootcoil', name: '腐根盘蛇 · ROOTCOIL' },
 
     { theme: 'temple', kind: 'clear', composition: { scarab: 8 }, name: '沙海神庙 · 柱厅' },
