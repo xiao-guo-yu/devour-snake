@@ -3400,6 +3400,11 @@
         e.z -= (dz / len) * 2.2;
         damage(stats.contactDamage, 'contact');
         if (state.over) return;
+        if (e.type === 'vine' && state.shieldTimer <= 0) {
+          const alreadySlowed = state.slowTimer > 0;
+          state.slowTimer = Math.max(state.slowTimer, 3);
+          if (!alreadySlowed) toast('被藤蔓缠绕', '移动速度降低 3 秒');
+        }
       }
 
       if (stats.shootCooldown) {
