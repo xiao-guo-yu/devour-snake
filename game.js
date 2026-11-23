@@ -2336,6 +2336,7 @@
   function updateIceSpawner(dt) {
     if (ROOMS[state.level]?.theme !== 'frozen') return;
     if (state.phase !== 'clear' && state.phase !== 'boss') return;
+    if (state.doorOpen) return;
     state.iceSpawnTimer -= dt;
     if (state.iceSpawnTimer > 0) return;
     state.iceSpawnTimer += ICE_SPAWN_INTERVAL;
@@ -2858,6 +2859,7 @@
     const firstUnlock = window.DevourSkills?.unlock?.(skillId) ?? false;
     state.skillOrb = null;
     rewardOrbGroup.visible = false;
+    clearCombatResidue();
     state.phase = 'exit';
     state.doorOpen = true;
     updateHud();
@@ -2943,8 +2945,6 @@
       gameOver('体长归零 —— 蛇不能没有身体。');
       return;
     }
-    // 掉血立刻补一只怪（清怪压力）
-    if (state.phase === 'clear' && state.enemies.filter((e) => e.alive).length < 16) spawnEnemy(8, true);
   }
 
   function growBy(n) {
@@ -4508,9 +4508,36 @@
     }
   }
 
+  function clearCombatResidue() {
+    const projectileLists = [
+      state.bullets,
+      state.enemyBullets,
+      state.pods,
+      state.ghostBullets,
+      state.hazards,
+      state.lavaBalls,
+      state.lavaPools,
+      state.orbs,
+      state.booms,
+      state.fireBursts,
+    ];
+    projectileLists.forEach((list) => {
+      list.forEach((entry) => {
+        const mesh = entry && entry.mesh ? entry.mesh : entry;
+        if (mesh) mesh.visible = false;
+      });
+      list.length = 0;
+    });
+    clearIceObstacles();
+    state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
+    state.slowTimer = 0;
+    state.hitFlash = 0;
+  }
+
   function checkClear() {
     if (state.phase !== 'clear' || state.doorOpen) return;
     if (state.enemies.some((e) => e.alive)) return;
+    clearCombatResidue();
     state.doorOpen = true;
     // 过关后豆子全部消失，且本关不再生成
     state.pelletsOff = true;
@@ -4742,6 +4769,8 @@
     activateShield,
     activateFrostBreath,
     damage,
+    checkClear,
+    clearCombatResidue,
     damageEnemiesInFireAoe,
     resetGame,
     spawnPellet,
