@@ -74,6 +74,7 @@
   const COLOSSUS_POOL_DURATION = 10;
   const ROOT_SUMMON_INTERVAL = 15;
   const ROOT_BULLET_INTERVAL = 5;
+  const PHARAOH_BULLET_INTERVAL = 4;
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
   const TWO_STAR_DAMAGE_LIMIT = 20;
@@ -2675,7 +2676,7 @@
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
       z: start.z,
-      shootTimer: isPharaoh ? 2.4 : (isDragon ? 99 : (isRootcoil ? ROOT_BULLET_INTERVAL : 3)),
+      shootTimer: isPharaoh ? PHARAOH_BULLET_INTERVAL : (isDragon ? 99 : (isRootcoil ? ROOT_BULLET_INTERVAL : 3)),
       jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
       jumpFrom: null,
@@ -3992,7 +3993,7 @@
       const isPharaoh = b.kind === 'pharaoh';
       if (isPharaoh) {
         // 三面扇形爆发：三个方向各三圈，子弹数从外圈到内圈递减
-        b.shootTimer = 3.5;
+        b.shootTimer = PHARAOH_BULLET_INTERVAL;
         const base = Math.atan2(hp.z - b.z, hp.x - b.x);
         const fans = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3];
         const rings = [
