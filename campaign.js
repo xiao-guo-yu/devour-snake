@@ -3,6 +3,7 @@
   'use strict';
 
   const STORAGE_KEY = 'devour-campaign-v2';
+  const TEST_UNLOCK_ALL = new URLSearchParams(window.location.search).get('unlock') === 'all';
   const REGIONS = [
     {
       id: 'green',
@@ -169,12 +170,14 @@
   }
 
   function regionUnlocked(regionIndex) {
+    if (TEST_UNLOCK_ALL) return true;
     if (regionIndex <= 0) return true;
     return starsFor(regionIndex - 1, 8) > 0;
   }
 
   function levelAvailable(regionIndex, level) {
     if (!level || level.planned || !regionUnlocked(regionIndex)) return false;
+    if (TEST_UNLOCK_ALL) return true;
     if (level.n === 1) return true;
     return starsFor(regionIndex, level.n - 1) > 0;
   }
