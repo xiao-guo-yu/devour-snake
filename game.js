@@ -77,6 +77,7 @@
   const PHARAOH_BULLET_INTERVAL = 6;
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
+  const SKILL_HUD_REVEAL_SECONDS = 6.5;
   const TWO_STAR_DAMAGE_LIMIT = 20;
   const THREE_STAR_TIME_LIMIT = 180;
   const DAMAGE_SCORE_PENALTY = 25;
@@ -2501,7 +2502,7 @@
     }
   }
 
-  function revealSkillHud(duration = 4) {
+  function revealSkillHud(duration = SKILL_HUD_REVEAL_SECONDS) {
     skillHudRevealTimer = duration;
     lastSkillHudSignature = '';
     updateSkillHud();
@@ -2663,7 +2664,7 @@
       showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败冰龙 · 完成远征' : '击败首领 · 进入下一层');
     }
     updateHud();
-    revealSkillHud(4);
+    revealSkillHud();
   }
 
   function spawnBoss(kind = 'rootcoil') {
@@ -3155,7 +3156,7 @@
   window.addEventListener('blur', () => held.clear());
   document.addEventListener('devour:skills-changed', () => {
     lastSkillHudSignature = '';
-    revealSkillHud(4);
+    revealSkillHud();
   });
 
   // ---------- 更新 ----------
