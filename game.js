@@ -50,8 +50,8 @@
   const DRAGON_BREATH_TELEGRAPH = 0.85;
   const DRAGON_BREATH_ACTIVE = 1.15;
   const DRAGON_BREATH_COOLDOWN = 6.2;
-  const DRAGON_BREATH_RANGE = 19;
-  const DRAGON_BREATH_HALF_ANGLE = Math.PI * 0.29;
+  const DRAGON_BREATH_RANGE = 23.2;
+  const DRAGON_BREATH_HALF_ANGLE = Math.PI * 0.12;
   const DRAGON_ATTACK_INTERVAL = 7;
   const DRAGON_MIRROR_HP_RATIO = 0.75;
   const DRAGON_LASER_TELEGRAPH = 0.9;
@@ -2239,7 +2239,10 @@
 
   // 凛冬冰龙龙息：贴图从左端窄口向右端展开，几何平移后以 Boss 嘴部为原点。
   const bossBreathRig = new THREE.Group();
-  const bossBreathGeo = new THREE.PlaneGeometry(DRAGON_BREATH_RANGE, DRAGON_BREATH_RANGE * 0.56);
+  const bossBreathGeo = new THREE.PlaneGeometry(
+    DRAGON_BREATH_RANGE,
+    DRAGON_BREATH_RANGE * 2 * Math.tan(DRAGON_BREATH_HALF_ANGLE)
+  );
   bossBreathGeo.translate(DRAGON_BREATH_RANGE / 2, 0, 0);
   const bossBreathMat = new THREE.MeshBasicMaterial({
     map: DRAGON_BREATH_TEX || null,
@@ -2318,16 +2321,17 @@
   const frostScarPool = [];
   const mirrorRubblePool = [];
   const frostSpikePool = [];
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 260; i++) {
     const scar = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.96, 0.96),
+      new THREE.PlaneGeometry(1.06, 1.06),
       new THREE.MeshBasicMaterial({
-        map: FROST_SCAR_TEX || null,
-        color: FROST_SCAR_TEX ? 0xffffff : 0xb7e9ff,
+        map: WOLF_FROST_TILE_TEX || FROST_SCAR_TEX || null,
+        color: WOLF_FROST_TILE_TEX ? 0xcceeff : 0xb7e9ff,
         transparent: true,
         opacity: 0,
         depthWrite: false,
         fog: false,
+        toneMapped: false,
       })
     );
     scar.rotation.x = -Math.PI / 2;
@@ -5112,33 +5116,34 @@
   }
 
   function spawnFrostScars(b) {
-    const candidates = [];
-    const seen = new Set();
-    for (let distance = 13; distance <= 19; distance += 0.8) {
-      for (let offset = -0.2; offset <= 0.201; offset += 0.1) {
-        const angle = b.breathAngle + offset;
-        const i = Math.round(b.x + Math.cos(angle) * distance + HALF);
-        const j = Math.round(b.z + Math.sin(angle) * distance + HALF);
-        const key = `${i},${j}`;
-        if (!inBounds(i, j) || isObstacle(i, j) || seen.has(key)) continue;
-        seen.add(key);
-        candidates.push({ i, j });
+    const dirX = Math.cos(b.breathAngle);
+    const dirZ = Math.sin(b.breathAngle);
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        if (isObstacle(i, j)) continue;
+        const dx = cellX(i) - b.x;
+        const dz = cellZ(j) - b.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 2.2 || distance > DRAGON_BREATH_RANGE) continue;
+        const dot = (dx * dirX + dz * dirZ) / distance;
+        const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+        const cellMargin = Math.atan2(0.72, Math.max(1, distance));
+        if (angle > DRAGON_BREATH_HALF_ANGLE + cellMargin) continue;
+
+        const existing = state.frostScars.find((scar) => scar.i === i && scar.j === j);
+        if (existing) {
+          existing.life = DRAGON_FROST_SCAR_LIFE;
+          existing.mesh.material.opacity = 0.9;
+          continue;
+        }
+        const mesh = frostScarPool.find((item) => !item.visible);
+        if (!mesh) return;
+        mesh.visible = true;
+        mesh.position.set(cellX(i), 0.12, cellZ(j));
+        mesh.rotation.z = 0;
+        mesh.material.opacity = 0.9;
+        state.frostScars.push({ i, j, mesh, life: DRAGON_FROST_SCAR_LIFE });
       }
-    }
-    for (let n = candidates.length - 1; n > 0; n--) {
-      const swap = randInt(n + 1);
-      [candidates[n], candidates[swap]] = [candidates[swap], candidates[n]];
-    }
-    const count = Math.min(candidates.length, 3 + randInt(3));
-    for (let n = 0; n < count; n++) {
-      const cell = candidates[n];
-      const mesh = frostScarPool.find((item) => !item.visible);
-      if (!mesh) break;
-      mesh.visible = true;
-      mesh.position.set(cellX(cell.i), 0.12, cellZ(cell.j));
-      mesh.rotation.z = Math.random() * Math.PI;
-      mesh.material.opacity = 0.68;
-      state.frostScars.push({ i: cell.i, j: cell.j, mesh, life: DRAGON_FROST_SCAR_LIFE });
     }
   }
 
@@ -5148,7 +5153,7 @@
       scar.life -= dt;
       const onScar = state.cells.some((cell) => cell.i === scar.i && cell.j === scar.j);
       if (onScar) state.slowTimer = Math.max(state.slowTimer, 0.45);
-      scar.mesh.material.opacity = Math.min(0.68, scar.life * 0.55);
+      scar.mesh.material.opacity = Math.min(0.9, scar.life * 0.34);
       if (scar.life <= 0) {
         scar.mesh.visible = false;
         state.frostScars.splice(k, 1);
