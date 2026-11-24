@@ -55,10 +55,10 @@
   const DRAGON_ATTACK_INTERVAL = 7;
   const DRAGON_MIRROR_HP_RATIO = 0.75;
   const DRAGON_LASER_TELEGRAPH = 0.9;
-  const DRAGON_LASER_ACTIVE = 1.15;
+  const DRAGON_LASER_ACTIVE = 1.5;
+  const DRAGON_LASER_SPIN_SPEED = Math.PI * 0.52;
   const DRAGON_LASER_RANGE = 23.2;
   const DRAGON_LASER_HIT_WIDTH = 1.52;
-  const DRAGON_REFLECTION_RANGE = 10;
   const DRAGON_SLAM_TELEGRAPH = 1.15;
   const DRAGON_SLAM_ACTIVE = 0.65;
   const DRAGON_FROST_SCAR_LIFE = 5;
@@ -2289,11 +2289,6 @@
     { length: 4 },
     () => createDragonBeamRig(FROST_LASER_TEX, 3.05, 0xe6fbff)
   );
-  const frostReflectionRigs = Array.from(
-    { length: 4 },
-    () => createDragonBeamRig(DRAGON_BREATH_RAY_TEX, 0.72, 0xbff4ff)
-  );
-
   const mirrorPillarMeshes = [];
   for (let i = 0; i < 2; i++) {
     const group = new THREE.Group();
@@ -3787,6 +3782,7 @@
       dragonAttackElapsed: 0,
       mirrorsSpawned: false,
       laserHit: false,
+      laserAngleOffset: 0,
       slamElapsed: 0,
       summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
       summonFlash: 0,
@@ -4958,7 +4954,6 @@
     state.frostSpikeBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.frostSpikeBursts.length = 0;
     frostLaserRigs.forEach((rig) => { rig.visible = false; });
-    frostReflectionRigs.forEach((rig) => { rig.visible = false; });
     mirrorPillarMeshes.forEach((mesh) => { mesh.visible = false; });
     mirrorRubblePool.forEach((mesh) => { mesh.visible = false; });
   }
@@ -4981,7 +4976,7 @@
       rubble.rotation.z = (Math.random() - 0.5) * 0.45;
       state.mirrorRubble.push({ mesh: rubble, i: cell.i, j: cell.j });
     }
-    toast('霜镜破碎', '折射通道已打开 · 碎裂冰面不会造成伤害');
+    toast('霜镜破碎', '激光阻挡已解除 · 碎裂冰面不会造成伤害');
     return true;
   }
 
@@ -5010,21 +5005,24 @@
       state.mirrorPillars.push(pillar);
     }
     if (state.mirrorPillars.length > 0) {
-      toast('霜镜召唤', '冰镜晶柱会折射激光 · 可用烈焰弹击碎');
+      toast('霜镜召唤', '冰镜晶柱会阻挡激光 · 可用烈焰弹击碎');
     }
   }
 
   function dragonLaserSegments(b) {
-    const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const baseAngle = b.laserAngleOffset || 0;
+    const directions = [
+      baseAngle,
+      baseAngle + Math.PI / 2,
+      baseAngle + Math.PI,
+      baseAngle - Math.PI / 2,
+    ];
     const mains = [];
-    const reflections = [];
     for (const angle of directions) {
       const dirX = Math.cos(angle);
       const dirZ = Math.sin(angle);
       let length = DRAGON_LASER_RANGE;
       let hitPillar = null;
-      let hitX = 0;
-      let hitZ = 0;
       for (const pillar of state.mirrorPillars) {
         if (!pillar.alive) continue;
         for (const cell of pillar.cells) {
@@ -5035,20 +5033,12 @@
           if (projection > 0 && projection < length && perpendicular <= 0.72) {
             length = Math.max(0.5, projection - 0.45);
             hitPillar = pillar;
-            hitX = cellX(cell.i);
-            hitZ = cellZ(cell.j);
           }
         }
       }
       mains.push({ angle, length, hitPillar });
-      if (hitPillar) {
-        reflections.push(
-          { angle: angle - Math.PI / 4, x: hitX, z: hitZ, length: DRAGON_REFLECTION_RANGE },
-          { angle: angle + Math.PI / 4, x: hitX, z: hitZ, length: DRAGON_REFLECTION_RANGE }
-        );
-      }
     }
-    return { mains, reflections };
+    return { mains };
   }
 
   function updateDragonLaserVisuals(b, opacity) {
@@ -5062,22 +5052,11 @@
       rig.scale.set(segment.length, 1, 1);
       rig.children[0].material.opacity = opacity;
     }
-    for (let i = 0; i < frostReflectionRigs.length; i++) {
-      const rig = frostReflectionRigs[i];
-      const segment = segments.reflections[i];
-      rig.visible = Boolean(segment);
-      if (!segment) continue;
-      rig.position.set(segment.x, 0, segment.z);
-      rig.rotation.y = Math.atan2(-Math.sin(segment.angle), Math.cos(segment.angle));
-      rig.scale.set(segment.length, 1, 1);
-      rig.children[0].material.opacity = opacity;
-    }
     return segments;
   }
 
   function hideDragonLaserVisuals() {
     frostLaserRigs.forEach((rig) => { rig.visible = false; });
-    frostReflectionRigs.forEach((rig) => { rig.visible = false; });
   }
 
   function pointHitsDragonRay(px, pz, ox, oz, angle, length, width) {
@@ -5099,17 +5078,6 @@
         if (pointHitsDragonRay(x, z, b.x, b.z, main.angle, main.length, DRAGON_LASER_HIT_WIDTH)) {
           return true;
         }
-      }
-      for (const reflection of segments.reflections) {
-        if (pointHitsDragonRay(
-          x,
-          z,
-          reflection.x,
-          reflection.z,
-          reflection.angle,
-          reflection.length,
-          DRAGON_LASER_HIT_WIDTH
-        )) return true;
       }
     }
     return false;
@@ -5235,6 +5203,7 @@
       b.breathAngle = targetAngle;
     } else if (attack === 'laser') {
       b.dragonState = 'laserTelegraph';
+      b.laserAngleOffset = 0;
     } else {
       b.dragonState = 'slamTelegraph';
     }
@@ -5336,6 +5305,7 @@
 
     if (b.dragonState === 'laserTelegraph' || b.dragonState === 'laserActive') {
       const active = b.dragonState === 'laserActive';
+      if (active) b.laserAngleOffset += DRAGON_LASER_SPIN_SPEED * dt;
       updateDragonLaserVisuals(b, active ? 0.92 : 0.22);
       setFrostDragonPose(true);
       if (active && !b.laserHit && bodyTouchesDragonLaser(b)) {
