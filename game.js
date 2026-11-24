@@ -3345,6 +3345,26 @@
     });
   }
 
+  function wispOrbTouchesObstacle(x, z, radius) {
+    const baseI = Math.round(x + HALF);
+    const baseJ = Math.round(z + HALF);
+    for (let di = -1; di <= 1; di++) {
+      for (let dj = -1; dj <= 1; dj++) {
+        const i = baseI + di;
+        const j = baseJ + dj;
+        if (!inBounds(i, j) || !isObstacle(i, j)) continue;
+        const cx = cellX(i);
+        const cz = cellZ(j);
+        const nearestX = Math.max(cx - 0.5, Math.min(x, cx + 0.5));
+        const nearestZ = Math.max(cz - 0.5, Math.min(z, cz + 0.5));
+        const dx = x - nearestX;
+        const dz = z - nearestZ;
+        if (dx * dx + dz * dz <= radius * radius) return true;
+      }
+    }
+    return false;
+  }
+
   function updateWispSpikes(dt) {
     const head = headPosition(_tmpA);
     for (let k = state.wispSpikes.length - 1; k >= 0; k--) {
@@ -3374,7 +3394,9 @@
         damage(1, 'projectile');
         spike.life = 0;
       }
-      if (spike.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj)) {
+      const hitObstacle = wispOrbTouchesObstacle(spike.x, spike.z, WISP_ORB_RADIUS);
+      if (spike.life <= 0 || !inBounds(ci, cj) || hitObstacle) {
+        if (hitObstacle) spawnFrostMist(spike.x, spike.z, 0.8);
         spike.mesh.visible = false;
         state.wispSpikes.splice(k, 1);
       }
