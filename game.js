@@ -41,7 +41,7 @@
   const ICE_SPAWN_INTERVAL = 15;
   const ICE_PILLARS_PER_WAVE = 5;
   const ICE_MAX_PILLARS = 80;
-  const WOLF_POUNCE_RANGE = 4;
+  const WOLF_POUNCE_RANGE = 6;
   const WOLF_CHARGE_TIME = 0.55;
   const WOLF_POUNCE_TIME = 0.24;
   const WOLF_STUN_TIME = 0.72;
