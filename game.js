@@ -40,6 +40,11 @@
   const ICE_SPAWN_INTERVAL = 15;
   const ICE_PILLARS_PER_WAVE = 5;
   const ICE_MAX_PILLARS = 80;
+  const WOLF_POUNCE_RANGE = 4;
+  const WOLF_CHARGE_TIME = 0.55;
+  const WOLF_POUNCE_TIME = 0.24;
+  const WOLF_STUN_TIME = 0.72;
+  const THIN_ICE_SLOW_TIME = 2.5;
   const DRAGON_BREATH_TELEGRAPH = 0.85;
   const DRAGON_BREATH_ACTIVE = 1.15;
   const DRAGON_BREATH_COOLDOWN = 6.2;
@@ -1290,6 +1295,15 @@
       ? imageTextureLoader.load(`assets/${file}?v=20261124-frozenpillars1`)
       : fallback
   );
+  const loadIceEffectTexture = (file) => {
+    if (!imageTextureLoader) return null;
+    const texture = imageTextureLoader.load(`assets/${file}?v=20261124-wolfhunter1`);
+    texture.colorSpace = THREE.SRGBColorSpace || 'srgb';
+    if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
+      texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    }
+    return texture;
+  };
   const loadPixelTexture = (file, fallback) => {
     const texture = imageTextureLoader
       ? imageTextureLoader.load(`assets/${file}?v=20261118-colossus-attacks`)
@@ -1304,6 +1318,9 @@
   const FIRE_BULLET_TEX = imageTextureLoader
     ? imageTextureLoader.load('assets/fireball-bullet.png?v=20261124-fireball-image1')
     : null;
+  const WOLF_CLAW_TEX = loadIceEffectTexture('wolf-claw-vfx.png');
+  const FROST_MIST_TEX = loadIceEffectTexture('frost-mist-vfx.png');
+  const THIN_ICE_TEX = loadIceEffectTexture('thin-ice.png');
   if (FIRE_BULLET_TEX) {
     FIRE_BULLET_TEX.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
@@ -1671,6 +1688,8 @@
   const anubisStaffGlowGeo = new THREE.CircleGeometry(0.34, 24);
   const anubisStaffCoreGeo = new THREE.CircleGeometry(0.1, 16);
   const anubisStaffs = [];
+  const wolfEyeGeo = new THREE.CircleGeometry(0.1, 18);
+  const wolfEyes = [];
   for (let i = 0; i < enemyPool.length; i++) {
     const eyePair = [-0.24, 0.24].map((x) => {
       const material = new THREE.MeshBasicMaterial({
@@ -1715,7 +1734,86 @@
     staffCore.visible = false;
     enemyPool[i].add(staffCore);
     anubisStaffs.push({ glow: staffGlow, core: staffCore });
+
+    const wolfEyePair = [-0.72, -0.45].map((x) => {
+      const eye = new THREE.Mesh(
+        wolfEyeGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.98,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          fog: false,
+        })
+      );
+      eye.position.set(x, -0.2, 0.08);
+      eye.visible = false;
+      enemyPool[i].add(eye);
+      return eye;
+    });
+    wolfEyes.push(wolfEyePair);
   }
+
+  const effectPlaneGeo = new THREE.PlaneGeometry(1, 1);
+  const wolfTelegraphPool = [];
+  for (let i = 0; i < 8; i++) {
+    const group = new THREE.Group();
+    const bars = [];
+    for (let barIndex = 0; barIndex < 4; barIndex++) {
+      const bar = new THREE.Mesh(
+        effectPlaneGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xb9f6ff,
+          transparent: true,
+          opacity: 0.52,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          fog: false,
+        })
+      );
+      bar.rotation.x = -Math.PI / 2;
+      bar.position.set(0, 0.18, (barIndex - 1.5) * 0.28);
+      group.add(bar);
+      bars.push(bar);
+    }
+    group.visible = false;
+    group.userData.bars = bars;
+    scene.add(group);
+    wolfTelegraphPool.push(group);
+  }
+
+  const createAdditiveEffectPool = (count, texture, tint, opacity) => {
+    const pool = [];
+    for (let i = 0; i < count; i++) {
+      const group = new THREE.Group();
+      const plane = new THREE.Mesh(
+        effectPlaneGeo,
+        new THREE.MeshBasicMaterial({
+          map: texture || null,
+          color: texture ? tint : 0x9fe9ff,
+          transparent: true,
+          opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          fog: false,
+          toneMapped: false,
+        })
+      );
+      plane.rotation.x = -Math.PI / 2;
+      group.add(plane);
+      group.userData.plane = plane;
+      group.visible = false;
+      scene.add(group);
+      pool.push(group);
+    }
+    return pool;
+  };
+  const wolfClawBurstPool = createAdditiveEffectPool(8, WOLF_CLAW_TEX, 0xd8fbff, 0.94);
+  const frostMistPool = createAdditiveEffectPool(10, FROST_MIST_TEX, 0xc8f5ff, 0.72);
+  const thinIcePool = createAdditiveEffectPool(64, THIN_ICE_TEX, 0xb8edff, 0.64);
 
   // ---------- 子弹 ----------
   const bulletPool = [];
@@ -2191,6 +2289,9 @@
     pods: [],
     ghostBullets: [],
     hazards: [],
+    thinIce: [],
+    wolfClawBursts: [],
+    frostMistBursts: [],
     lavaBalls: [],
     lavaPools: [],
     skillOrb: null,
@@ -2489,6 +2590,14 @@
       staffPulse: 0,
       frozenTimer: 0,
       splitTimer: spawnStats.splitInterval || 0,
+      wolfState: 'stalk',
+      wolfStateTimer: 0,
+      wolfLock: null,
+      wolfPounceFrom: null,
+      wolfPounceTarget: null,
+      wolfPath: [],
+      wolfTelegraph: null,
+      wolfStunTimer: 0,
     });
     // 复用槽位时恢复当前类型的贴图与缩放。
     const idx = state.enemies.indexOf(slot);
@@ -2561,6 +2670,296 @@
     const cell = findIceSlugSplitCell(parent);
     if (!cell) return null;
     return activateEnemySlot(slot, 'iceSlug', cell.i, cell.j);
+  }
+
+  function hideWolfTelegraph(e) {
+    if (!e || !e.wolfTelegraph) return;
+    e.wolfTelegraph.visible = false;
+    e.wolfTelegraph = null;
+  }
+
+  function showWolfTelegraph(e) {
+    hideWolfTelegraph(e);
+    const lock = e.wolfLock;
+    if (!lock) return;
+    const group = wolfTelegraphPool.find((item) => !item.visible);
+    if (!group) return;
+    const fromX = e.x;
+    const fromZ = e.z;
+    const toX = cellX(lock.i);
+    const toZ = cellZ(lock.j);
+    const dx = toX - fromX;
+    const dz = toZ - fromZ;
+    const length = Math.max(0.8, Math.hypot(dx, dz));
+    group.position.set((fromX + toX) / 2, 0, (fromZ + toZ) / 2);
+    group.rotation.y = Math.atan2(-dz, dx);
+    for (let i = 0; i < group.userData.bars.length; i++) {
+      const bar = group.userData.bars[i];
+      bar.scale.set(length, 0.055 + (i % 2) * 0.018, 1);
+      bar.material.opacity = 0.38 + i * 0.07;
+    }
+    group.visible = true;
+    e.wolfTelegraph = group;
+  }
+
+  function spawnTimedEffect(pool, list, x, z, angle, size, life, opacity) {
+    const group = pool.find((item) => !item.visible);
+    if (!group) return null;
+    group.visible = true;
+    group.position.set(x, 0.2, z);
+    group.rotation.y = angle;
+    group.scale.setScalar(size);
+    group.userData.plane.material.opacity = opacity;
+    list.push({ group, life, maxLife: life, size, opacity });
+    return group;
+  }
+
+  function spawnWolfClawBurst(x, z, angle, size = 3.2) {
+    const group = spawnTimedEffect(wolfClawBurstPool, state.wolfClawBursts, x, z, angle, size, 0.38, 0.94);
+    if (group) group.position.y = 0.62;
+  }
+
+  function spawnFrostMist(x, z, size = 2.1) {
+    spawnTimedEffect(
+      frostMistPool,
+      state.frostMistBursts,
+      x,
+      z,
+      Math.random() * Math.PI * 2,
+      size,
+      0.48,
+      0.72
+    );
+  }
+
+  function updateWolfCombatEffects(dt) {
+    for (const list of [state.wolfClawBursts, state.frostMistBursts]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const effect = list[k];
+        effect.life -= dt;
+        const progress = 1 - Math.max(0, effect.life / effect.maxLife);
+        effect.group.scale.setScalar(effect.size * (0.82 + progress * 0.3));
+        effect.group.userData.plane.material.opacity = effect.opacity * (1 - progress);
+        if (effect.life <= 0) {
+          effect.group.visible = false;
+          list.splice(k, 1);
+        }
+      }
+    }
+  }
+
+  function removeThinIce(ice) {
+    if (!ice) return;
+    ice.mesh.visible = false;
+    const index = state.thinIce.indexOf(ice);
+    if (index >= 0) state.thinIce.splice(index, 1);
+  }
+
+  function spawnThinIce(cells) {
+    for (const cell of cells) {
+      if (!inBounds(cell.i, cell.j)) continue;
+      const existing = state.thinIce.find((ice) => ice.i === cell.i && ice.j === cell.j);
+      if (existing) {
+        existing.hits = 0;
+        existing.mesh.userData.plane.material.opacity = 0.64;
+        continue;
+      }
+      const mesh = thinIcePool.find((item) => !item.visible);
+      if (!mesh) continue;
+      mesh.visible = true;
+      mesh.position.set(cellX(cell.i), 0.16, cellZ(cell.j));
+      mesh.rotation.y = (Math.random() - 0.5) * 0.28;
+      mesh.scale.setScalar(1.08);
+      mesh.userData.plane.material.opacity = 0.64;
+      state.thinIce.push({ i: cell.i, j: cell.j, mesh, hits: 0, phase: Math.random() * 6.28 });
+    }
+  }
+
+  function triggerThinIceAt(i, j) {
+    const ice = state.thinIce.find((item) => item.i === i && item.j === j);
+    if (!ice) return;
+    ice.hits += 1;
+    if (ice.hits < 2) {
+      ice.mesh.userData.plane.material.opacity = 0.32;
+      ice.mesh.scale.set(1.22, 0.92, 1.22);
+      spawnFrostMist(cellX(i), cellZ(j), 0.8);
+      return;
+    }
+    removeThinIce(ice);
+    spawnFrostMist(cellX(i), cellZ(j), 1.15);
+    state.slowTimer = Math.max(state.slowTimer, THIN_ICE_SLOW_TIME);
+    damage(1, 'hazard');
+  }
+
+  function updateThinIce() {
+    for (const ice of state.thinIce) {
+      const pulse = 1.04 + Math.sin(state.time * 3.8 + ice.phase) * 0.045;
+      ice.mesh.scale.set(pulse, pulse, pulse);
+      ice.mesh.userData.plane.material.opacity = ice.hits === 0
+        ? 0.56 + Math.sin(state.time * 4.4 + ice.phase) * 0.1
+        : 0.24 + Math.sin(state.time * 7 + ice.phase) * 0.06;
+    }
+  }
+
+  function clearWolfCombatEffects() {
+    state.enemies.forEach(hideWolfTelegraph);
+    wolfTelegraphPool.forEach((group) => { group.visible = false; });
+    for (const list of [state.wolfClawBursts, state.frostMistBursts]) {
+      list.forEach((effect) => { effect.group.visible = false; });
+      list.length = 0;
+    }
+    state.thinIce.forEach((ice) => { ice.mesh.visible = false; });
+    state.thinIce.length = 0;
+  }
+
+  function wolfPathBetween(fromI, fromJ, toI, toJ) {
+    const path = [{ i: fromI, j: fromJ }];
+    let i = fromI;
+    let j = fromJ;
+    const di = Math.sign(toI - fromI);
+    const dj = Math.sign(toJ - fromJ);
+    for (let guard = 0; guard < 8; guard++) {
+      if (i === toI && j === toJ) break;
+      i += di;
+      j += dj;
+      path.push({ i, j });
+    }
+    return path;
+  }
+
+  function tryStartWolfCharge(e) {
+    const head = state.cells[0];
+    if (!head) return false;
+    const wi = Math.round(e.x + HALF);
+    const wj = Math.round(e.z + HALF);
+    const sameRow = wi === head.i;
+    const sameColumn = wj === head.j;
+    if (!sameRow && !sameColumn) return false;
+    const distance = Math.abs(wi - head.i) + Math.abs(wj - head.j);
+    if (distance < 1 || distance > WOLF_POUNCE_RANGE) return false;
+    e.wolfState = 'charge';
+    e.wolfStateTimer = WOLF_CHARGE_TIME;
+    e.wolfLock = { i: head.i, j: head.j };
+    e.wolfPath = wolfPathBetween(wi, wj, head.i, head.j);
+    showWolfTelegraph(e);
+    return true;
+  }
+
+  function moveFrostWolfTowardTail(e, mesh, tail, dt) {
+    const stats = enemyStats(e.type);
+    const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul);
+    const tailX = cellX(tail.i);
+    const tailZ = cellZ(tail.j);
+    const directions = [
+      [1, 0], [1, 1], [0, 1], [-1, 1],
+      [-1, 0], [-1, -1], [0, -1], [1, -1],
+    ];
+    let best = null;
+    let bestScore = Infinity;
+    for (const [dx, dz] of directions) {
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = e.x + (dx / len) * speed * dt;
+      const nz = e.z + (dz / len) * speed * dt;
+      const ci = Math.round(nx + HALF);
+      const cj = Math.round(nz + HALF);
+      if (!inBounds(ci, cj) || isObstacle(ci, cj)) continue;
+      if (state.cells.some((cell) => cell.i === ci && cell.j === cj)) continue;
+      const score = Math.hypot(tailX - nx, tailZ - nz);
+      if (score < bestScore) {
+        bestScore = score;
+        best = { x: nx, z: nz, i: ci, j: cj };
+      }
+    }
+    if (best) {
+      e.x = best.x;
+      e.z = best.z;
+      e.i = best.i;
+      e.j = best.j;
+    }
+    mesh.position.set(e.x, 0.5 + Math.sin(state.time * 4 + e.bob) * 0.04, e.z);
+    mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
+    if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+      e.cool = stats.contactCooldown;
+      damage(stats.contactDamage, 'contact');
+    }
+  }
+
+  function finishWolfPounce(e) {
+    const path = e.wolfPath || [];
+    spawnWolfClawBurst(e.x, e.z, Math.atan2(-(e.wolfPounceTarget.z - e.wolfPounceFrom.z),
+      e.wolfPounceTarget.x - e.wolfPounceFrom.x), 2.4 + path.length * 0.45);
+    spawnThinIce(path.slice(-2));
+    const head = state.cells[0];
+    const hit = head && e.wolfLock && head.i === e.wolfLock.i && head.j === e.wolfLock.j;
+    if (hit) {
+      e.cool = enemyStats(e.type).contactCooldown;
+      damage(1, 'contact');
+      e.wolfState = 'stalk';
+      e.wolfStateTimer = 0;
+    } else {
+      e.wolfState = 'stun';
+      e.wolfStateTimer = WOLF_STUN_TIME;
+      e.wolfStunTimer = WOLF_STUN_TIME;
+      spawnFrostMist(e.x, e.z, 2.5);
+    }
+    e.wolfLock = null;
+    e.wolfPounceFrom = null;
+    e.wolfPounceTarget = null;
+    e.wolfPath = [];
+  }
+
+  function updateFrostWolf(e, mesh, tail, dt) {
+    if (!e.wolfState) e.wolfState = 'stalk';
+    if (e.wolfState === 'charge') {
+      e.wolfStateTimer -= dt;
+      if (e.wolfTelegraph) {
+        const opacity = 0.62 + Math.sin(state.time * 18) * 0.2;
+        for (const bar of e.wolfTelegraph.userData.bars) {
+          bar.material.opacity = opacity;
+        }
+      }
+      if (e.wolfStateTimer <= 0) {
+        hideWolfTelegraph(e);
+        e.wolfState = 'pounce';
+        e.wolfStateTimer = WOLF_POUNCE_TIME;
+        e.wolfPounceFrom = { x: e.x, z: e.z };
+        e.wolfPounceTarget = { x: cellX(e.wolfLock.i), z: cellZ(e.wolfLock.j) };
+      }
+      mesh.material.color.setHex(0xffffff);
+      mesh.position.set(e.x, 0.54 + Math.sin(state.time * 22) * 0.05, e.z);
+      return;
+    }
+
+    if (e.wolfState === 'pounce') {
+      e.wolfStateTimer = Math.max(0, e.wolfStateTimer - dt);
+      const progress = 1 - e.wolfStateTimer / WOLF_POUNCE_TIME;
+      const eased = progress * progress * (3 - 2 * progress);
+      e.x = e.wolfPounceFrom.x + (e.wolfPounceTarget.x - e.wolfPounceFrom.x) * eased;
+      e.z = e.wolfPounceFrom.z + (e.wolfPounceTarget.z - e.wolfPounceFrom.z) * eased;
+      e.i = Math.round(e.x + HALF);
+      e.j = Math.round(e.z + HALF);
+      mesh.material.color.setHex(0xffffff);
+      mesh.position.set(e.x, 0.62 + Math.sin(progress * Math.PI) * 0.42, e.z);
+      if (e.wolfStateTimer <= 0) finishWolfPounce(e);
+      return;
+    }
+
+    if (e.wolfState === 'stun') {
+      e.wolfStateTimer = Math.max(0, e.wolfStateTimer - dt);
+      e.wolfStunTimer = e.wolfStateTimer;
+      mesh.material.color.setHex(0x777b80);
+      mesh.position.set(e.x, 0.42, e.z);
+      mesh.rotation.z = Math.sin(state.time * 18) * 0.02;
+      if (e.wolfStateTimer <= 0) {
+        e.wolfState = 'stalk';
+        e.wolfStunTimer = 0;
+      }
+      return;
+    }
+
+    mesh.material.color.setHex(0xffffff);
+    if (tryStartWolfCharge(e)) return;
+    moveFrostWolfTowardTail(e, mesh, tail, dt);
   }
 
   function campaignPosition(levelIndex) {
@@ -2720,6 +3119,7 @@
     state.ghostBullets = [];
     (state.hazards || []).forEach((h) => { h.mesh.visible = false; });
     state.hazards = [];
+    clearWolfCombatEffects();
     (state.lavaBalls || []).forEach((b) => { b.mesh.visible = false; });
     state.lavaBalls = [];
     (state.lavaPools || []).forEach((p) => { p.mesh.visible = false; });
@@ -3148,6 +3548,8 @@
     }
 
     state.cells.unshift({ i: ni, j: nj });
+    triggerThinIceAt(ni, nj);
+    if (state.over) return;
 
     const pi = state.pellets.findIndex((p) => p.i === ni && p.j === nj);
     if (pi >= 0) {
@@ -3684,6 +4086,17 @@
         (e.staffPulse > 0 ? 0.16 : 0);
       staff.core.material.opacity = 0.88;
     }
+
+    const wolfEyePair = wolfEyes[index];
+    const wolfEyesActive = e.type === 'frostWolf' && e.wolfState === 'charge';
+    for (const eye of wolfEyePair) {
+      eye.visible = wolfEyesActive;
+      if (wolfEyesActive) {
+        const pulse = 1.1 + Math.sin(state.time * 20 + index) * 0.22;
+        eye.scale.setScalar(pulse);
+        eye.material.opacity = 0.82 + Math.sin(state.time * 24 + index) * 0.16;
+      }
+    }
   }
 
   function absorbPelletsNearAnubis(e) {
@@ -3713,7 +4126,11 @@
     for (let k = 0; k < enemyPool.length; k++) {
       const mesh = enemyPool[k];
       const e = state.enemies[k];
-      if (!e || !e.alive) { mesh.visible = false; continue; }
+      if (!e || !e.alive) {
+        mesh.visible = false;
+        if (e) hideWolfTelegraph(e);
+        continue;
+      }
       mesh.visible = true;
       if (!spawnLocked && e.type === 'iceSlug') {
         const splitInterval = enemyStats(e.type).splitInterval;
@@ -3725,6 +4142,10 @@
         }
       }
       if (e.frozenTimer > 0) {
+        hideWolfTelegraph(e);
+        if (e.type === 'frostWolf' && wolfEyes[k]) {
+          wolfEyes[k].forEach((eye) => { eye.visible = false; });
+        }
         e.frozenTimer = Math.max(0, e.frozenTimer - dt);
         mesh.material.color.setHex(0xa9eeff);
         mesh.position.set(e.x, 0.5 + Math.sin(state.time * 2.4 + e.bob) * 0.025, e.z);
@@ -3745,6 +4166,12 @@
       const dz = hp.z - e.z;
       const len = Math.hypot(dx, dz) || 1;
       if (e.cool > 0) e.cool -= dt;
+      if (e.type === 'frostWolf') {
+        const tail = state.cells[state.cells.length - 1] || state.cells[0];
+        updateFrostWolf(e, mesh, tail, dt);
+        if (state.over) return;
+        continue;
+      }
       if (e.type === 'emberWisp') {
         updateEmberWisp(e, mesh, hp, dt);
         continue;
@@ -4782,6 +5209,7 @@
       list.length = 0;
     });
     clearIceObstacles();
+    clearWolfCombatEffects();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
     state.hitFlash = 0;
@@ -4990,6 +5418,8 @@
         updateColossusLavaPools(dt);
       }
 
+      updateWolfCombatEffects(dt);
+      updateThinIce();
       updateBullets(dt);
       updateFireTrails(dt);
       updateEnergyOrbs(dt);
@@ -5040,6 +5470,8 @@
     spawnIceObstacle,
     spawnIcePillar: spawnIceObstacle,
     breakIceObstacle,
+    spawnThinIce,
+    triggerThinIceAt,
     getIceObstacles: () => [...new Set(dynamicIce.values())].map(({ i, j, cells }) => ({
       i,
       j,
