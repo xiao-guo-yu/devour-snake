@@ -45,6 +45,7 @@
   const WOLF_CHARGE_TIME = 0.55;
   const WOLF_POUNCE_TIME = 0.24;
   const WOLF_STUN_TIME = 0.72;
+  const WOLF_RENDER_SCALE = 1.82;
   const THIN_ICE_SLOW_TIME = 2.5;
   const DRAGON_BREATH_TELEGRAPH = 0.85;
   const DRAGON_BREATH_ACTIVE = 1.15;
@@ -55,8 +56,8 @@
   const DRAGON_MIRROR_HP_RATIO = 0.75;
   const DRAGON_LASER_TELEGRAPH = 0.9;
   const DRAGON_LASER_ACTIVE = 1.15;
-  const DRAGON_LASER_RANGE = 19;
-  const DRAGON_LASER_HIT_WIDTH = 0.56;
+  const DRAGON_LASER_RANGE = 23.2;
+  const DRAGON_LASER_HIT_WIDTH = 1.52;
   const DRAGON_REFLECTION_RANGE = 10;
   const DRAGON_SLAM_TELEGRAPH = 1.15;
   const DRAGON_SLAM_ACTIVE = 0.65;
@@ -65,6 +66,11 @@
   const WISP_SOLID_TIME = 3;
   const WISP_CAST_WARNING = 0.85;
   const WISP_FOG_LIFE = 5;
+  const WISP_ORB_RADIUS = 0.46;
+  const WISP_ORB_SPEED = 2.65;
+  const WISP_ORB_TURN_RATE = 1.35;
+  const WISP_ORB_LIFE = 9;
+  const WISP_DISSOLVE_TIME = 0.62;
   const FROST_SKILL_COST = 2;
   const FROST_SKILL_COOLDOWN = 6;
   const FROST_SKILL_DURATION = 3;
@@ -162,7 +168,7 @@
     },
     frostWolf: {
       hp: 1, speed: 2.05, contactDamage: 2, contactCooldown: 1.15,
-      contactRadius: 0.988, retreatSpeedMul: 0.46,
+      contactRadius: 1.38, retreatSpeedMul: 0.46,
     },
     frostWisp: {
       hp: 1, speed: 0.42, contactDamage: 1, contactCooldown: 1.25,
@@ -1319,7 +1325,7 @@
   );
   const loadIceEffectTexture = (file) => {
     if (!imageTextureLoader) return null;
-    const texture = imageTextureLoader.load(`assets/${file}?v=20261124-wolfhunter1`);
+    const texture = imageTextureLoader.load(`assets/${file}?v=20261124-frostbatch1`);
     texture.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
       texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
@@ -1342,7 +1348,7 @@
     : null;
   const WOLF_CLAW_TEX = loadIceEffectTexture('wolf-claw-vfx.png');
   const FROST_MIST_TEX = loadIceEffectTexture('frost-mist-vfx.png');
-  const THIN_ICE_TEX = loadIceEffectTexture('thin-ice.png');
+  const WOLF_FROST_TILE_TEX = loadIceEffectTexture('wolf-frost-tile.png');
   if (FIRE_BULLET_TEX) {
     FIRE_BULLET_TEX.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
@@ -1396,10 +1402,11 @@
   const FROST_SCAR_TEX = loadIceEffectTexture('frost-scar.png');
   const MIRROR_PILLAR_TEX = loadIceEffectTexture('mirror-pillar.png');
   const FROST_SPIKES_TEX = loadIceEffectTexture('frost-spikes.png');
-  const FROST_DRAGON_SLAM_TEX = Array.from(
-    { length: 6 },
-    (_, index) => loadIceEffectTexture(`frost-dragon-slam-${index + 1}.png`)
-  );
+  const FROST_DRAGON_SLAM_TEX = [
+    loadIceEffectTexture('frost-dragon-slam-raise.png'),
+    loadIceEffectTexture('frost-dragon-slam-impact.png'),
+  ];
+  const WISP_DISSOLVE_TEX = loadIceEffectTexture('frost-wisp-dissolve.png');
   const WISP_FOG_TEX = Array.from(
     { length: 4 },
     (_, index) => loadIceEffectTexture(`frost-wisp-fog-${index + 1}.png`)
@@ -1840,12 +1847,12 @@
     wolfTelegraphPool.push(group);
   }
 
-  const createAdditiveEffectPool = (count, texture, tint, opacity) => {
+  const createAdditiveEffectPool = (count, texture, tint, opacity, geometry = effectPlaneGeo) => {
     const pool = [];
     for (let i = 0; i < count; i++) {
       const group = new THREE.Group();
       const plane = new THREE.Mesh(
-        effectPlaneGeo,
+        geometry,
         new THREE.MeshBasicMaterial({
           map: texture || null,
           color: texture ? tint : 0x9fe9ff,
@@ -1869,27 +1876,52 @@
   };
   const wolfClawBurstPool = createAdditiveEffectPool(8, WOLF_CLAW_TEX, 0xd8fbff, 0.94);
   const frostMistPool = createAdditiveEffectPool(10, FROST_MIST_TEX, 0xc8f5ff, 0.72);
-  const thinIcePool = createAdditiveEffectPool(64, FROST_MIST_TEX, 0xcaf3ff, 0.54);
   const wispFogPool = createAdditiveEffectPool(48, WISP_FOG_TEX[0], 0xc1f1f8, 0.42);
+  const wispDissolvePool = createAdditiveEffectPool(
+    12,
+    WISP_DISSOLVE_TEX,
+    0xbfefff,
+    0.86,
+    new THREE.PlaneGeometry(3.2, 3.2)
+  );
   const wispWarningPool = Array.from(
     { length: 16 },
     () => createDragonBeamRig(DRAGON_BREATH_RAY_TEX, 0.58, 0xd8fbff)
   );
-  const wispSpikePool = [];
-  for (let i = 0; i < 24; i++) {
+  const thinIcePool = [];
+  for (let i = 0; i < 64; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.25, 1.25),
+      new THREE.PlaneGeometry(1.14, 1.14),
       new THREE.MeshBasicMaterial({
-        map: FROST_SPIKES_TEX || null,
-        color: FROST_SPIKES_TEX ? 0xffffff : 0xc8f7ff,
+        map: WOLF_FROST_TILE_TEX || null,
+        color: WOLF_FROST_TILE_TEX ? 0xffffff : 0xcaf3ff,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.78,
         depthWrite: false,
         fog: false,
         toneMapped: false,
       })
     );
     mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.16;
+    mesh.renderOrder = 2;
+    mesh.visible = false;
+    mesh.userData.plane = mesh;
+    scene.add(mesh);
+    thinIcePool.push(mesh);
+  }
+  const wispSpikePool = [];
+  for (let i = 0; i < 24; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(WISP_ORB_RADIUS, 14, 10),
+      new THREE.MeshStandardMaterial({
+        color: 0xaeeeff,
+        emissive: 0x34baff,
+        emissiveIntensity: 2.1,
+        roughness: 0.18,
+        metalness: 0.06,
+      })
+    );
     mesh.visible = false;
     scene.add(mesh);
     wispSpikePool.push(mesh);
@@ -1968,6 +2000,22 @@
     mesh.visible = false;
     scene.add(mesh);
     bossBulletPool.push(mesh);
+  }
+
+  const frostSlamBulletPool = [];
+  for (let i = 0; i < 40; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.46, 12, 9),
+      new THREE.MeshStandardMaterial({
+        color: 0xbcefff,
+        emissive: 0x36b9ff,
+        emissiveIntensity: 2.25,
+        roughness: 0.22,
+      })
+    );
+    mesh.visible = false;
+    scene.add(mesh);
+    frostSlamBulletPool.push(mesh);
   }
 
   // ---------- 第三关小怪的能量豆（比 Boss 弹幕更大） ----------
@@ -2236,7 +2284,7 @@
 
   const frostLaserRigs = Array.from(
     { length: 4 },
-    () => createDragonBeamRig(FROST_LASER_TEX, 1.15, 0xe6fbff)
+    () => createDragonBeamRig(FROST_LASER_TEX, 3.05, 0xe6fbff)
   );
   const frostReflectionRigs = Array.from(
     { length: 4 },
@@ -2491,6 +2539,7 @@
     thinIce: [],
     wolfClawBursts: [],
     frostMistBursts: [],
+    wispDissolves: [],
     mirrorPillars: [],
     mirrorRubble: [],
     frostScars: [],
@@ -2974,7 +3023,7 @@
       const existing = state.thinIce.find((ice) => ice.i === cell.i && ice.j === cell.j);
       if (existing) {
         existing.hits = 0;
-        existing.mesh.userData.plane.material.opacity = 0.64;
+        existing.mesh.userData.plane.material.opacity = 0.82;
         continue;
       }
       const mesh = thinIcePool.find((item) => !item.visible);
@@ -2982,8 +3031,8 @@
       mesh.visible = true;
       mesh.position.set(cellX(cell.i), 0.16, cellZ(cell.j));
       mesh.rotation.y = (Math.random() - 0.5) * 0.28;
-      mesh.scale.setScalar(1.08);
-      mesh.userData.plane.material.opacity = 0.64;
+      mesh.scale.setScalar(1);
+      mesh.userData.plane.material.opacity = 0.82;
       state.thinIce.push({ i: cell.i, j: cell.j, mesh, hits: 0, phase: Math.random() * 6.28 });
     }
   }
@@ -2993,8 +3042,8 @@
     if (!ice) return;
     ice.hits += 1;
     if (ice.hits < 2) {
-      ice.mesh.userData.plane.material.opacity = 0.32;
-      ice.mesh.scale.set(1.22, 0.92, 1.22);
+      ice.mesh.userData.plane.material.opacity = 0.46;
+      ice.mesh.scale.set(1.12, 0.92, 1.12);
       spawnFrostMist(cellX(i), cellZ(j), 0.8);
       return;
     }
@@ -3009,8 +3058,8 @@
       const pulse = 1.04 + Math.sin(state.time * 3.8 + ice.phase) * 0.045;
       ice.mesh.scale.set(pulse, pulse, pulse);
       ice.mesh.userData.plane.material.opacity = ice.hits === 0
-        ? 0.56 + Math.sin(state.time * 4.4 + ice.phase) * 0.1
-        : 0.24 + Math.sin(state.time * 7 + ice.phase) * 0.06;
+        ? 0.76 + Math.sin(state.time * 4.4 + ice.phase) * 0.07
+        : 0.34 + Math.sin(state.time * 7 + ice.phase) * 0.05;
     }
   }
 
@@ -3030,6 +3079,9 @@
     wispWarningPool.forEach((rig) => { rig.visible = false; });
     state.wispFogPatches.forEach((patch) => { patch.group.visible = false; });
     state.wispFogPatches.length = 0;
+    state.wispDissolves.forEach((effect) => { effect.group.visible = false; });
+    state.wispDissolves.length = 0;
+    wispDissolvePool.forEach((group) => { group.visible = false; });
     state.wispSpikes.forEach((spike) => { spike.mesh.visible = false; });
     state.wispSpikes.length = 0;
   }
@@ -3226,6 +3278,38 @@
     state.wispFogPatches.push({ i, j, group, life: WISP_FOG_LIFE, phase: Math.random() * 6.28 });
   }
 
+  function spawnWispDissolve(x, z) {
+    const group = wispDissolvePool.find((item) => !item.visible);
+    if (!group) return;
+    group.visible = true;
+    group.position.set(x, 0.24, z);
+    group.rotation.y = Math.random() * Math.PI * 2;
+    group.scale.setScalar(0.88);
+    group.userData.plane.material.opacity = 0.86;
+    state.wispDissolves.push({
+      group,
+      life: WISP_DISSOLVE_TIME,
+      maxLife: WISP_DISSOLVE_TIME,
+      spin: (Math.random() - 0.5) * 0.8,
+    });
+  }
+
+  function updateWispDissolves(dt) {
+    for (let k = state.wispDissolves.length - 1; k >= 0; k--) {
+      const effect = state.wispDissolves[k];
+      effect.life -= dt;
+      const progress = 1 - Math.max(0, effect.life / effect.maxLife);
+      effect.group.rotation.y += effect.spin * dt;
+      effect.group.scale.setScalar(0.88 + Math.sin(progress * Math.PI) * 0.18);
+      effect.group.userData.plane.material.opacity =
+        Math.max(0, 0.86 * (1 - progress * progress));
+      if (effect.life <= 0) {
+        effect.group.visible = false;
+        state.wispDissolves.splice(k, 1);
+      }
+    }
+  }
+
   function updateWispFogPatches(dt) {
     for (let k = state.wispFogPatches.length - 1; k >= 0; k--) {
       const patch = state.wispFogPatches[k];
@@ -3250,32 +3334,48 @@
     const mesh = wispSpikePool.find((item) => !item.visible);
     if (!mesh) return;
     mesh.visible = true;
-    mesh.position.set(e.x, 0.34, e.z);
-    mesh.rotation.z = -angle;
-    mesh.scale.setScalar(0.7);
+    mesh.position.set(e.x, 0.5, e.z);
+    mesh.scale.setScalar(1);
     state.wispSpikes.push({
       mesh,
       x: e.x,
       z: e.z,
-      vx: Math.cos(angle) * 7,
-      vz: Math.sin(angle) * 7,
-      life: 1.5,
+      vx: Math.cos(angle) * WISP_ORB_SPEED,
+      vz: Math.sin(angle) * WISP_ORB_SPEED,
+      life: WISP_ORB_LIFE,
     });
   }
 
   function updateWispSpikes(dt) {
+    const head = headPosition(_tmpA);
     for (let k = state.wispSpikes.length - 1; k >= 0; k--) {
       const spike = state.wispSpikes[k];
       spike.life -= dt;
+      const desired = Math.atan2(head.z - spike.z, head.x - spike.x);
+      const current = Math.atan2(spike.vz, spike.vx);
+      const turn = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
+      const angle = current + Math.max(
+        -WISP_ORB_TURN_RATE * dt,
+        Math.min(WISP_ORB_TURN_RATE * dt, turn)
+      );
+      spike.vx = Math.cos(angle) * WISP_ORB_SPEED;
+      spike.vz = Math.sin(angle) * WISP_ORB_SPEED;
       spike.x += spike.vx * dt;
       spike.z += spike.vz * dt;
-      spike.mesh.position.set(spike.x, 0.34, spike.z);
-      spike.mesh.scale.setScalar(0.7 + Math.min(1, (1.5 - spike.life) * 2) * 0.35);
-      if (bodyDistanceSq(spike.x, spike.z) < 0.72 * 0.72) {
+      spike.mesh.position.set(
+        spike.x,
+        0.5 + Math.sin(state.time * 7 + k) * 0.04,
+        spike.z
+      );
+      spike.mesh.rotation.y += dt * 2.2;
+      spike.mesh.scale.setScalar(1 + Math.sin(state.time * 8 + k) * 0.06);
+      const ci = Math.round(spike.x + HALF);
+      const cj = Math.round(spike.z + HALF);
+      if (bodyDistanceSq(spike.x, spike.z) < 0.74 * 0.74) {
         damage(1, 'projectile');
         spike.life = 0;
       }
-      if (spike.life <= 0 || Math.abs(spike.x) > HALF + 1 || Math.abs(spike.z) > HALF + 1) {
+      if (spike.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj)) {
         spike.mesh.visible = false;
         state.wispSpikes.splice(k, 1);
       }
@@ -3340,6 +3440,7 @@
           spawnWispSpike(e, e.wispDirections[k % Math.max(1, e.wispDirections.length)] || 0);
         }
         hideWispWarnings(e);
+        spawnWispDissolve(e.x, e.z);
         e.wispState = 'fog';
         e.wispStateTimer = WISP_FOG_TIME;
         e.wispMoveTimer = 0;
@@ -3370,7 +3471,7 @@
 
   function enemyRenderScale(type) {
     if (type === 'iceSlug') return 0.8;
-    if (type === 'frostWolf') return 1.3;
+    if (type === 'frostWolf') return WOLF_RENDER_SCALE;
     if (type === 'emberWisp') return WISP_RENDER_SCALE;
     if (type === 'frostWisp') return 1.28;
     return 1;
@@ -3653,10 +3754,10 @@
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 1.55 : (isPharaoh ? 1.425 : 2)),
-      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 3.2 : (isPharaoh ? 3.45 : 2.3)),
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 2.325 : (isPharaoh ? 1.425 : 2)),
+      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 4.8 : (isPharaoh ? 3.45 : 2.3)),
       orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : (isPharaoh ? 3.9 : 2.6)),
-      contactRadius: isRootcoil ? 4.8 : (isDragon ? 3.25 : (isPharaoh ? 3.75 : 2.5)),
+      contactRadius: isRootcoil ? 4.8 : (isDragon ? 4.88 : (isPharaoh ? 3.75 : 2.5)),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
@@ -5065,6 +5166,29 @@
     state.frostSpikeBursts.push({ mesh, life: 0.58, maxLife: 0.58 });
   }
 
+  function spawnFrostSlamRing(b) {
+    const count = 18;
+    const startRadius = 5.15;
+    const speed = 5.1;
+    for (let k = 0; k < count; k++) {
+      const mesh = frostSlamBulletPool.find((item) => !item.visible);
+      if (!mesh) break;
+      const angle = (k / count) * Math.PI * 2 + state.time * 0.18;
+      const x = b.x + Math.cos(angle) * startRadius;
+      const z = b.z + Math.sin(angle) * startRadius;
+      mesh.visible = true;
+      mesh.position.set(x, 0.5, z);
+      state.enemyBullets.push({
+        mesh,
+        x,
+        z,
+        vx: Math.cos(angle) * speed,
+        vz: Math.sin(angle) * speed,
+        life: 4.6,
+      });
+    }
+  }
+
   function eruptFrostScars() {
     const scars = state.frostScars.slice();
     for (const scar of scars) {
@@ -5092,13 +5216,8 @@
     }
   }
 
-  function setSlamPose(elapsed) {
-    const times = [0.0, 0.42, 0.62, 0.71, 0.81, 0.95];
-    let frame = 0;
-    for (let i = 0; i < times.length; i++) {
-      if (elapsed >= times[i]) frame = i;
-    }
-    setFrostDragonPose(true, FROST_DRAGON_SLAM_TEX[frame]);
+  function setSlamPose(impact = false) {
+    setFrostDragonPose(true, FROST_DRAGON_SLAM_TEX[impact ? 1 : 0]);
   }
 
   function startFrostDragonAttack(b, attack, targetAngle) {
@@ -5132,7 +5251,7 @@
   }
 
   function updateFrostDragon(b, dt, hp) {
-    const baseScale = b.renderScale || 1.55;
+    const baseScale = b.renderScale || 2.325;
     const dx = hp.x - b.x;
     const dz = hp.z - b.z;
     const targetAngle = Math.atan2(dz, dx);
@@ -5238,13 +5357,17 @@
     if (b.dragonState === 'slamTelegraph' || b.dragonState === 'slamActive') {
       b.slamElapsed += dt;
       const active = b.dragonState === 'slamActive';
-      setSlamPose(b.slamElapsed);
-      bossMesh.scale.setScalar(baseScale + (active ? 1 : 0) * Math.sin(b.slamElapsed * 10) * 0.08);
+      setSlamPose(active);
+      bossMesh.scale.setScalar(
+        baseScale * (1 + (active ? Math.sin(b.slamElapsed * 10) * 0.025 : 0))
+      );
       if (!active && b.dragonAttackElapsed >= DRAGON_SLAM_TELEGRAPH) {
         b.dragonState = 'slamActive';
         b.dragonAttackElapsed = 0;
         b.slamElapsed = 0;
+        setSlamPose(true);
         eruptFrostScars();
+        spawnFrostSlamRing(b);
         if (state.over) return;
         return;
       }
@@ -5597,6 +5720,7 @@
     for (const enemy of state.enemies) {
       if (!enemy.alive || isEnemyInvulnerable(enemy)) continue;
       if (Math.abs(enemy.i - ci) <= 1 && Math.abs(enemy.j - cj) <= 1) {
+        if (enemy.type === 'frostWisp') spawnWispDissolve(enemy.x, enemy.z);
         enemy.alive = false;
         state.kills += 1;
         state.score += 30;
@@ -5732,6 +5856,7 @@
       en.hp -= damageAmount;
       hitCount += 1;
       if (en.hp <= 0) {
+        if (en.type === 'frostWisp') spawnWispDissolve(en.x, en.z);
         en.alive = false;
         state.kills += 1;
         state.score += 25;
@@ -5777,18 +5902,31 @@
       const ci = Math.round(b.x + HALF);
       const cj = Math.round(b.z + HALF);
       let burstSpawned = false;
-      if (b.fire && dynamicIce.has(`${ci},${cj}`)) {
+      let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
+      if (!dead && b.fire) {
+        const orbIndex = state.wispSpikes.findIndex((orb) => (
+          Math.hypot(orb.x - b.x, orb.z - b.z) < WISP_ORB_RADIUS + PLAYER_BULLET_RADIUS + 0.2
+        ));
+        if (orbIndex >= 0) {
+          const orb = state.wispSpikes[orbIndex];
+          orb.mesh.visible = false;
+          state.wispSpikes.splice(orbIndex, 1);
+          spawnFireBurst(b.x, b.z);
+          burstSpawned = true;
+          dead = true;
+        }
+      }
+      if (!dead && b.fire && dynamicIce.has(`${ci},${cj}`)) {
         breakIceObstacle(ci, cj);
         spawnFireBurst(b.x, b.z);
         burstSpawned = true;
       }
       const mirror = findMirrorAt(ci, cj);
-      if (b.fire && mirror) {
+      if (!dead && b.fire && mirror) {
         breakMirrorPillar(mirror);
         spawnFireBurst(b.x, b.z);
         burstSpawned = true;
       }
-      let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
 
       // 命中小怪
       if (!dead && (state.phase === 'clear' || state.phase === 'boss')) {
@@ -5817,6 +5955,7 @@
               dead = true;
               break;
             }
+            if (en.type === 'frostWisp') spawnWispDissolve(en.x, en.z);
             en.alive = false;
             state.kills += 1;
             state.score += 25;
@@ -6181,6 +6320,7 @@
       updateFrostScars(dt);
       updateFrostSpikes(dt);
       updateWispFogPatches(dt);
+      updateWispDissolves(dt);
       updateWispSpikes(dt);
       updateBullets(dt);
       updateFireTrails(dt);
@@ -6239,6 +6379,13 @@
     startFrostDragonAttack,
     spawnFrostScars,
     eruptFrostScars,
+    spawnFrostSlamRing: () => state.boss && spawnFrostSlamRing(state.boss),
+    spawnWispDissolve,
+    spawnWispIceOrb: (x, z, angle = 0) => spawnWispSpike({ x, z }, angle),
+    getWispCombat: () => ({
+      dissolves: state.wispDissolves.length,
+      orbs: state.wispSpikes.map(({ x, z, vx, vz, life }) => ({ x, z, vx, vz, life })),
+    }),
     getFrostDragonArena: () => ({
       mirrors: state.mirrorPillars.map((pillar) => ({
         i: pillar.i,
