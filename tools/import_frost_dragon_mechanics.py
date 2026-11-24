@@ -30,6 +30,16 @@ def extract_slam_frames():
         print(f"{name}: {image.size[0]}x{image.size[1]}")
 
 
+def extract_wisp_fog_frames():
+    animation = Image.open(SOURCE_DIR / "冰雾团_呼吸.gif")
+    for index in range(animation.n_frames):
+        animation.seek(index)
+        frame = animation.convert("RGBA").resize((256, 256), Image.Resampling.LANCZOS)
+        name = f"frost-wisp-fog-{index + 1}.png"
+        frame.save(OUTPUT_DIR / name, optimize=True)
+        print(f"{name}: {frame.size[0]}x{frame.size[1]}")
+
+
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     resize_rgba(SOURCE_DIR / "冰面_1x1_厚霜.png", "frost-scar.png", (256, 256))
@@ -38,6 +48,7 @@ def main():
     resize_rgba(SOURCE_DIR / "冰柱_1x2_透明底.png", "mirror-pillar.png", (384, 934))
     resize_rgba(SOURCE_DIR / "冰刺攻击_透明底.png", "frost-spikes.png", (640, 665))
     extract_slam_frames()
+    extract_wisp_fog_frames()
 
 
 if __name__ == "__main__":
