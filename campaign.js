@@ -85,6 +85,26 @@
         { n: 8, room: 31, name: '凛冬冰龙', boss: true, icon: 'assets/frost-dragon-idle.png' },
       ],
     },
+    {
+      id: 'storm',
+      name: '风暴空域',
+      en: 'STORM AIRSPACE',
+      subtitle: '雷云之上的王座正俯瞰整片天空',
+      art: 'assets/storm-eagle.png',
+      accent: '#92dcff',
+      accent2: '#326994',
+      base: 32,
+      levels: [
+        { n: 1, room: 32, name: '浮云边陲', icon: 'assets/storm-skimmer.png' },
+        { n: 2, room: 33, name: '雷羽回廊', icon: 'assets/storm-moth.png' },
+        { n: 3, room: 34, name: '裂空风谷', icon: 'assets/storm-moth.png' },
+        { n: 4, room: 35, name: '隼影高台', icon: 'assets/storm-falcon.png' },
+        { n: 5, room: 36, name: '旋云交汇', icon: 'assets/storm-skimmer.png' },
+        { n: 6, room: 37, name: '暴风核心', icon: 'assets/storm-moth.png' },
+        { n: 7, room: 38, name: '王座前庭', icon: 'assets/storm-falcon.png' },
+        { n: 8, room: 39, name: '风暴巨鹰', boss: true, icon: 'assets/storm-eagle.png' },
+      ],
+    },
   ];
 
   const NODE_POSITIONS = [

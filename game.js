@@ -80,15 +80,25 @@
   const FROST_SKILL_DURATION = 3;
   const FROST_SKILL_RANGE = 13;
   const FROST_SKILL_HALF_ANGLE = Math.PI * 0.34;
+  const STORM_LIGHTNING_INTERVAL = 5;
+  const STORM_LIGHTNING_WARNING = 1;
+  const STORM_LIGHTNING_IMPACT_TIME = 0.42;
+  const STORM_LIGHTNING_DAMAGE = 1;
+  const STORM_OBSTACLE_COUNT = 8;
+  const STORM_EAGLE_HP = 470;
+  const STORM_TORNADO_INTERVAL = 9;
+  const STORM_TORNADO_FIRST_CAST = 5;
+  const STORM_TORNADO_WARNING = 1.05;
+  const STORM_TORNADO_LIFE = 6;
+  const STORM_TORNADO_SIZE = 2.25;
+  const STORM_TORNADO_HIT_COOLDOWN = 1.2;
+  const STORM_BOLT_SPEED = 4.6;
+  const STORM_DIVE_RANGE = 10;
+  const STORM_DIVE_TELEGRAPH = 0.82;
+  const STORM_DIVE_TIME = 0.34;
+  const STORM_DIVE_RECOVER = 0.7;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
-  const DEBUG_START_LEVEL = (() => {
-    try {
-      const value = Number(new URLSearchParams(window.location.search).get('level'));
-      return Number.isInteger(value) ? Math.max(0, Math.min(ROOM_COUNT - 1, value)) : 0;
-    } catch (err) {
-      return 0;
-    }
-  })();
+  let DEBUG_START_LEVEL = 0;
   const DOOR_CELL = { i: 22, j: 1 };
   const SPAWN_DOOR_CELL = { i: 22, j: N - 1 };
   const BOSS_CELL = { i: 22, j: 22 };
@@ -178,6 +188,20 @@
       hp: 1, speed: 0.42, contactDamage: 1, contactCooldown: 1.25,
       contactRadius: 0.7, retreatSpeedMul: 0.4,
     },
+    stormSkimmer: {
+      hp: 1, speed: 2.45, contactDamage: 1, contactCooldown: 1.15,
+      contactRadius: 0.62, retreatSpeedMul: 0.48,
+      dashInterval: 2.6, dashDuration: 0.38, dashSpeedMul: 2.35,
+    },
+    stormMoth: {
+      hp: 2, speed: 1.18, contactDamage: 1, contactCooldown: 1.3,
+      contactRadius: 0.68, retreatSpeedMul: 0.42,
+      shootCooldown: 3.2, shootRange: 18, preferredRange: 5.2,
+    },
+    stormFalcon: {
+      hp: 3, speed: 1.55, contactDamage: 2, contactCooldown: 1.25,
+      contactRadius: 0.82, retreatSpeedMul: 0.4,
+    },
   };
 
   // 每个区域 7 个普通关 + 第 8 关 Boss；composition 表示三种小怪的具体数量。
@@ -217,8 +241,25 @@
     { theme: 'frozen', kind: 'clear', composition: { frostWolf: 5, frostWisp: 3 }, name: '永冻冰原 · 霜骨荒径' },
     { theme: 'frozen', kind: 'clear', composition: { frostWisp: 8 }, name: '永冻冰原 · 冰封王座前庭' },
     { theme: 'frozen', kind: 'boss', boss: 'frost_dragon', name: '凛冬冰龙 · FROST DRAGON' },
+
+    { theme: 'storm', kind: 'clear', composition: { stormSkimmer: 8 }, name: '风暴空域 · 浮云边陲' },
+    { theme: 'storm', kind: 'clear', composition: { stormSkimmer: 5, stormMoth: 3 }, name: '风暴空域 · 雷羽回廊' },
+    { theme: 'storm', kind: 'clear', composition: { stormMoth: 8 }, name: '风暴空域 · 裂空风谷' },
+    { theme: 'storm', kind: 'clear', composition: { stormSkimmer: 5, stormFalcon: 3 }, name: '风暴空域 · 隼影高台' },
+    { theme: 'storm', kind: 'clear', composition: { stormSkimmer: 3, stormMoth: 2, stormFalcon: 3 }, name: '风暴空域 · 旋云交汇' },
+    { theme: 'storm', kind: 'clear', composition: { stormMoth: 5, stormFalcon: 3 }, name: '风暴空域 · 暴风核心' },
+    { theme: 'storm', kind: 'clear', composition: { stormFalcon: 8 }, name: '风暴空域 · 王座前庭' },
+    { theme: 'storm', kind: 'boss', boss: 'storm_eagle', name: '风暴巨鹰 · STORM EAGLE' },
   ];
   const ROOM_COUNT = ROOMS.length;
+  DEBUG_START_LEVEL = (() => {
+    try {
+      const value = Number(new URLSearchParams(window.location.search).get('level'));
+      return Number.isInteger(value) ? Math.max(0, Math.min(ROOM_COUNT - 1, value)) : 0;
+    } catch (err) {
+      return 0;
+    }
+  })();
 
   // ---------- 渲染基础 ----------
   const stage = document.getElementById('stage');
@@ -1376,6 +1417,9 @@
     iceSlug: loadCharacterTexture('ice-slug.png', null),
     frostWolf: loadCharacterTexture('frost-wolf.png', null),
     frostWisp: loadCharacterTexture('frost-wisp.png', null),
+    stormSkimmer: loadCharacterTexture('storm-skimmer.png', null),
+    stormMoth: loadCharacterTexture('storm-moth.png', null),
+    stormFalcon: loadCharacterTexture('storm-falcon.png', null),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
@@ -1398,6 +1442,7 @@
     pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
     magma_colossus: magmaColossusTex,
     frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
+    storm_eagle: loadCharacterTexture('storm-eagle.png', null),
   };
   const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
   const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
@@ -1415,6 +1460,9 @@
     { length: 4 },
     (_, index) => loadIceEffectTexture(`frost-wisp-fog-${index + 1}.png`)
   );
+  const STORM_LIGHTNING_TEX = loadIceEffectTexture('storm-lightning.png');
+  const STORM_TORNADO_TEX = loadIceEffectTexture('storm-tornado.png');
+  const STORM_ROCK_TEX = loadCharacterTexture('storm-rock.png', null);
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -1594,6 +1642,32 @@
     }
     placeObstacles(seeds, ICE_BLOCK_TEX);
     clearIceObstacles();
+  }
+
+  /** 第五章：固定 8 组 2×2 风暴岩石，避开出生区、传送门与 Boss 王座。 */
+  function layoutStorm(level) {
+    const seeds = [];
+    const fits = (i, j) => {
+      if (i < 4 || j < 4 || i > N - 6 || j > N - 6) return false;
+      if (Math.abs(i - 22) < 6 && j < 9) return false;
+      if (Math.abs(i - 22) < 7 && j > 32) return false;
+      if (Math.abs(i - 22) < 7 && Math.abs(j - 22) < 7) return false;
+      if (level === 32 && i < 24 && Math.abs(j - START_ROOM.doorJ) < 5) return false;
+      for (const [si, sj] of seeds) {
+        if (Math.abs(si - i) < 7 && Math.abs(sj - j) < 7) return false;
+      }
+      return true;
+    };
+    let attempts = 0;
+    while (seeds.length < STORM_OBSTACLE_COUNT && attempts++ < 600) {
+      const i = 4 + randInt(N - 10);
+      const j = 4 + randInt(N - 10);
+      if (!fits(i, j)) continue;
+      seeds.push([i, j]);
+    }
+    placeObstacles(seeds, STORM_ROCK_TEX);
+    clearIceObstacles();
+    clearStormArena();
   }
 
   // ---------- 蛇：一条连续的带状身体 ----------
@@ -1929,6 +2003,104 @@
     mesh.visible = false;
     scene.add(mesh);
     wispSpikePool.push(mesh);
+  }
+
+  const stormWarningPool = [];
+  for (let i = 0; i < 8; i++) {
+    const group = new THREE.Group();
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd36a,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        fog: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    const border = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(2, 2)),
+      new THREE.LineBasicMaterial({
+        color: 0xfff1b0,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    border.rotation.x = -Math.PI / 2;
+    group.add(plane, border);
+    group.userData.plane = plane;
+    group.userData.border = border;
+    group.visible = false;
+    scene.add(group);
+    stormWarningPool.push(group);
+  }
+
+  const stormLightningPool = [];
+  for (let i = 0; i < 4; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.25, 6.4),
+      new THREE.MeshBasicMaterial({
+        map: STORM_LIGHTNING_TEX || null,
+        color: STORM_LIGHTNING_TEX ? 0xffffff : 0xbcefff,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.34;
+    mesh.renderOrder = 6;
+    mesh.visible = false;
+    scene.add(mesh);
+    stormLightningPool.push(mesh);
+  }
+
+  const stormTornadoPool = [];
+  for (let i = 0; i < 4; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(STORM_TORNADO_SIZE * 1.24, STORM_TORNADO_SIZE * 2.13),
+      new THREE.MeshBasicMaterial({
+        map: STORM_TORNADO_TEX || null,
+        color: STORM_TORNADO_TEX ? 0xffffff : 0xaedfff,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.3;
+    mesh.renderOrder = 5;
+    mesh.visible = false;
+    scene.add(mesh);
+    stormTornadoPool.push(mesh);
+  }
+
+  const stormBoltPool = [];
+  for (let i = 0; i < 32; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.29, 10, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0xd8f7ff,
+        emissive: 0x43b8ff,
+        emissiveIntensity: 2.6,
+        roughness: 0.2,
+      })
+    );
+    mesh.visible = false;
+    scene.add(mesh);
+    stormBoltPool.push(mesh);
   }
 
   // ---------- 子弹 ----------
@@ -2517,6 +2689,7 @@
     pharaoh: { id: 'yellow', color: 0xf0c66c, core: 0xfff0b8, emissive: 0xc28d24 },
     magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     frost_dragon: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
+    storm_eagle: { id: 'yellow', color: 0x9fe6ff, core: 0xf1fdff, emissive: 0x3b9cc5 },
   };
 
   // ---------- 状态 ----------
@@ -2549,6 +2722,13 @@
     frostSpikeBursts: [],
     wispFogPatches: [],
     wispSpikes: [],
+    stormWarnings: [],
+    stormLightningStrikes: [],
+    stormTornadoes: [],
+    stormBolts: [],
+    stormLightningTimer: STORM_LIGHTNING_INTERVAL,
+    stormSummon: null,
+    stormIntroShown: false,
     lavaBalls: [],
     lavaPools: [],
     skillOrb: null,
@@ -2864,6 +3044,15 @@
       wispMoveTimer: 0,
       wispDirections: [],
       wispWarnings: [],
+      stormDashTimer: spawnStats.dashInterval || 0,
+      stormDashActive: 0,
+      stormPhase: Math.random() * Math.PI * 2,
+      stormDiveState: 'idle',
+      stormDiveTimer: 3.4 + Math.random() * 1.8,
+      stormDiveFrom: null,
+      stormDiveTarget: null,
+      stormDiveElapsed: 0,
+      stormDiveHit: false,
     });
     // 复用槽位时恢复当前类型的贴图与缩放。
     const idx = state.enemies.indexOf(slot);
@@ -3638,6 +3827,9 @@
     if (type === 'frostWolf') return WOLF_RENDER_SCALE;
     if (type === 'emberWisp') return WISP_RENDER_SCALE;
     if (type === 'frostWisp') return 1.28;
+    if (type === 'stormSkimmer') return 0.84;
+    if (type === 'stormMoth') return 0.98;
+    if (type === 'stormFalcon') return 1.18;
     return 1;
   }
 
@@ -3747,6 +3939,7 @@
     temple: { fog: 0x1b1206, a: 0x3b2a17, b: 0x4a351e, hemi: 0xf0cf91, wall: 0x4a3b28, ea: 0x0a0501, eb: 0x0c0702 },
     volcano: { fog: 0x160705, a: 0x12100f, b: 0x1a1512, hemi: 0xff9a58, wall: 0x221814, ea: 0x4a1605, eb: 0x621d06 },
     frozen: { fog: 0x07172a, a: 0x416f8b, b: 0x5786a0, hemi: 0xc9f4ff, wall: 0x84adbf, ea: 0x0b3d57, eb: 0x0d4a66 },
+    storm: { fog: 0x06111e, a: 0x263d4d, b: 0x35566b, hemi: 0xc7ebff, wall: 0x5c7180, ea: 0x0a314a, eb: 0x0e405b },
   };
 
   function startLevel(idx) {
@@ -3761,9 +3954,11 @@
     bossMesh.visible = false;
     pharaohShieldRig.visible = false;
     rootSummonRig.visible = false;
+    clearStormArena();
     if (room.theme === 'temple') layoutTemple(idx);
     else if (room.theme === 'volcano') layoutVolcano(idx);
     else if (room.theme === 'frozen') layoutFrozen(idx);
+    else if (room.theme === 'storm') layoutStorm(idx);
     else layoutStumps(idx);
 
     state.enemies.forEach((e) => { e.alive = false; });
@@ -3777,6 +3972,8 @@
     state.ghostBullets = [];
     (state.hazards || []).forEach((h) => { h.mesh.visible = false; });
     state.hazards = [];
+    state.stormBolts.forEach((bolt) => { bolt.mesh.visible = false; });
+    state.stormBolts.length = 0;
     clearWolfCombatEffects();
     (state.lavaBalls || []).forEach((b) => { b.mesh.visible = false; });
     state.lavaBalls = [];
@@ -3800,6 +3997,8 @@
     state.frostCooldown = 0;
     state.frostEffectTimer = 0;
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
+    state.stormLightningTimer = STORM_LIGHTNING_INTERVAL;
+    state.stormIntroShown = false;
     shieldRibbon.visible = false;
     shieldHaloRig.visible = false;
     bossBreathRig.visible = false;
@@ -3864,8 +4063,10 @@
     matB.color.setHex(tint.b);
     matA.emissive.setHex(tint.ea);
     matB.emissive.setHex(tint.eb);
-    matA.emissiveIntensity = room.theme === 'volcano' ? 0.72 : (room.theme === 'frozen' ? 0.22 : 0.16);
-    matB.emissiveIntensity = room.theme === 'volcano' ? 0.72 : (room.theme === 'frozen' ? 0.22 : 0.16);
+    matA.emissiveIntensity = room.theme === 'volcano'
+      ? 0.72
+      : ((room.theme === 'frozen' || room.theme === 'storm') ? 0.22 : 0.16);
+    matB.emissiveIntensity = matA.emissiveIntensity;
     wallMat.color.setHex(tint.wall);
     hemi.color.setHex(tint.hemi);
     lavaUnderlay.visible = room.theme === 'volcano';
@@ -3900,7 +4101,11 @@
       );
     } else {
       spawnBoss(room.boss);
-      showLevelIntro('BOSS RITE', room.name, idx === ROOM_COUNT - 1 ? '击败冰龙 · 完成远征' : '击败首领 · 进入下一层');
+      showLevelIntro(
+        'BOSS RITE',
+        room.name,
+        idx === ROOM_COUNT - 1 ? '击败风暴巨鹰 · 完成远征' : '击败首领 · 进入下一层'
+      );
     }
     updateHud();
     revealSkillHud();
@@ -3910,18 +4115,19 @@
     const isPharaoh = kind === 'pharaoh';
     const isColossus = kind === 'magma_colossus';
     const isDragon = kind === 'frost_dragon';
-    const isRootcoil = !isPharaoh && !isColossus && !isDragon;
-    const hp = isColossus ? 480 : (isDragon ? 440 : (isPharaoh ? 380 : BOSS_HP));
+    const isEagle = kind === 'storm_eagle';
+    const isRootcoil = !isPharaoh && !isColossus && !isDragon && !isEagle;
+    const hp = isColossus ? 480 : (isDragon ? 440 : (isEagle ? STORM_EAGLE_HP : (isPharaoh ? 380 : BOSS_HP)));
     const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 2.325 : (isPharaoh ? 1.425 : 2)),
-      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 4.8 : (isPharaoh ? 3.45 : 2.3)),
-      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : (isPharaoh ? 3.9 : 2.6)),
-      contactRadius: isRootcoil ? 4.8 : (isDragon ? 4.88 : (isPharaoh ? 3.75 : 2.5)),
+      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 2.325 : (isEagle ? 2.55 : (isPharaoh ? 1.425 : 2))),
+      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 4.8 : (isEagle ? 4.55 : (isPharaoh ? 3.45 : 2.3))),
+      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : (isEagle ? 4.15 : (isPharaoh ? 3.9 : 2.6))),
+      contactRadius: isRootcoil ? 4.8 : (isDragon ? 4.88 : (isEagle ? 4.35 : (isPharaoh ? 3.75 : 2.5))),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
@@ -3950,6 +4156,8 @@
       laserAngleOffset: 0,
       slamElapsed: 0,
       summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
+      stormSummonTimer: isEagle ? STORM_TORNADO_FIRST_CAST : 0,
+      stormSummonState: 'idle',
       summonFlash: 0,
       shieldActive: isPharaoh,
       shieldHp: isPharaoh ? PHARAOH_SHIELD_HP : 0,
@@ -3974,9 +4182,11 @@
     colossusImpactRing.visible = false;
     el.bname.textContent = isDragon
       ? '凛冬冰龙 · FROST DRAGON'
-      : (isColossus
-        ? '熔岩巨像 · MAGMA COLOSSUS'
-        : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL'));
+      : (isEagle
+        ? '风暴巨鹰 · STORM EAGLE'
+        : (isColossus
+          ? '熔岩巨像 · MAGMA COLOSSUS'
+          : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL')));
   }
 
   function summonGreenhouseMinions() {
@@ -4061,6 +4271,7 @@
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
     if (bossKind === 'frost_dragon') clearFrostDragonArena();
+    if (bossKind === 'storm_eagle') clearStormArena();
     clearWispCombatEffects();
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
@@ -4720,6 +4931,155 @@
     }
   }
 
+  function updateStormMoth(e, mesh, hp, dt) {
+    const stats = enemyStats(e.type);
+    const dx = hp.x - e.x;
+    const dz = hp.z - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const nxDir = dx / len;
+    const nzDir = dz / len;
+    let mx = 0;
+    let mz = 0;
+    if (len > stats.preferredRange + 1.2 || len < stats.preferredRange - 1.2) {
+      const sign = len > stats.preferredRange ? 1 : -1;
+      mx = nxDir * sign;
+      mz = nzDir * sign;
+    } else {
+      const orbit = Math.sin(e.stormPhase) >= 0 ? 1 : -1;
+      mx = -nzDir * orbit;
+      mz = nxDir * orbit;
+    }
+    let nx = e.x + mx * stats.speed * dt;
+    let nz = e.z + mz * stats.speed * dt;
+    const ci = Math.round(nx + HALF);
+    const cj = Math.round(nz + HALF);
+    if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+      nx = e.x - mx * stats.speed * dt;
+      nz = e.z - mz * stats.speed * dt;
+    }
+    e.x = Math.max(-HALF + 0.4, Math.min(HALF - 0.4, nx));
+    e.z = Math.max(-HALF + 0.4, Math.min(HALF - 0.4, nz));
+    e.i = Math.round(e.x + HALF);
+    e.j = Math.round(e.z + HALF);
+    e.stormPhase += dt * 1.4;
+    mesh.position.set(e.x, 0.58 + Math.sin(state.time * 4.8 + e.bob) * 0.1, e.z);
+    mesh.rotation.z = Math.sin(state.time * 3.2 + e.bob) * 0.12;
+    mesh.scale.setScalar(enemyRenderScale(e.type) + Math.sin(state.time * 5 + e.bob) * 0.04);
+
+    if (e.cool > 0) e.cool -= dt;
+    if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+      e.cool = stats.contactCooldown;
+      damage(stats.contactDamage, 'contact');
+      if (state.over) return;
+    }
+
+    e.shootTimer -= dt;
+    if (e.shootTimer <= 0) {
+      e.shootTimer = stats.shootCooldown;
+      if (len < stats.shootRange) spawnStormBolt(e.x, e.z, hp.x, hp.z);
+    }
+  }
+
+  function updateStormFalcon(e, mesh, hp, dt) {
+    const stats = enemyStats(e.type);
+    const dx = hp.x - e.x;
+    const dz = hp.z - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    if (e.cool > 0) e.cool -= dt;
+
+    if (e.stormDiveState === 'idle') {
+      const orbit = Math.sin(state.time * 0.9 + e.stormPhase) >= 0 ? 1 : -1;
+      const toward = len > 6.2 ? 1 : (len < 4.8 ? -1 : 0.18);
+      const mx = (dx / len) * toward + (-dz / len) * orbit * 0.82;
+      const mz = (dz / len) * toward + (dx / len) * orbit * 0.82;
+      const ml = Math.hypot(mx, mz) || 1;
+      let nx = e.x + (mx / ml) * stats.speed * dt;
+      let nz = e.z + (mz / ml) * stats.speed * dt;
+      const ci = Math.round(nx + HALF);
+      const cj = Math.round(nz + HALF);
+      if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+        nx = e.x - (mz / ml) * stats.speed * dt;
+        nz = e.z + (mx / ml) * stats.speed * dt;
+      }
+      e.x = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nx));
+      e.z = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nz));
+      e.i = Math.round(e.x + HALF);
+      e.j = Math.round(e.z + HALF);
+      mesh.material.color.setHex(0xffffff);
+      mesh.position.set(e.x, 0.58 + Math.sin(state.time * 3.4 + e.bob) * 0.09, e.z);
+      mesh.rotation.z = Math.sin(state.time * 2.2 + e.bob) * 0.07;
+      mesh.scale.setScalar(enemyRenderScale(e.type));
+
+      if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+        e.cool = stats.contactCooldown;
+        damage(stats.contactDamage, 'contact');
+        if (state.over) return;
+      }
+
+      e.stormDiveTimer -= dt;
+      if (e.stormDiveTimer <= 0 && len <= STORM_DIVE_RANGE) {
+        e.stormDiveState = 'telegraph';
+        e.stormDiveElapsed = 0;
+        e.stormDiveTarget = { x: hp.x, z: hp.z };
+        e.stormDiveHit = false;
+      }
+      return;
+    }
+
+    if (e.stormDiveState === 'telegraph') {
+      e.stormDiveElapsed += dt;
+      const pulse = 0.5 + Math.sin(state.time * 20) * 0.5;
+      mesh.material.color.setHex(0xb8f2ff);
+      mesh.position.set(e.x, 0.7 + Math.sin(state.time * 16) * 0.06, e.z);
+      mesh.scale.setScalar(enemyRenderScale(e.type) * (1 + pulse * 0.1));
+      const target = e.stormDiveTarget || { x: e.x, z: e.z };
+      mesh.rotation.z = Math.atan2(-(target.z - e.z), target.x - e.x) * 0.18;
+      if (e.stormDiveElapsed >= STORM_DIVE_TELEGRAPH) {
+        e.stormDiveState = 'dive';
+        e.stormDiveElapsed = 0;
+        e.stormDiveFrom = { x: e.x, z: e.z };
+      }
+      return;
+    }
+
+    if (e.stormDiveState === 'dive') {
+      e.stormDiveElapsed += dt;
+      const progress = Math.min(1, e.stormDiveElapsed / STORM_DIVE_TIME);
+      const eased = progress * progress * (3 - 2 * progress);
+      const from = e.stormDiveFrom || { x: e.x, z: e.z };
+      const target = e.stormDiveTarget || hp;
+      e.x = from.x + (target.x - from.x) * eased;
+      e.z = from.z + (target.z - from.z) * eased;
+      e.i = Math.round(e.x + HALF);
+      e.j = Math.round(e.z + HALF);
+      mesh.material.color.setHex(0xd8f7ff);
+      mesh.position.set(e.x, 0.62 + Math.sin(Math.PI * progress) * 1.15, e.z);
+      mesh.rotation.z = Math.atan2(-(target.z - from.z), target.x - from.x) - Math.PI / 2;
+      mesh.scale.setScalar(enemyRenderScale(e.type) * 1.06);
+      if (progress >= 1) {
+        if (bodyDistanceSq(e.x, e.z) < 1.18 * 1.18) {
+          damage(1, 'contact');
+        }
+        e.stormDiveState = 'recover';
+        e.stormDiveElapsed = 0;
+      }
+      return;
+    }
+
+    e.stormDiveElapsed += dt;
+    mesh.material.color.setHex(0x9bb4c1);
+    mesh.position.set(e.x, 0.5 + Math.sin(state.time * 5 + e.bob) * 0.025, e.z);
+    mesh.rotation.z = Math.sin(state.time * 4) * 0.04;
+    mesh.scale.setScalar(enemyRenderScale(e.type) * 0.94);
+    if (e.stormDiveElapsed >= STORM_DIVE_RECOVER) {
+      e.stormDiveState = 'idle';
+      e.stormDiveElapsed = 0;
+      e.stormDiveTimer = 3.8 + Math.random() * 1.6;
+      e.stormDiveTarget = null;
+      e.stormDiveFrom = null;
+    }
+  }
+
   function updateMummyAbility(e, dt) {
     const stats = enemyStats(e.type);
     if (e.eyeTimer === undefined) e.eyeTimer = stats.eyeGlowCooldown;
@@ -4871,6 +5231,16 @@
         if (state.over) return;
         continue;
       }
+      if (e.type === 'stormMoth') {
+        updateStormMoth(e, mesh, hp, dt);
+        if (state.over) return;
+        continue;
+      }
+      if (e.type === 'stormFalcon') {
+        updateStormFalcon(e, mesh, hp, dt);
+        if (state.over) return;
+        continue;
+      }
       if (e.type === 'emberWisp') {
         updateEmberWisp(e, mesh, hp, dt);
         continue;
@@ -4887,6 +5257,15 @@
       }
 
       const stats = enemyStats(e.type);
+      if (e.type === 'stormSkimmer') {
+        e.stormDashTimer -= dt;
+        e.stormDashActive = Math.max(0, e.stormDashActive - dt);
+        if (e.stormDashTimer <= 0) {
+          e.stormDashTimer = stats.dashInterval;
+          e.stormDashActive = stats.dashDuration;
+        }
+        e.speedMul = e.stormDashActive > 0 ? stats.dashSpeedMul : 1;
+      }
       const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul) *
         (e.cool > 0 ? stats.retreatSpeedMul : 1);
       let nx = e.x + (dx / len) * speed * dt;
@@ -5624,6 +6003,10 @@
     const b = state.boss;
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
+    if (b.kind === 'storm_eagle') {
+      updateStormEagle(b, dt, hp);
+      return;
+    }
     if (b.kind === 'frost_dragon') {
       updateFrostDragon(b, dt, hp);
       return;
@@ -5691,6 +6074,41 @@
           spawnBossBullet(b.x, b.z, Math.cos(ang) * spd, Math.sin(ang) * spd);
         }
       }
+    }
+  }
+
+  function startStormEagleSummon(b) {
+    const anchors = [];
+    anchors.push(chooseStormAnchor(anchors, true));
+    anchors.push(chooseStormAnchor(anchors, true));
+    anchors.forEach((anchor) => showStormWarning(anchor, 'tornado', STORM_TORNADO_WARNING));
+    b.stormSummonState = 'warning';
+    b.stormSummonTimer = STORM_TORNADO_WARNING;
+    toast('风暴巨鹰 · 双旋召来', '两处 2×2 风眼预警 1 秒 · 持续 6 秒');
+  }
+
+  function updateStormEagle(b, dt, hp) {
+    b.x = cellX(BOSS_CELL.i);
+    b.z = cellZ(BOSS_CELL.j);
+    const flap = 1 + Math.sin(state.time * 3.2) * 0.025;
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 2.1) * 0.025;
+    bossMesh.scale.setScalar((b.renderScale || 2.55) * flap);
+    bossPlaneMat.color.setHex(b.stormSummonState === 'warning' ? 0xcaf7ff : 0xffffff);
+    if (b.cool > 0) b.cool -= dt;
+    if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
+      b.cool = 1.6;
+      damage(2, 'contact');
+      if (state.over) return;
+    }
+
+    b.stormSummonTimer -= dt;
+    if (b.stormSummonTimer > 0) return;
+    if (b.stormSummonState === 'warning') {
+      b.stormSummonState = 'idle';
+      b.stormSummonTimer = STORM_TORNADO_INTERVAL;
+    } else {
+      startStormEagleSummon(b);
     }
   }
 
@@ -5789,6 +6207,233 @@
       if (h.life <= 0) {
         h.mesh.visible = false;
         state.hazards.splice(k, 1);
+      }
+    }
+  }
+
+  function stormFootprintContainsBody(anchor, size = 2) {
+    return state.cells.some((cell) => (
+      cell.i >= anchor.i && cell.i < anchor.i + size &&
+      cell.j >= anchor.j && cell.j < anchor.j + size
+    ));
+  }
+
+  function chooseStormAnchor(used = [], avoidBoss = false) {
+    const head = state.cells[0] || { i: HALF, j: HALF };
+    for (let tries = 0; tries < 80; tries++) {
+      let i;
+      let j;
+      if (Math.random() < 0.36) {
+        i = head.i + randInt(7) - 3;
+        j = head.j + randInt(7) - 3;
+      } else {
+        i = 2 + randInt(N - 5);
+        j = 2 + randInt(N - 5);
+      }
+      i = Math.max(1, Math.min(N - 3, i));
+      j = Math.max(1, Math.min(N - 3, j));
+      if (avoidBoss && Math.abs(i - BOSS_CELL.i) < 6 && Math.abs(j - BOSS_CELL.j) < 6) {
+        continue;
+      }
+      if (used.some((anchor) => Math.abs(anchor.i - i) < 3 && Math.abs(anchor.j - j) < 3)) {
+        continue;
+      }
+      return { i, j };
+    }
+    return { i: N - 5, j: N - 5 };
+  }
+
+  function showStormWarning(anchor, kind, duration) {
+    const mesh = stormWarningPool.find((item) => !item.visible);
+    if (!mesh) return null;
+    const lightning = kind === 'lightning';
+    mesh.visible = true;
+    mesh.position.set(cellX(anchor.i + 0.5), 0.17, cellZ(anchor.j + 0.5));
+    mesh.userData.plane.material.color.setHex(lightning ? 0xffc94f : 0xff8f64);
+    mesh.userData.border.material.color.setHex(lightning ? 0xfff2b8 : 0xffd5c4);
+    const warning = {
+      mesh,
+      anchor: { ...anchor },
+      kind,
+      duration,
+      remaining: duration,
+    };
+    state.stormWarnings.push(warning);
+    return warning;
+  }
+
+  function strikeStormLightning(anchor) {
+    const mesh = stormLightningPool.find((item) => !item.visible);
+    if (mesh) {
+      mesh.visible = true;
+      mesh.material.opacity = 0.98;
+      mesh.position.set(cellX(anchor.i + 0.5), 0.34, cellZ(anchor.j + 0.5));
+      mesh.rotation.z = (Math.random() - 0.5) * 0.12;
+      state.stormLightningStrikes.push({
+        mesh,
+        t: 0,
+        duration: STORM_LIGHTNING_IMPACT_TIME,
+      });
+    }
+    if (stormFootprintContainsBody(anchor, 2)) {
+      const previousDamage = state.damageTaken;
+      damage(STORM_LIGHTNING_DAMAGE, 'hazard');
+      if (state.damageTaken > previousDamage && !state.over) {
+        toast('落雷命中', `2×2 雷区 · 体长 -${STORM_LIGHTNING_DAMAGE}`);
+      }
+    }
+  }
+
+  function spawnStormTornado(anchor) {
+    const mesh = stormTornadoPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.visible = true;
+    mesh.material.opacity = 0.86;
+    mesh.position.set(cellX(anchor.i + 0.5), 0.3, cellZ(anchor.j + 0.5));
+    state.stormTornadoes.push({
+      mesh,
+      anchor: { ...anchor },
+      life: STORM_TORNADO_LIFE,
+      maxLife: STORM_TORNADO_LIFE,
+      hitCooldown: 0,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  function clearStormArena() {
+    state.stormWarnings.forEach((warning) => {
+      if (warning.mesh) warning.mesh.visible = false;
+    });
+    state.stormWarnings.length = 0;
+    state.stormLightningStrikes.forEach((strike) => {
+      if (strike.mesh) strike.mesh.visible = false;
+    });
+    state.stormLightningStrikes.length = 0;
+    state.stormTornadoes.forEach((tornado) => {
+      if (tornado.mesh) tornado.mesh.visible = false;
+    });
+    state.stormTornadoes.length = 0;
+    state.stormBolts.forEach((bolt) => {
+      if (bolt.mesh) bolt.mesh.visible = false;
+    });
+    state.stormBolts.length = 0;
+    state.stormWarnings.length = 0;
+    state.stormSummon = null;
+    state.stormLightningTimer = STORM_LIGHTNING_INTERVAL;
+    state.stormIntroShown = false;
+  }
+
+  function updateStormWarnings(dt) {
+    for (let k = state.stormWarnings.length - 1; k >= 0; k--) {
+      const warning = state.stormWarnings[k];
+      warning.remaining = Math.max(0, warning.remaining - dt);
+      const pulse = 0.5 + Math.sin(state.time * 24) * 0.5;
+      warning.mesh.userData.plane.material.opacity = 0.22 + pulse * 0.2;
+      warning.mesh.userData.border.material.opacity = 0.72 + pulse * 0.28;
+      if (warning.remaining > 0) continue;
+      warning.mesh.visible = false;
+      state.stormWarnings.splice(k, 1);
+      if (warning.kind === 'lightning') strikeStormLightning(warning.anchor);
+      else spawnStormTornado(warning.anchor);
+    }
+  }
+
+  function updateStormLightningStrikes(dt) {
+    for (let k = state.stormLightningStrikes.length - 1; k >= 0; k--) {
+      const strike = state.stormLightningStrikes[k];
+      strike.t += dt;
+      const left = 1 - Math.min(1, strike.t / strike.duration);
+      strike.mesh.material.opacity = left;
+      strike.mesh.scale.setScalar(0.94 + (1 - left) * 0.08);
+      if (left <= 0) {
+        strike.mesh.visible = false;
+        state.stormLightningStrikes.splice(k, 1);
+      }
+    }
+  }
+
+  function updateStormTornadoes(dt) {
+    for (let k = state.stormTornadoes.length - 1; k >= 0; k--) {
+      const tornado = state.stormTornadoes[k];
+      tornado.life -= dt;
+      tornado.hitCooldown = Math.max(0, tornado.hitCooldown - dt);
+      tornado.mesh.rotation.z += dt * 0.72;
+      tornado.mesh.material.opacity = Math.min(0.9, Math.max(0, tornado.life) * 2.5) *
+        (0.88 + Math.sin(state.time * 5 + tornado.phase) * 0.08);
+      tornado.mesh.scale.setScalar(0.96 + Math.sin(state.time * 4.2 + tornado.phase) * 0.04);
+      if (tornado.hitCooldown <= 0 && stormFootprintContainsBody(tornado.anchor, 2)) {
+        tornado.hitCooldown = STORM_TORNADO_HIT_COOLDOWN;
+        const previousDamage = state.damageTaken;
+        damage(1, 'hazard');
+        if (state.damageTaken > previousDamage && !state.over) {
+          toast('卷入龙卷', '体长 -1 · 立即离开 2×2 风眼');
+        }
+      }
+      if (tornado.life <= 0) {
+        tornado.mesh.visible = false;
+        state.stormTornadoes.splice(k, 1);
+      }
+    }
+  }
+
+  function updateStormArena(dt) {
+    if (ROOMS[state.level]?.theme !== 'storm') return;
+    updateStormWarnings(dt);
+    updateStormLightningStrikes(dt);
+    updateStormTornadoes(dt);
+    if (state.phase !== 'clear' && state.phase !== 'boss') return;
+    state.stormLightningTimer -= dt;
+    if (state.stormLightningTimer > 0) return;
+    state.stormLightningTimer = STORM_LIGHTNING_INTERVAL;
+    const anchor = chooseStormAnchor();
+    showStormWarning(anchor, 'lightning', STORM_LIGHTNING_WARNING);
+    if (!state.stormIntroShown) {
+      state.stormIntroShown = true;
+      toast('雷暴将至', '每 5 秒随机落下 2×2 雷区 · 预警 1 秒');
+    }
+  }
+
+  function spawnStormBolt(x, z, tx, tz) {
+    const mesh = stormBoltPool.find((item) => !item.visible);
+    if (!mesh) return;
+    const dx = tx - x;
+    const dz = tz - z;
+    const len = Math.hypot(dx, dz) || 1;
+    mesh.visible = true;
+    mesh.position.set(x, 0.56, z);
+    state.stormBolts.push({
+      mesh,
+      x,
+      z,
+      vx: (dx / len) * STORM_BOLT_SPEED,
+      vz: (dz / len) * STORM_BOLT_SPEED,
+      life: 4.8,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  function updateStormBolts(dt) {
+    for (let k = state.stormBolts.length - 1; k >= 0; k--) {
+      const bolt = state.stormBolts[k];
+      bolt.life -= dt;
+      bolt.x += bolt.vx * dt;
+      bolt.z += bolt.vz * dt;
+      bolt.mesh.position.set(
+        bolt.x,
+        0.56 + Math.sin(state.time * 18 + bolt.phase) * 0.08,
+        bolt.z
+      );
+      bolt.mesh.scale.setScalar(0.9 + Math.sin(state.time * 22 + bolt.phase) * 0.12);
+      const ci = Math.round(bolt.x + HALF);
+      const cj = Math.round(bolt.z + HALF);
+      let dead = bolt.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
+      if (!dead && bodyDistanceSq(bolt.x, bolt.z) < 0.64 * 0.64) {
+        damage(1, 'projectile');
+        dead = true;
+      }
+      if (dead) {
+        bolt.mesh.visible = false;
+        state.stormBolts.splice(k, 1);
       }
     }
   }
@@ -6239,6 +6884,7 @@
       state.lavaPools,
       state.orbs,
       state.booms,
+      state.stormBolts,
       state.fireBursts,
       state.fireTrails,
     ];
@@ -6253,6 +6899,7 @@
     clearWolfCombatEffects();
     clearFrostDragonArena();
     clearWispCombatEffects();
+    clearStormArena();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
     state.hitFlash = 0;
@@ -6390,7 +7037,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像与凛冬冰龙，四片疆域都成了你的巢。';
+    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像、凛冬冰龙与风暴巨鹰，五片疆域都成了你的巢。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
@@ -6468,6 +7115,8 @@
       updateWispFogPatches(dt);
       updateWispDissolves(dt);
       updateWispSpikes(dt);
+      updateStormBolts(dt);
+      updateStormArena(dt);
       updateBullets(dt);
       updateFireTrails(dt);
       updateEnergyOrbs(dt);
@@ -6542,6 +7191,15 @@
       frostScars: state.frostScars.map(({ i, j, life }) => ({ i, j, life })),
       rubbleCount: state.mirrorRubble.length,
       segments: state.boss?.kind === 'frost_dragon' ? dragonLaserSegments(state.boss) : null,
+    }),
+    getStormArena: () => ({
+      theme: ROOMS[state.level]?.theme || null,
+      lightningTimer: state.stormLightningTimer,
+      warnings: state.stormWarnings.map(({ anchor, kind, remaining }) => ({ ...anchor, kind, remaining })),
+      strikes: state.stormLightningStrikes.length,
+      tornadoes: state.stormTornadoes.map(({ anchor, life }) => ({ ...anchor, life })),
+      bolts: state.stormBolts.length,
+      bossKind: state.boss?.kind || null,
     }),
     getIceObstacles: () => [...new Set(dynamicIce.values())].map(({ i, j, cells }) => ({
       i,

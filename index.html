@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>吞噬之蛇 — 温室、神庙、火山与永冻冰原</title>
+  <title>吞噬之蛇 — 温室、神庙、火山、永冻冰原与风暴空域</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307110c'/%3E%3Cpath d='M13 37c8 0 8-13 17-13s8 13 17 13 7-8 7-8' fill='none' stroke='%2362e2b3' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='51' cy='29' r='7' fill='%2362e2b3'/%3E%3Ccircle cx='53' cy='27' r='1.6' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -88,6 +88,37 @@
       0 0 0 5px rgba(89,186,235,.04),
       0 0 24px rgba(92,190,239,.17),
       inset 0 0 22px rgba(108,209,255,.1);
+  }
+  body[data-game-theme="storm"] {
+    --jade: #92dcff;
+    --jade-deep: #326994;
+    --gold: #d9efff;
+    --bronze: #63879e;
+    --crimson: #b9dcf0;
+    --paper: #edf8ff;
+    --ink: #030913;
+  }
+  body[data-game-theme="storm"] .panel {
+    background:
+      linear-gradient(135deg, rgba(129,205,244,.1), transparent 36%),
+      rgba(4, 12, 23, .9);
+    border-color: rgba(102, 165, 198, .58);
+    box-shadow:
+      0 14px 34px rgba(0,0,0,.58),
+      inset 0 0 26px rgba(83,169,215,.05);
+  }
+  body[data-game-theme="storm"] #hpfill {
+    background: linear-gradient(90deg, #2f749b, #85d8ff 70%, #e8fbff);
+    box-shadow: 0 0 16px rgba(92,194,244,.55);
+  }
+  body[data-game-theme="storm"] .touch-action,
+  body[data-game-theme="storm"] .touch-fire {
+    border-color: rgba(126,205,244,.72);
+    color: #edf9ff;
+    box-shadow:
+      0 0 0 5px rgba(87,171,218,.045),
+      0 0 24px rgba(91,185,236,.18),
+      inset 0 0 22px rgba(100,194,244,.11);
   }
   #stage { position: fixed; inset: 0; }
   #stage::before {
@@ -1156,6 +1187,15 @@
       url("assets/frozen-wastes-map.jpg") center / cover no-repeat,
       linear-gradient(180deg, #071b2d, #04101d);
   }
+  body[data-campaign-theme="storm"] .campaign-screen {
+    --map-accent: #92dcff;
+    --map-accent-deep: #326994;
+    background:
+      linear-gradient(180deg, rgba(2,8,17,.7), rgba(7,25,42,.78) 52%, rgba(1,6,14,.94)),
+      radial-gradient(circle at 50% 7%, rgba(151,224,255,.25), transparent 30%),
+      url("assets/storm-airspace-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #061524, #020912);
+  }
   .campaign-shell {
     position: relative;
     z-index: 2;
@@ -1550,6 +1590,13 @@
       radial-gradient(circle at 50% 10%, rgba(157,226,255,.2), transparent 26%),
       url("assets/frozen-wastes-map.jpg") center / cover no-repeat,
       linear-gradient(180deg, #071b2d, #04101d);
+  }
+  body[data-campaign-theme="storm"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(2,8,17,.7), rgba(7,25,42,.8) 55%, rgba(1,6,14,.95)),
+      radial-gradient(circle at 50% 10%, rgba(151,224,255,.21), transparent 27%),
+      url("assets/storm-airspace-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #061524, #020912);
   }
   #levelMapScreen .campaign-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
   .region-map-head {
@@ -2422,10 +2469,10 @@
         <span class="eyebrow">DEVOUR CAMPAIGN</span>
         <h2>吞噬版图</h2>
       </div>
-      <div class="campaign-total" aria-label="战役总进度">总星途 <b id="campaignTotal">0 / 32</b></div>
+      <div class="campaign-total" aria-label="战役总进度">总星途 <b id="campaignTotal">0 / 40</b></div>
     </header>
     <div class="region-stage">
-      <div class="region-cards" id="regionCards" aria-label="四个区域"></div>
+      <div class="region-cards" id="regionCards" aria-label="远征区域"></div>
     </div>
     <footer class="campaign-legend" aria-label="地图说明">
       <span><i></i> 已开放关卡</span>
