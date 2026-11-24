@@ -51,6 +51,16 @@
   const DRAGON_BREATH_COOLDOWN = 6.2;
   const DRAGON_BREATH_RANGE = 19;
   const DRAGON_BREATH_HALF_ANGLE = Math.PI * 0.29;
+  const DRAGON_ATTACK_INTERVAL = 7;
+  const DRAGON_MIRROR_HP_RATIO = 0.75;
+  const DRAGON_LASER_TELEGRAPH = 0.9;
+  const DRAGON_LASER_ACTIVE = 1.15;
+  const DRAGON_LASER_RANGE = 19;
+  const DRAGON_LASER_HIT_WIDTH = 0.56;
+  const DRAGON_REFLECTION_RANGE = 10;
+  const DRAGON_SLAM_TELEGRAPH = 1.15;
+  const DRAGON_SLAM_ACTIVE = 0.65;
+  const DRAGON_FROST_SCAR_LIFE = 5;
   const FROST_SKILL_COST = 2;
   const FROST_SKILL_COOLDOWN = 6;
   const FROST_SKILL_DURATION = 3;
@@ -356,7 +366,14 @@
   const FROZEN_OBSTACLE_COUNT = 8;
 
   const inBounds = (i, j) => i >= 0 && j >= 0 && i < N && j < N;
-  const isObstacle = (i, j) => obstacles.has(`${i},${j}`) || dynamicIce.has(`${i},${j}`);
+  const mirrorBlocksCell = (i, j) => Boolean(
+    state.mirrorPillars && state.mirrorPillars.some((pillar) => (
+      pillar.alive && pillar.cells.some((cell) => cell.i === i && cell.j === j)
+    ))
+  );
+  const isObstacle = (i, j) => (
+    obstacles.has(`${i},${j}`) || dynamicIce.has(`${i},${j}`) || mirrorBlocksCell(i, j)
+  );
 
   // ---------- 手绘 sprite（canvas 2D 贴图） ----------
   function spriteTexture(size, draw) {
@@ -1370,6 +1387,15 @@
   };
   const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
   const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
+  const DRAGON_BREATH_RAY_TEX = loadIceEffectTexture('dragon-breath-ray.png');
+  const FROST_LASER_TEX = loadIceEffectTexture('frost-laser.png');
+  const FROST_SCAR_TEX = loadIceEffectTexture('frost-scar.png');
+  const MIRROR_PILLAR_TEX = loadIceEffectTexture('mirror-pillar.png');
+  const FROST_SPIKES_TEX = loadIceEffectTexture('frost-spikes.png');
+  const FROST_DRAGON_SLAM_TEX = Array.from(
+    { length: 6 },
+    (_, index) => loadIceEffectTexture(`frost-dragon-slam-${index + 1}.png`)
+  );
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -2131,6 +2157,125 @@
   bossBreathRig.visible = false;
   scene.add(bossBreathRig);
 
+  function createDragonBeamRig(texture, width, color) {
+    const geometry = new THREE.PlaneGeometry(1, width);
+    geometry.translate(0.5, 0, 0);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture || null,
+      color: texture ? color : 0x9feaff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+      toneMapped: false,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.32;
+    mesh.renderOrder = 5;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.visible = false;
+    scene.add(group);
+    return group;
+  }
+
+  const frostLaserRigs = Array.from(
+    { length: 4 },
+    () => createDragonBeamRig(FROST_LASER_TEX, 1.15, 0xe6fbff)
+  );
+  const frostReflectionRigs = Array.from(
+    { length: 4 },
+    () => createDragonBeamRig(DRAGON_BREATH_RAY_TEX, 0.72, 0xbff4ff)
+  );
+
+  const mirrorPillarMeshes = [];
+  for (let i = 0; i < 2; i++) {
+    const group = new THREE.Group();
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.45, 3.15),
+      new THREE.MeshBasicMaterial({
+        map: MIRROR_PILLAR_TEX || null,
+        color: MIRROR_PILLAR_TEX ? 0xffffff : 0x86e8ff,
+        transparent: true,
+        opacity: 0.98,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.54;
+    mesh.renderOrder = 3;
+    group.add(mesh);
+    group.visible = false;
+    scene.add(group);
+    mirrorPillarMeshes.push(group);
+  }
+
+  const frostScarPool = [];
+  const mirrorRubblePool = [];
+  const frostSpikePool = [];
+  for (let i = 0; i < 48; i++) {
+    const scar = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.96, 0.96),
+      new THREE.MeshBasicMaterial({
+        map: FROST_SCAR_TEX || null,
+        color: FROST_SCAR_TEX ? 0xffffff : 0xb7e9ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    scar.rotation.x = -Math.PI / 2;
+    scar.position.y = 0.12;
+    scar.renderOrder = 2;
+    scar.visible = false;
+    scene.add(scar);
+    frostScarPool.push(scar);
+  }
+  for (let i = 0; i < 24; i++) {
+    const rubble = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.98, 0.98),
+      new THREE.MeshBasicMaterial({
+        map: FROST_SCAR_TEX || null,
+        color: 0xb8dced,
+        transparent: true,
+        opacity: 0.38,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    rubble.rotation.x = -Math.PI / 2;
+    rubble.position.y = 0.105;
+    rubble.renderOrder = 2;
+    rubble.visible = false;
+    scene.add(rubble);
+    mirrorRubblePool.push(rubble);
+  }
+  for (let i = 0; i < 24; i++) {
+    const spike = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.65, 1.65),
+      new THREE.MeshBasicMaterial({
+        map: FROST_SPIKES_TEX || null,
+        color: FROST_SPIKES_TEX ? 0xffffff : 0xc8f7ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    spike.rotation.x = -Math.PI / 2;
+    spike.position.y = 0.3;
+    spike.renderOrder = 4;
+    spike.visible = false;
+    scene.add(spike);
+    frostSpikePool.push(spike);
+  }
+
   const playerFrostRig = new THREE.Group();
   const playerFrostGeo = new THREE.PlaneGeometry(11.5, 5.2);
   playerFrostGeo.translate(5.75, 0, 0);
@@ -2293,6 +2438,10 @@
     thinIce: [],
     wolfClawBursts: [],
     frostMistBursts: [],
+    mirrorPillars: [],
+    mirrorRubble: [],
+    frostScars: [],
+    frostSpikeBursts: [],
     lavaBalls: [],
     lavaPools: [],
     skillOrb: null,
@@ -3157,6 +3306,7 @@
     shieldHaloRig.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
+    clearFrostDragonArena();
     playerFrostRig.visible = false;
 
     // 温室关卡特性保留：第二关小怪更快，第三关会远程
@@ -3293,6 +3443,12 @@
       breathElapsed: 0,
       breathAngle: 0,
       breathHit: false,
+      dragonState: isDragon ? 'idle' : 'none',
+      dragonAttack: null,
+      dragonAttackElapsed: 0,
+      mirrorsSpawned: false,
+      laserHit: false,
+      slamElapsed: 0,
       summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
       summonFlash: 0,
       shieldActive: isPharaoh,
@@ -3311,6 +3467,7 @@
     bossMesh.rotation.z = 0;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
+    if (isDragon) clearFrostDragonArena();
     pharaohShieldRig.visible = false;
     rootSummonRig.visible = false;
     colossusShadow.visible = false;
@@ -3403,6 +3560,7 @@
     rootSummonRig.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
+    if (bossKind === 'frost_dragon') clearFrostDragonArena();
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
     state.phase = 'pick';
@@ -4412,15 +4570,292 @@
     }
   }
 
-  function setFrostDragonPose(attacking) {
-    const texture = attacking
+  function setFrostDragonPose(attacking, overrideTexture = null) {
+    const texture = overrideTexture || (attacking
       ? (FROST_DRAGON_ATTACK_TEX || BOSS_TEX.frost_dragon)
-      : (BOSS_TEX.frost_dragon || bossPoseTexture);
+      : (BOSS_TEX.frost_dragon || bossPoseTexture));
     if (!texture || bossPlaneMat.map === texture) return;
     bossPlaneMat.map = texture;
     bossPlaneMat.color.setHex(0xffffff);
     bossPlaneMat.needsUpdate = true;
     bossPoseTexture = texture;
+  }
+
+  function clearFrostDragonArena() {
+    state.mirrorPillars.forEach((pillar) => {
+      pillar.alive = false;
+      if (pillar.mesh) pillar.mesh.visible = false;
+    });
+    state.mirrorPillars.length = 0;
+    state.mirrorRubble.forEach((rubble) => { rubble.mesh.visible = false; });
+    state.mirrorRubble.length = 0;
+    state.frostScars.forEach((scar) => { scar.mesh.visible = false; });
+    state.frostScars.length = 0;
+    state.frostSpikeBursts.forEach((burst) => { burst.mesh.visible = false; });
+    state.frostSpikeBursts.length = 0;
+    frostLaserRigs.forEach((rig) => { rig.visible = false; });
+    frostReflectionRigs.forEach((rig) => { rig.visible = false; });
+    mirrorPillarMeshes.forEach((mesh) => { mesh.visible = false; });
+    mirrorRubblePool.forEach((mesh) => { mesh.visible = false; });
+  }
+
+  function findMirrorAt(i, j) {
+    return state.mirrorPillars.find((pillar) => (
+      pillar.alive && pillar.cells.some((cell) => cell.i === i && cell.j === j)
+    ));
+  }
+
+  function breakMirrorPillar(pillar) {
+    if (!pillar || !pillar.alive) return false;
+    pillar.alive = false;
+    pillar.mesh.visible = false;
+    for (const cell of pillar.cells) {
+      const rubble = mirrorRubblePool.find((mesh) => !mesh.visible);
+      if (!rubble) continue;
+      rubble.visible = true;
+      rubble.position.set(cellX(cell.i), 0.105, cellZ(cell.j));
+      rubble.rotation.z = (Math.random() - 0.5) * 0.45;
+      state.mirrorRubble.push({ mesh: rubble, i: cell.i, j: cell.j });
+    }
+    toast('霜镜破碎', '折射通道已打开 · 碎裂冰面不会造成伤害');
+    return true;
+  }
+
+  function spawnMirrorPillars() {
+    if (state.mirrorPillars.some((pillar) => pillar.alive)) return;
+    const anchors = [
+      { i: BOSS_CELL.i, j: 10, direction: -1 },
+      { i: BOSS_CELL.i, j: 30, direction: 1 },
+    ];
+    for (let n = 0; n < anchors.length; n++) {
+      let anchor = null;
+      for (let offset = 0; offset <= 4; offset++) {
+        const j = anchors[n].j + (anchors[n].direction < 0 ? -offset : offset);
+        const cells = [{ i: BOSS_CELL.i, j }, { i: BOSS_CELL.i, j: j + 1 }, { i: BOSS_CELL.i, j: j + 2 }];
+        if (cells.every((cell) => inBounds(cell.i, cell.j) && !isObstacle(cell.i, cell.j))) {
+          anchor = { i: BOSS_CELL.i, j, cells };
+          break;
+        }
+      }
+      if (!anchor) continue;
+      const mesh = mirrorPillarMeshes[n];
+      const pillar = { id: n, i: anchor.i, j: anchor.j, cells: anchor.cells, mesh, alive: true };
+      mesh.visible = true;
+      mesh.position.set(cellX(anchor.i), 0, cellZ(anchor.j + 1));
+      mesh.rotation.y = 0;
+      state.mirrorPillars.push(pillar);
+    }
+    if (state.mirrorPillars.length > 0) {
+      toast('霜镜召唤', '冰镜晶柱会折射激光 · 可用烈焰弹击碎');
+    }
+  }
+
+  function dragonLaserSegments(b) {
+    const directions = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const mains = [];
+    const reflections = [];
+    for (const angle of directions) {
+      const dirX = Math.cos(angle);
+      const dirZ = Math.sin(angle);
+      let length = DRAGON_LASER_RANGE;
+      let hitPillar = null;
+      let hitX = 0;
+      let hitZ = 0;
+      for (const pillar of state.mirrorPillars) {
+        if (!pillar.alive) continue;
+        for (const cell of pillar.cells) {
+          const dx = cellX(cell.i) - b.x;
+          const dz = cellZ(cell.j) - b.z;
+          const projection = dx * dirX + dz * dirZ;
+          const perpendicular = Math.abs(-dx * dirZ + dz * dirX);
+          if (projection > 0 && projection < length && perpendicular <= 0.72) {
+            length = Math.max(0.5, projection - 0.45);
+            hitPillar = pillar;
+            hitX = cellX(cell.i);
+            hitZ = cellZ(cell.j);
+          }
+        }
+      }
+      mains.push({ angle, length, hitPillar });
+      if (hitPillar) {
+        reflections.push(
+          { angle: angle - Math.PI / 4, x: hitX, z: hitZ, length: DRAGON_REFLECTION_RANGE },
+          { angle: angle + Math.PI / 4, x: hitX, z: hitZ, length: DRAGON_REFLECTION_RANGE }
+        );
+      }
+    }
+    return { mains, reflections };
+  }
+
+  function updateDragonLaserVisuals(b, opacity) {
+    const segments = dragonLaserSegments(b);
+    for (let i = 0; i < frostLaserRigs.length; i++) {
+      const rig = frostLaserRigs[i];
+      const segment = segments.mains[i];
+      rig.visible = true;
+      rig.position.set(b.x, 0, b.z);
+      rig.rotation.y = Math.atan2(-Math.sin(segment.angle), Math.cos(segment.angle));
+      rig.scale.set(segment.length, 1, 1);
+      rig.children[0].material.opacity = opacity;
+    }
+    for (let i = 0; i < frostReflectionRigs.length; i++) {
+      const rig = frostReflectionRigs[i];
+      const segment = segments.reflections[i];
+      rig.visible = Boolean(segment);
+      if (!segment) continue;
+      rig.position.set(segment.x, 0, segment.z);
+      rig.rotation.y = Math.atan2(-Math.sin(segment.angle), Math.cos(segment.angle));
+      rig.scale.set(segment.length, 1, 1);
+      rig.children[0].material.opacity = opacity;
+    }
+    return segments;
+  }
+
+  function hideDragonLaserVisuals() {
+    frostLaserRigs.forEach((rig) => { rig.visible = false; });
+    frostReflectionRigs.forEach((rig) => { rig.visible = false; });
+  }
+
+  function pointHitsDragonRay(px, pz, ox, oz, angle, length, width) {
+    const dirX = Math.cos(angle);
+    const dirZ = Math.sin(angle);
+    const dx = px - ox;
+    const dz = pz - oz;
+    const projection = dx * dirX + dz * dirZ;
+    if (projection < 0 || projection > length) return false;
+    return Math.abs(-dx * dirZ + dz * dirX) <= width;
+  }
+
+  function bodyTouchesDragonLaser(b) {
+    const segments = dragonLaserSegments(b);
+    for (const cell of state.cells) {
+      const x = cellX(cell.i);
+      const z = cellZ(cell.j);
+      for (const main of segments.mains) {
+        if (pointHitsDragonRay(x, z, b.x, b.z, main.angle, main.length, DRAGON_LASER_HIT_WIDTH)) {
+          return true;
+        }
+      }
+      for (const reflection of segments.reflections) {
+        if (pointHitsDragonRay(
+          x,
+          z,
+          reflection.x,
+          reflection.z,
+          reflection.angle,
+          reflection.length,
+          DRAGON_LASER_HIT_WIDTH
+        )) return true;
+      }
+    }
+    return false;
+  }
+
+  function spawnFrostScars(b) {
+    const candidates = [];
+    const seen = new Set();
+    for (let distance = 13; distance <= 19; distance += 0.8) {
+      for (let offset = -0.2; offset <= 0.201; offset += 0.1) {
+        const angle = b.breathAngle + offset;
+        const i = Math.round(b.x + Math.cos(angle) * distance + HALF);
+        const j = Math.round(b.z + Math.sin(angle) * distance + HALF);
+        const key = `${i},${j}`;
+        if (!inBounds(i, j) || isObstacle(i, j) || seen.has(key)) continue;
+        seen.add(key);
+        candidates.push({ i, j });
+      }
+    }
+    for (let n = candidates.length - 1; n > 0; n--) {
+      const swap = randInt(n + 1);
+      [candidates[n], candidates[swap]] = [candidates[swap], candidates[n]];
+    }
+    const count = Math.min(candidates.length, 3 + randInt(3));
+    for (let n = 0; n < count; n++) {
+      const cell = candidates[n];
+      const mesh = frostScarPool.find((item) => !item.visible);
+      if (!mesh) break;
+      mesh.visible = true;
+      mesh.position.set(cellX(cell.i), 0.12, cellZ(cell.j));
+      mesh.rotation.z = Math.random() * Math.PI;
+      mesh.material.opacity = 0.68;
+      state.frostScars.push({ i: cell.i, j: cell.j, mesh, life: DRAGON_FROST_SCAR_LIFE });
+    }
+  }
+
+  function updateFrostScars(dt) {
+    for (let k = state.frostScars.length - 1; k >= 0; k--) {
+      const scar = state.frostScars[k];
+      scar.life -= dt;
+      const onScar = state.cells.some((cell) => cell.i === scar.i && cell.j === scar.j);
+      if (onScar) state.slowTimer = Math.max(state.slowTimer, 0.45);
+      scar.mesh.material.opacity = Math.min(0.68, scar.life * 0.55);
+      if (scar.life <= 0) {
+        scar.mesh.visible = false;
+        state.frostScars.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnFrostSpike(x, z) {
+    const mesh = frostSpikePool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.visible = true;
+    mesh.position.set(x, 0.3, z);
+    mesh.scale.setScalar(0.35);
+    mesh.material.opacity = 0.96;
+    state.frostSpikeBursts.push({ mesh, life: 0.58, maxLife: 0.58 });
+  }
+
+  function eruptFrostScars() {
+    const scars = state.frostScars.slice();
+    for (const scar of scars) {
+      spawnFrostSpike(cellX(scar.i), cellZ(scar.j));
+      if (state.cells.some((cell) => cell.i === scar.i && cell.j === scar.j)) {
+        state.slowTimer = Math.max(state.slowTimer, 2);
+        damage(1, 'hazard');
+      }
+      scar.mesh.visible = false;
+    }
+    state.frostScars.length = 0;
+  }
+
+  function updateFrostSpikes(dt) {
+    for (let k = state.frostSpikeBursts.length - 1; k >= 0; k--) {
+      const burst = state.frostSpikeBursts[k];
+      burst.life -= dt;
+      const progress = 1 - Math.max(0, burst.life / burst.maxLife);
+      burst.mesh.scale.setScalar(0.35 + Math.sin(Math.min(1, progress * 2.4) * Math.PI * 0.5) * 0.95);
+      burst.mesh.material.opacity = progress < 0.7 ? 0.96 : (1 - progress) / 0.3 * 0.96;
+      if (burst.life <= 0) {
+        burst.mesh.visible = false;
+        state.frostSpikeBursts.splice(k, 1);
+      }
+    }
+  }
+
+  function setSlamPose(elapsed) {
+    const times = [0.0, 0.42, 0.62, 0.71, 0.81, 0.95];
+    let frame = 0;
+    for (let i = 0; i < times.length; i++) {
+      if (elapsed >= times[i]) frame = i;
+    }
+    setFrostDragonPose(true, FROST_DRAGON_SLAM_TEX[frame]);
+  }
+
+  function startFrostDragonAttack(b, attack, targetAngle) {
+    b.dragonAttack = attack;
+    b.dragonAttackElapsed = 0;
+    b.laserHit = false;
+    b.breathHit = false;
+    if (attack === 'breath') {
+      b.dragonState = 'breathTelegraph';
+      b.breathAngle = targetAngle;
+    } else if (attack === 'laser') {
+      b.dragonState = 'laserTelegraph';
+    } else {
+      b.dragonState = 'slamTelegraph';
+    }
+    setFrostDragonPose(true);
   }
 
   function bodyTouchesDragonBreath(b) {
@@ -4442,81 +4877,126 @@
     const dx = hp.x - b.x;
     const dz = hp.z - b.z;
     const targetAngle = Math.atan2(dz, dx);
+    b.x = cellX(BOSS_CELL.i);
+    b.z = cellZ(BOSS_CELL.j);
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 2.1) * 0.03);
+    if (!b.mirrorsSpawned && b.hp <= b.max * DRAGON_MIRROR_HP_RATIO) {
+      b.mirrorsSpawned = true;
+      spawnMirrorPillars();
+    }
 
-    if (b.breathState === 'idle') {
-      const distance = Math.hypot(dx, dz) || 1;
-      if (distance > 7) {
-        b.x += (dx / distance) * 0.42 * dt;
-        b.z += (dz / distance) * 0.42 * dt;
-      }
-      b.x = Math.max(-HALF + 3, Math.min(HALF - 3, b.x));
-      b.z = Math.max(-HALF + 3, Math.min(HALF - 3, b.z));
-      bossMesh.position.set(b.x, 0, b.z);
+    if (b.dragonState === 'idle') {
       bossMesh.rotation.z = Math.sin(state.time * 1.5) * 0.025;
-      bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 2.1) * 0.03);
       bossBreathRig.visible = false;
       bossBreathMat.opacity = 0;
+      hideDragonLaserVisuals();
       setFrostDragonPose(false);
-
       if (b.cool > 0) b.cool -= dt;
       if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
         b.cool = 1.6;
         damage(2, 'contact');
         if (state.over) return;
       }
-
       b.breathTimer -= dt;
       if (b.breathTimer <= 0) {
-        b.breathState = 'telegraph';
-        b.breathElapsed = 0;
-        b.breathAngle = targetAngle;
-        b.breathHit = false;
-        setFrostDragonPose(true);
+        const attacks = ['breath', 'laser', 'slam'];
+        startFrostDragonAttack(b, attacks[randInt(attacks.length)], targetAngle);
       }
       return;
     }
 
-    bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 8) * 0.018;
-    bossMesh.scale.setScalar(baseScale + Math.sin(state.time * 7) * 0.012);
-    setFrostDragonPose(true);
+    b.dragonAttackElapsed += dt;
 
-    b.breathElapsed += dt;
-    if (b.breathState === 'telegraph') {
-      b.breathAngle = Math.atan2(dz, dx);
-    }
-    const dirX = Math.cos(b.breathAngle);
-    const dirZ = Math.sin(b.breathAngle);
-    bossBreathRig.position.set(b.x + dirX * 1.45, 0, b.z + dirZ * 1.45);
-    bossBreathRig.rotation.y = Math.atan2(-dirZ, dirX);
-    bossBreathRig.visible = true;
-
-    if (b.breathState === 'telegraph') {
-      const progress = Math.min(1, b.breathElapsed / DRAGON_BREATH_TELEGRAPH);
-      bossBreathMat.opacity = 0.18 + progress * 0.24;
-      if (b.breathElapsed >= DRAGON_BREATH_TELEGRAPH) {
-        b.breathState = 'active';
-        b.breathElapsed = 0;
+    if (b.dragonState === 'breathTelegraph') {
+      b.breathAngle = targetAngle;
+      const dirX = Math.cos(b.breathAngle);
+      const dirZ = Math.sin(b.breathAngle);
+      bossBreathRig.position.set(b.x + dirX * 1.45, 0, b.z + dirZ * 1.45);
+      bossBreathRig.rotation.y = Math.atan2(-dirZ, dirX);
+      bossBreathRig.visible = true;
+      bossBreathMat.opacity = Math.min(0.42, 0.18 + b.dragonAttackElapsed / DRAGON_BREATH_TELEGRAPH * 0.24);
+      if (b.dragonAttackElapsed >= DRAGON_BREATH_TELEGRAPH) {
+        b.dragonState = 'breathActive';
+        b.dragonAttackElapsed = 0;
         bossBreathMat.opacity = 0.92;
       }
       return;
     }
 
-    bossBreathMat.opacity = 0.84 + Math.sin(state.time * 19) * 0.1;
-    if (!b.breathHit && bodyTouchesDragonBreath(b)) {
-      b.breathHit = true;
-      const shielded = state.shieldTimer > 0;
-      damage(2, 'projectile');
-      if (!shielded) toast('凛冬龙息命中', '体长 -2');
-      if (state.over) return;
+    if (b.dragonState === 'breathActive') {
+      const dirX = Math.cos(b.breathAngle);
+      const dirZ = Math.sin(b.breathAngle);
+      bossBreathRig.position.set(b.x + dirX * 1.45, 0, b.z + dirZ * 1.45);
+      bossBreathRig.rotation.y = Math.atan2(-dirZ, dirX);
+      bossBreathRig.visible = true;
+      bossBreathMat.opacity = 0.84 + Math.sin(state.time * 19) * 0.1;
+      if (!b.breathHit && bodyTouchesDragonBreath(b)) {
+        b.breathHit = true;
+        const shielded = state.shieldTimer > 0;
+        damage(2, 'projectile');
+        if (!shielded) toast('凛冬龙息命中', '体长 -2');
+        if (state.over) return;
+      }
+      if (b.dragonAttackElapsed >= DRAGON_BREATH_ACTIVE) {
+        spawnFrostScars(b);
+        bossBreathRig.visible = false;
+        bossBreathMat.opacity = 0;
+        b.dragonState = 'slamTelegraph';
+        b.dragonAttack = 'slam';
+        b.dragonAttackElapsed = 0;
+        b.slamElapsed = 0;
+      }
+      return;
     }
-    if (b.breathElapsed >= DRAGON_BREATH_ACTIVE) {
-      b.breathState = 'idle';
-      b.breathElapsed = 0;
-      b.breathTimer = DRAGON_BREATH_COOLDOWN;
-      bossBreathRig.visible = false;
-      bossBreathMat.opacity = 0;
-      setFrostDragonPose(false);
+
+    if (b.dragonState === 'laserTelegraph' || b.dragonState === 'laserActive') {
+      const active = b.dragonState === 'laserActive';
+      updateDragonLaserVisuals(b, active ? 0.92 : 0.22);
+      setFrostDragonPose(true);
+      if (active && !b.laserHit && bodyTouchesDragonLaser(b)) {
+        b.laserHit = true;
+        damage(1, 'projectile');
+        if (state.over) return;
+      }
+      const duration = active ? DRAGON_LASER_ACTIVE : DRAGON_LASER_TELEGRAPH;
+      if (b.dragonAttackElapsed >= duration) {
+        if (!active) {
+          b.dragonState = 'laserActive';
+          b.dragonAttackElapsed = 0;
+        } else {
+          hideDragonLaserVisuals();
+          b.dragonState = 'idle';
+          b.dragonAttack = null;
+          b.breathTimer = DRAGON_ATTACK_INTERVAL;
+          setFrostDragonPose(false);
+        }
+      }
+      return;
+    }
+
+    if (b.dragonState === 'slamTelegraph' || b.dragonState === 'slamActive') {
+      b.slamElapsed += dt;
+      const active = b.dragonState === 'slamActive';
+      setSlamPose(b.slamElapsed);
+      bossMesh.scale.setScalar(baseScale + (active ? 1 : 0) * Math.sin(b.slamElapsed * 10) * 0.08);
+      if (!active && b.dragonAttackElapsed >= DRAGON_SLAM_TELEGRAPH) {
+        b.dragonState = 'slamActive';
+        b.dragonAttackElapsed = 0;
+        b.slamElapsed = 0;
+        eruptFrostScars();
+        if (state.over) return;
+        return;
+      }
+      if (active && b.dragonAttackElapsed >= DRAGON_SLAM_ACTIVE) {
+        b.dragonState = 'idle';
+        b.dragonAttack = null;
+        b.dragonAttackElapsed = 0;
+        b.slamElapsed = 0;
+        b.breathTimer = DRAGON_ATTACK_INTERVAL;
+        setFrostDragonPose(false);
+      }
     }
   }
 
@@ -5043,6 +5523,12 @@
         spawnFireBurst(b.x, b.z);
         burstSpawned = true;
       }
+      const mirror = findMirrorAt(ci, cj);
+      if (b.fire && mirror) {
+        breakMirrorPillar(mirror);
+        spawnFireBurst(b.x, b.z);
+        burstSpawned = true;
+      }
       let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
 
       // 命中小怪
@@ -5221,6 +5707,7 @@
     });
     clearIceObstacles();
     clearWolfCombatEffects();
+    clearFrostDragonArena();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
     state.hitFlash = 0;
@@ -5431,6 +5918,8 @@
 
       updateWolfCombatEffects(dt);
       updateThinIce();
+      updateFrostScars(dt);
+      updateFrostSpikes(dt);
       updateBullets(dt);
       updateFireTrails(dt);
       updateEnergyOrbs(dt);
@@ -5483,6 +5972,22 @@
     breakIceObstacle,
     spawnThinIce,
     triggerThinIceAt,
+    spawnMirrorPillars,
+    breakMirrorPillar,
+    startFrostDragonAttack,
+    spawnFrostScars,
+    eruptFrostScars,
+    getFrostDragonArena: () => ({
+      mirrors: state.mirrorPillars.map((pillar) => ({
+        i: pillar.i,
+        j: pillar.j,
+        alive: pillar.alive,
+        cells: pillar.cells.map((cell) => ({ ...cell })),
+      })),
+      frostScars: state.frostScars.map(({ i, j, life }) => ({ i, j, life })),
+      rubbleCount: state.mirrorRubble.length,
+      segments: state.boss?.kind === 'frost_dragon' ? dragonLaserSegments(state.boss) : null,
+    }),
     getIceObstacles: () => [...new Set(dynamicIce.values())].map(({ i, j, cells }) => ({
       i,
       j,
