@@ -5907,7 +5907,7 @@
       const ci = Math.round(b.x + HALF);
       const cj = Math.round(b.z + HALF);
       let burstSpawned = false;
-      let dead = b.life <= 0 || !inBounds(ci, cj) || isObstacle(ci, cj);
+      let dead = b.life <= 0 || !inBounds(ci, cj);
       if (!dead && b.fire) {
         const orbIndex = state.wispSpikes.findIndex((orb) => (
           Math.hypot(orb.x - b.x, orb.z - b.z) < WISP_ORB_RADIUS + PLAYER_BULLET_RADIUS + 0.2
@@ -5932,6 +5932,7 @@
         spawnFireBurst(b.x, b.z);
         burstSpawned = true;
       }
+      if (!dead && isObstacle(ci, cj)) dead = true;
 
       // 命中小怪
       if (!dead && (state.phase === 'clear' || state.phase === 'boss')) {
