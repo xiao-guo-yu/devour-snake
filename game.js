@@ -24,6 +24,7 @@
   const SHIELD_HALO_SCALE_X = 0.94;
   const SHIELD_HALO_SCALE_Y = 0.72;
   const MAX_ENEMIES = 48;
+  const ICE_SLUG_MAX_ACTIVE = 16;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
   const FIRE_BULLET_IMAGE_WIDTH = 3.0;
@@ -2665,6 +2666,8 @@
   }
 
   function spawnIceSlugChild(parent) {
+    const slugCount = state.enemies.filter((enemy) => enemy.alive && enemy.type === 'iceSlug').length;
+    if (slugCount >= ICE_SLUG_MAX_ACTIVE) return null;
     const slot = state.enemies.find((e) => !e.alive);
     if (!slot) return null;
     const cell = findIceSlugSplitCell(parent);
