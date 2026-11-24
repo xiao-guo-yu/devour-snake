@@ -144,11 +144,11 @@
     // 第四章小怪的机制与最终数值后续单独补齐；蛞蝓会周期性分裂。
     iceSlug: {
       hp: 2, speed: 0.234, contactDamage: 1, contactCooldown: 1.3,
-      contactRadius: 0.74, retreatSpeedMul: 0.4, splitInterval: 10,
+      contactRadius: 0.592, retreatSpeedMul: 0.4, splitInterval: 10,
     },
     frostWolf: {
       hp: 1, speed: 2.05, contactDamage: 2, contactCooldown: 1.15,
-      contactRadius: 0.76, retreatSpeedMul: 0.46,
+      contactRadius: 0.988, retreatSpeedMul: 0.46,
     },
     frostWisp: {
       hp: 1, speed: 0.42, contactDamage: 1, contactCooldown: 1.25,
@@ -2607,7 +2607,7 @@
       mesh.material.map = TEX[spawnType] || null;
       mesh.material.color.setHex(0xffffff);
       mesh.material.needsUpdate = true;
-      mesh.scale.setScalar(spawnType === 'emberWisp' ? WISP_RENDER_SCALE : (spawnType === 'frostWisp' ? 1.28 : 1));
+      mesh.scale.setScalar(enemyRenderScale(spawnType));
     }
     return slot;
   }
@@ -2986,6 +2986,14 @@
     return ENEMY_STATS[type] || ENEMY_STATS.spore;
   }
 
+  function enemyRenderScale(type) {
+    if (type === 'iceSlug') return 0.8;
+    if (type === 'frostWolf') return 1.3;
+    if (type === 'emberWisp') return WISP_RENDER_SCALE;
+    if (type === 'frostWisp') return 1.28;
+    return 1;
+  }
+
   function chooseRespawnEnemyType() {
     const types = state.roomEnemyTypes;
     if (!types || types.length === 0) return 'spore';
@@ -3222,7 +3230,7 @@
       const type = types[k % types.length];
       enemyPool[k].material = (ENEMY_MATS[type] || ENEMY_MATS.spore).clone();
       enemyPool[k].material.color.setHex(0xffffff);
-      enemyPool[k].scale.setScalar(type === 'emberWisp' ? WISP_RENDER_SCALE : (type === 'frostWisp' ? 1.28 : 1));
+      enemyPool[k].scale.setScalar(enemyRenderScale(type));
       state.enemies[k].type = type;
       state.enemies[k].hp = enemyStats(type).hp;
       state.enemies[k].speedMul = 1;
