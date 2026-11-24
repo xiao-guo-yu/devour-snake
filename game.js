@@ -2355,7 +2355,7 @@
     scene.add(rubble);
     mirrorRubblePool.push(rubble);
   }
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 300; i++) {
     const spike = new THREE.Mesh(
       new THREE.PlaneGeometry(1.65, 1.65),
       new THREE.MeshBasicMaterial({
@@ -5140,7 +5140,7 @@
   }
 
   function spawnFrostSlamRing(b) {
-    const count = 18;
+    const count = 36;
     const startRadius = 5.15;
     const speed = 5.1;
     for (let k = 0; k < count; k++) {
