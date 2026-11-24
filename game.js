@@ -1869,7 +1869,7 @@
   };
   const wolfClawBurstPool = createAdditiveEffectPool(8, WOLF_CLAW_TEX, 0xd8fbff, 0.94);
   const frostMistPool = createAdditiveEffectPool(10, FROST_MIST_TEX, 0xc8f5ff, 0.72);
-  const thinIcePool = createAdditiveEffectPool(64, THIN_ICE_TEX, 0xb8edff, 0.64);
+  const thinIcePool = createAdditiveEffectPool(64, FROST_MIST_TEX, 0xcaf3ff, 0.54);
   const wispFogPool = createAdditiveEffectPool(48, WISP_FOG_TEX[0], 0xc1f1f8, 0.42);
   const wispWarningPool = Array.from(
     { length: 16 },
