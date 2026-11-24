@@ -2528,25 +2528,29 @@
       [1, 0], [1, 1], [0, 1], [-1, 1],
       [-1, 0], [-1, -1], [0, -1], [1, -1],
     ];
-    const fits = (i, j, minHeadDistance) => {
+    const radii = [6, 7, 8, 9, 10];
+    const fits = (i, j, minHeadDistance, minParentDistance = 0) => {
       if (!inBounds(i, j) || isObstacle(i, j)) return false;
       if (Math.abs(i - head.i) + Math.abs(j - head.j) < minHeadDistance) return false;
+      if (Math.abs(i - parentI) + Math.abs(j - parentJ) < minParentDistance) return false;
       if (state.enemies.some((e) => e.alive && e.i === i && e.j === j)) return false;
       return true;
     };
 
-    for (let radius = 1; radius <= 4; radius++) {
+    const radiusStart = randInt(radii.length);
+    for (let radiusStep = 0; radiusStep < radii.length; radiusStep++) {
+      const radius = radii[(radiusStart + radiusStep) % radii.length];
       const start = randInt(offsets.length);
       for (let step = 0; step < offsets.length; step++) {
         const [di, dj] = offsets[(start + step) % offsets.length];
         const i = parentI + di * radius;
         const j = parentJ + dj * radius;
-        if (fits(i, j, 3)) return { i, j };
+        if (fits(i, j, 3, 6)) return { i, j };
       }
     }
     for (let tries = 0; tries < 200; tries++) {
       const i = randInt(N), j = randInt(N);
-      if (fits(i, j, 6)) return { i, j };
+      if (fits(i, j, 6, 6)) return { i, j };
     }
     return null;
   }
