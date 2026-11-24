@@ -23,6 +23,7 @@
   const SHIELD_COOLDOWN = 5;
   const SHIELD_HALO_SCALE_X = 0.94;
   const SHIELD_HALO_SCALE_Y = 0.72;
+  const MAX_ENEMIES = 48;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
   const FIRE_BULLET_IMAGE_WIDTH = 3.0;
@@ -134,10 +135,10 @@
       contactRadius: 0.7, retreatSpeedMul: 0.4,
       shootCooldown: 3.6, revealDelay: 0.35, hideHalfSize: 4,
     },
-    // 第四章小怪的机制与最终数值后续单独补齐；此处只提供关卡主体所需的占位数值。
+    // 第四章小怪的机制与最终数值后续单独补齐；蛞蝓会周期性分裂。
     iceSlug: {
-      hp: 1, speed: 0.78, contactDamage: 1, contactCooldown: 1.3,
-      contactRadius: 0.74, retreatSpeedMul: 0.4,
+      hp: 2, speed: 0.234, contactDamage: 1, contactCooldown: 1.3,
+      contactRadius: 0.74, retreatSpeedMul: 0.4, splitInterval: 10,
     },
     frostWolf: {
       hp: 1, speed: 2.05, contactDamage: 2, contactCooldown: 1.15,
@@ -1656,7 +1657,7 @@
   ];
   const enemyGeo = new THREE.PlaneGeometry(2.2, 2.2);
   const enemyPool = [];
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < MAX_ENEMIES; i++) {
     const mesh = new THREE.Mesh(enemyGeo, ENEMY_MATS.spore);
     mesh.rotation.x = -Math.PI / 2;
     mesh.visible = false;
@@ -2469,47 +2470,93 @@
     }
   }
 
+  function activateEnemySlot(slot, spawnType, i, j) {
+    const spawnStats = enemyStats(spawnType);
+    Object.assign(slot, {
+      alive: true, type: spawnType, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
+      shootTimer: 0.8 + Math.random() * 1.4,
+      jumpTimer: spawnStats.jumpInterval || 0,
+      jumpElapsed: 0,
+      jumpFrom: null,
+      jumpTo: null,
+      trailTimer: 0.2,
+      hidden: false,
+      revealTimer: 0,
+      hp: spawnStats.hp,
+      speedMul: 1,
+      eyeTimer: spawnStats.eyeGlowCooldown || 0,
+      invulnTimer: 0,
+      staffPulse: 0,
+      frozenTimer: 0,
+      splitTimer: spawnStats.splitInterval || 0,
+    });
+    // 复用槽位时恢复当前类型的贴图与缩放。
+    const idx = state.enemies.indexOf(slot);
+    const mesh = idx >= 0 ? enemyPool[idx] : null;
+    if (mesh) {
+      mesh.material.map = TEX[spawnType] || null;
+      mesh.material.color.setHex(0xffffff);
+      mesh.material.needsUpdate = true;
+      mesh.scale.setScalar(spawnType === 'emberWisp' ? WISP_RENDER_SCALE : (spawnType === 'frostWisp' ? 1.28 : 1));
+    }
+    return slot;
+  }
+
   function spawnEnemy(distFromHead = 10, isRespawn = false, forcedType = null) {
     const h = state.cells[0] || { i: HALF, j: HALF };
     const slot = state.enemies.find((e) => !e.alive);
     if (!slot) return;
     const spawnType = forcedType || (isRespawn ? chooseRespawnEnemyType() : (slot.type || 'spore'));
-    const spawnStats = enemyStats(spawnType);
     for (let tries = 0; tries < 300; tries++) {
       const i = randInt(N), j = randInt(N);
       if (isObstacle(i, j)) continue;
       if (Math.abs(i - h.i) + Math.abs(j - h.j) < distFromHead) continue;
       if (state.enemies.some((e) => e.alive && e.i === i && e.j === j)) continue;
-      Object.assign(slot, {
-        alive: true, type: spawnType, i, j, x: cellX(i), z: cellZ(j), cool: 0, bob: Math.random() * 6,
-        shootTimer: 0.8 + Math.random() * 1.4,
-        jumpTimer: spawnStats.jumpInterval || 0,
-        jumpElapsed: 0,
-        jumpFrom: null,
-        jumpTo: null,
-        trailTimer: 0.2,
-        hidden: false,
-        revealTimer: 0,
-        hp: spawnStats.hp,
-        speedMul: 1,
-        eyeTimer: spawnStats.eyeGlowCooldown || 0,
-        invulnTimer: 0,
-        staffPulse: 0,
-        frozenTimer: 0,
-        frozenTimer: 0,
-      });
-      // 复活时恢复原色/原贴图（甲虫被打灰后）
-      const idx = state.enemies.indexOf(slot);
-      if (idx >= 0 && enemyPool[idx]) {
-        enemyPool[idx].material.map = TEX[slot.type] || null;
-        enemyPool[idx].material.color.setHex(0xffffff);
-        enemyPool[idx].material.needsUpdate = true;
-      }
-      if (isRespawn && slot.type === 'obsidianBeetle') {
+      const spawned = activateEnemySlot(slot, spawnType, i, j);
+      if (isRespawn && spawned.type === 'obsidianBeetle') {
         spawnLavaHazard(cellX(i), cellZ(j));
       }
-      return slot;
+      return spawned;
     }
+  }
+
+  function findIceSlugSplitCell(parent) {
+    const head = state.cells[0] || { i: HALF, j: HALF };
+    const parentI = Math.round(parent.x + HALF);
+    const parentJ = Math.round(parent.z + HALF);
+    const offsets = [
+      [1, 0], [1, 1], [0, 1], [-1, 1],
+      [-1, 0], [-1, -1], [0, -1], [1, -1],
+    ];
+    const fits = (i, j, minHeadDistance) => {
+      if (!inBounds(i, j) || isObstacle(i, j)) return false;
+      if (Math.abs(i - head.i) + Math.abs(j - head.j) < minHeadDistance) return false;
+      if (state.enemies.some((e) => e.alive && e.i === i && e.j === j)) return false;
+      return true;
+    };
+
+    for (let radius = 1; radius <= 4; radius++) {
+      const start = randInt(offsets.length);
+      for (let step = 0; step < offsets.length; step++) {
+        const [di, dj] = offsets[(start + step) % offsets.length];
+        const i = parentI + di * radius;
+        const j = parentJ + dj * radius;
+        if (fits(i, j, 3)) return { i, j };
+      }
+    }
+    for (let tries = 0; tries < 200; tries++) {
+      const i = randInt(N), j = randInt(N);
+      if (fits(i, j, 6)) return { i, j };
+    }
+    return null;
+  }
+
+  function spawnIceSlugChild(parent) {
+    const slot = state.enemies.find((e) => !e.alive);
+    if (!slot) return null;
+    const cell = findIceSlugSplitCell(parent);
+    if (!cell) return null;
+    return activateEnemySlot(slot, 'iceSlug', cell.i, cell.j);
   }
 
   function campaignPosition(levelIndex) {
@@ -3657,12 +3704,22 @@
   function updateEnemies(dt) {
     const hp = headPosition(_tmpA).clone();
     const spawnLocked = state.spawnGrace > 0;
+    let splitCount = 0;
     if (spawnLocked) state.spawnGrace = Math.max(0, state.spawnGrace - dt);
     for (let k = 0; k < enemyPool.length; k++) {
       const mesh = enemyPool[k];
       const e = state.enemies[k];
       if (!e || !e.alive) { mesh.visible = false; continue; }
       mesh.visible = true;
+      if (!spawnLocked && e.type === 'iceSlug') {
+        const splitInterval = enemyStats(e.type).splitInterval;
+        if (!(e.splitTimer > 0)) e.splitTimer = splitInterval;
+        e.splitTimer -= dt;
+        if (e.splitTimer <= 0) {
+          e.splitTimer += splitInterval;
+          if (spawnIceSlugChild(e)) splitCount += 1;
+        }
+      }
       if (e.frozenTimer > 0) {
         e.frozenTimer = Math.max(0, e.frozenTimer - dt);
         mesh.material.color.setHex(0xa9eeff);
@@ -3756,6 +3813,10 @@
           }
         }
       }
+    }
+    if (splitCount > 0) {
+      updateHud();
+      toast('冰晶增殖', `${splitCount} 只冰晶蛞蝓完成分裂`);
     }
   }
 
@@ -4814,7 +4875,7 @@
     state.time = 0;
     state.shotDamage = 6;
     state.shootCdMul = 1;
-    state.enemies = Array.from({ length: 24 }, () => ({ alive: false, i: 0, j: 0, x: 0, z: 0, cool: 0, bob: 0 }));
+    state.enemies = Array.from({ length: MAX_ENEMIES }, () => ({ alive: false, i: 0, j: 0, x: 0, z: 0, cool: 0, bob: 0 }));
 
     el.overlay.classList.remove('show');
     const safeStartLevel = Math.max(0, Math.min(ROOM_COUNT - 1, Number(startLevelIndex) || 0));
