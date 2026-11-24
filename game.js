@@ -41,10 +41,14 @@
   const ICE_SPAWN_INTERVAL = 15;
   const ICE_PILLARS_PER_WAVE = 5;
   const ICE_MAX_PILLARS = 80;
-  const WOLF_POUNCE_RANGE = 6;
-  const WOLF_CHARGE_TIME = 0.55;
-  const WOLF_POUNCE_TIME = 0.24;
-  const WOLF_STUN_TIME = 0.72;
+  const WOLF_POUNCE_RANGE = 7;
+  const WOLF_POUNCE_HIT_RADIUS = 1.35;
+  const WOLF_CHARGE_TIME = 0.42;
+  const WOLF_POUNCE_TIME = 0.18;
+  const WOLF_STUN_TIME = 0.62;
+  const WOLF_CHASER_COUNT = 2;
+  const WOLF_WANDER_SPEED_MUL = 0.68;
+  const WOLF_WANDER_DETECTION_RANGE = 4;
   const WOLF_RENDER_SCALE = 1.82;
   const THIN_ICE_SLOW_TIME = 2.5;
   const DRAGON_BREATH_TELEGRAPH = 0.85;
@@ -167,8 +171,8 @@
       contactRadius: 0.592, retreatSpeedMul: 0.4, splitInterval: 10,
     },
     frostWolf: {
-      hp: 1, speed: 2.05, contactDamage: 2, contactCooldown: 1.15,
-      contactRadius: 1.38, retreatSpeedMul: 0.46,
+      hp: 3, speed: 2.05, contactDamage: 2, contactCooldown: 0.9,
+      contactRadius: 1.62, retreatSpeedMul: 0.46,
     },
     frostWisp: {
       hp: 1, speed: 0.42, contactDamage: 1, contactCooldown: 1.25,
@@ -2845,10 +2849,14 @@
       splitTimer: spawnStats.splitInterval || 0,
       wolfState: 'stalk',
       wolfStateTimer: 0,
+      wolfMode: 'wanderer',
+      wolfWanderDir: randInt(8),
+      wolfWanderTimer: 0.35 + Math.random() * 0.75,
       wolfLock: null,
       wolfPounceFrom: null,
       wolfPounceTarget: null,
       wolfPath: [],
+      wolfPounceHitDone: false,
       wolfTelegraph: null,
       wolfStunTimer: 0,
       wispState: 'fog',
@@ -3100,29 +3108,140 @@
     return path;
   }
 
-  function tryStartWolfCharge(e) {
+  function maintainWolfChasers() {
+    const head = state.cells[0];
+    if (!head) return;
+    const wolves = state.enemies.filter((e) => e.alive && e.type === 'frostWolf');
+    if (wolves.length === 0) return;
+    const distanceSq = (wolf) => {
+      const dx = wolf.x - cellX(head.i);
+      const dz = wolf.z - cellZ(head.j);
+      return dx * dx + dz * dz;
+    };
+
+    for (const wolf of wolves) {
+      if (wolf.wolfMode !== 'chaser') wolf.wolfMode = 'wanderer';
+    }
+    let chasers = wolves.filter((wolf) => wolf.wolfMode === 'chaser');
+    if (chasers.length > WOLF_CHASER_COUNT) {
+      chasers.sort((a, b) => distanceSq(a) - distanceSq(b));
+      for (const wolf of chasers.slice(WOLF_CHASER_COUNT)) {
+        wolf.wolfMode = 'wanderer';
+        wolf.wolfWanderTimer = 0;
+      }
+      chasers = chasers.slice(0, WOLF_CHASER_COUNT);
+    }
+    if (chasers.length < WOLF_CHASER_COUNT) {
+      const candidates = wolves
+        .filter((wolf) => wolf.wolfMode !== 'chaser')
+        .sort((a, b) => distanceSq(a) - distanceSq(b));
+      while (chasers.length < WOLF_CHASER_COUNT && candidates.length > 0) {
+        const wolf = candidates.shift();
+        wolf.wolfMode = 'chaser';
+        chasers.push(wolf);
+      }
+    }
+  }
+
+  function tryStartWolfCharge(e, detectionRange = WOLF_POUNCE_RANGE) {
     const head = state.cells[0];
     if (!head) return false;
     const wi = Math.round(e.x + HALF);
     const wj = Math.round(e.z + HALF);
-    const sameRow = wi === head.i;
-    const sameColumn = wj === head.j;
-    if (!sameRow && !sameColumn) return false;
-    const distance = Math.abs(wi - head.i) + Math.abs(wj - head.j);
-    if (distance < 1 || distance > WOLF_POUNCE_RANGE) return false;
+    const di = head.i - wi;
+    const dj = head.j - wj;
+    if (di === 0 && dj === 0) return false;
+    if (di !== 0 && dj !== 0 && Math.abs(di) !== Math.abs(dj)) return false;
+    const steps = Math.max(Math.abs(di), Math.abs(dj));
+    if (steps > detectionRange) return false;
+    const stepI = Math.sign(di);
+    const stepJ = Math.sign(dj);
+    for (let step = 1; step < steps; step++) {
+      if (isObstacle(wi + stepI * step, wj + stepJ * step)) return false;
+    }
     e.wolfState = 'charge';
     e.wolfStateTimer = WOLF_CHARGE_TIME;
+    e.wolfPounceHitDone = false;
     e.wolfLock = { i: head.i, j: head.j };
     e.wolfPath = wolfPathBetween(wi, wj, head.i, head.j);
     showWolfTelegraph(e);
     return true;
   }
 
-  function moveFrostWolfTowardTail(e, mesh, tail, dt) {
+  function moveFrostWolfWander(e, mesh, dt) {
+    const stats = enemyStats(e.type);
+    const speed = stats.speed * WOLF_WANDER_SPEED_MUL * (e.speedMul === undefined ? 1 : e.speedMul);
+    const directions = [
+      [1, 0], [1, 1], [0, 1], [-1, 1],
+      [-1, 0], [-1, -1], [0, -1], [1, -1],
+    ];
+    e.wolfWanderTimer = (e.wolfWanderTimer ?? 0) - dt;
+    if (e.wolfWanderTimer <= 0) {
+      e.wolfWanderDir = randInt(directions.length);
+      e.wolfWanderTimer = 0.45 + Math.random() * 0.8;
+    }
+
+    const validMoves = [];
+    const head = state.cells[0];
+    const currentDistance = head
+      ? Math.hypot(e.x - cellX(head.i), e.z - cellZ(head.j))
+      : Infinity;
+    const startDir = e.wolfWanderDir || 0;
+    for (let attempt = 0; attempt < directions.length; attempt++) {
+      const directionIndex = (startDir + attempt) % directions.length;
+      const [dx, dz] = directions[directionIndex];
+      const length = Math.hypot(dx, dz) || 1;
+      const nx = e.x + (dx / length) * speed * dt;
+      const nz = e.z + (dz / length) * speed * dt;
+      const ci = Math.round(nx + HALF);
+      const cj = Math.round(nz + HALF);
+      if (!inBounds(ci, cj) || isObstacle(ci, cj)) continue;
+      if (state.cells.some((cell) => cell.i === ci && cell.j === cj)) continue;
+      if (state.enemies.some((other) => other !== e && other.alive && other.i === ci && other.j === cj)) continue;
+      const nextDistance = head
+        ? Math.hypot(nx - cellX(head.i), nz - cellZ(head.j))
+        : Infinity;
+      validMoves.push({
+        x: nx,
+        z: nz,
+        i: ci,
+        j: cj,
+        directionIndex,
+        distanceGain: nextDistance - currentDistance,
+      });
+    }
+    let best = null;
+    if (validMoves.length > 0) {
+      const roamingMoves = currentDistance < 12
+        ? validMoves.filter((move) => move.distanceGain >= -0.35)
+        : validMoves;
+      const choices = roamingMoves.length > 0 ? roamingMoves : validMoves;
+      best = choices[randInt(choices.length)];
+    }
+    if (best) {
+      e.x = best.x;
+      e.z = best.z;
+      e.i = best.i;
+      e.j = best.j;
+      e.wolfWanderDir = best.directionIndex;
+    } else {
+      e.wolfWanderTimer = 0;
+    }
+
+    mesh.material.color.setHex(0xffffff);
+    mesh.position.set(e.x, 0.5 + Math.sin(state.time * 3.2 + e.bob) * 0.045, e.z);
+    mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.09;
+    if (bodyDistanceSq(e.x, e.z) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+      e.cool = stats.contactCooldown;
+      damage(stats.contactDamage, 'contact');
+    }
+  }
+
+  function moveFrostWolfTowardSnake(e, mesh, target, dt) {
     const stats = enemyStats(e.type);
     const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul);
-    const tailX = cellX(tail.i);
-    const tailZ = cellZ(tail.j);
+    const targetX = cellX(target.i);
+    const targetZ = cellZ(target.j);
     const directions = [
       [1, 0], [1, 1], [0, 1], [-1, 1],
       [-1, 0], [-1, -1], [0, -1], [1, -1],
@@ -3137,7 +3256,7 @@
       const cj = Math.round(nz + HALF);
       if (!inBounds(ci, cj) || isObstacle(ci, cj)) continue;
       if (state.cells.some((cell) => cell.i === ci && cell.j === cj)) continue;
-      const score = Math.hypot(tailX - nx, tailZ - nz);
+      const score = Math.hypot(targetX - nx, targetZ - nz);
       if (score < bestScore) {
         bestScore = score;
         best = { x: nx, z: nz, i: ci, j: cj };
@@ -3157,16 +3276,26 @@
     }
   }
 
+  function wolfPounceTouchesSnake(e) {
+    const collisionRadiusSq = WOLF_POUNCE_HIT_RADIUS * WOLF_POUNCE_HIT_RADIUS;
+    const path = e.wolfPath && e.wolfPath.length > 1
+      ? e.wolfPath.slice(1)
+      : [{ i: e.i, j: e.j }];
+    for (const point of path) {
+      if (bodyDistanceSq(cellX(point.i), cellZ(point.j)) <= collisionRadiusSq) return true;
+    }
+    return bodyDistanceSq(e.x, e.z) <= collisionRadiusSq;
+  }
+
   function finishWolfPounce(e) {
     const path = e.wolfPath || [];
     spawnWolfClawBurst(e.x, e.z, Math.atan2(-(e.wolfPounceTarget.z - e.wolfPounceFrom.z),
       e.wolfPounceTarget.x - e.wolfPounceFrom.x), 2.4 + path.length * 0.45);
     spawnThinIce(path.slice(-2));
-    const head = state.cells[0];
-    const hit = head && e.wolfLock && head.i === e.wolfLock.i && head.j === e.wolfLock.j;
+    const hit = e.wolfPounceHitDone || wolfPounceTouchesSnake(e);
     if (hit) {
       e.cool = enemyStats(e.type).contactCooldown;
-      damage(1, 'contact');
+      if (!e.wolfPounceHitDone) damage(1, 'contact');
       e.wolfState = 'stalk';
       e.wolfStateTimer = 0;
     } else {
@@ -3179,10 +3308,12 @@
     e.wolfPounceFrom = null;
     e.wolfPounceTarget = null;
     e.wolfPath = [];
+    e.wolfPounceHitDone = false;
   }
 
-  function updateFrostWolf(e, mesh, tail, dt) {
+  function updateFrostWolf(e, mesh, target, dt) {
     if (!e.wolfState) e.wolfState = 'stalk';
+    if (!e.wolfMode) e.wolfMode = 'wanderer';
     if (e.wolfState === 'charge') {
       e.wolfStateTimer -= dt;
       if (e.wolfTelegraph) {
@@ -3195,6 +3326,7 @@
         hideWolfTelegraph(e);
         e.wolfState = 'pounce';
         e.wolfStateTimer = WOLF_POUNCE_TIME;
+        e.wolfPounceHitDone = false;
         e.wolfPounceFrom = { x: e.x, z: e.z };
         e.wolfPounceTarget = { x: cellX(e.wolfLock.i), z: cellZ(e.wolfLock.j) };
       }
@@ -3213,6 +3345,13 @@
       e.j = Math.round(e.z + HALF);
       mesh.material.color.setHex(0xffffff);
       mesh.position.set(e.x, 0.62 + Math.sin(progress * Math.PI) * 0.42, e.z);
+      if (!e.wolfPounceHitDone &&
+        bodyDistanceSq(e.x, e.z) <= WOLF_POUNCE_HIT_RADIUS * WOLF_POUNCE_HIT_RADIUS) {
+        e.wolfPounceHitDone = true;
+        e.cool = enemyStats(e.type).contactCooldown;
+        damage(1, 'contact');
+        if (state.over) return;
+      }
       if (e.wolfStateTimer <= 0) finishWolfPounce(e);
       return;
     }
@@ -3231,8 +3370,12 @@
     }
 
     mesh.material.color.setHex(0xffffff);
-    if (tryStartWolfCharge(e)) return;
-    moveFrostWolfTowardTail(e, mesh, tail, dt);
+    const detectionRange = e.wolfMode === 'chaser'
+      ? WOLF_POUNCE_RANGE
+      : WOLF_WANDER_DETECTION_RANGE;
+    if (tryStartWolfCharge(e, detectionRange)) return;
+    if (e.wolfMode === 'chaser') moveFrostWolfTowardSnake(e, mesh, target, dt);
+    else moveFrostWolfWander(e, mesh, dt);
   }
 
   function hideWispWarnings(e) {
@@ -4050,6 +4193,10 @@
       gameOver('体长归零 —— 蛇不能没有身体。');
       return;
     }
+    if (state.phase === 'clear' && state.roomEnemyTypes.includes('frostWolf')) {
+      const living = state.enemies.filter((enemy) => enemy.alive).length;
+      if (living < MAX_ENEMIES) spawnEnemy(8, true, 'frostWolf');
+    }
   }
 
   function growBy(n) {
@@ -4662,6 +4809,7 @@
     const spawnLocked = state.spawnGrace > 0;
     let splitCount = 0;
     if (spawnLocked) state.spawnGrace = Math.max(0, state.spawnGrace - dt);
+    maintainWolfChasers();
     for (let k = 0; k < enemyPool.length; k++) {
       const mesh = enemyPool[k];
       const e = state.enemies[k];
@@ -4713,8 +4861,8 @@
       const len = Math.hypot(dx, dz) || 1;
       if (e.cool > 0) e.cool -= dt;
       if (e.type === 'frostWolf') {
-        const tail = state.cells[state.cells.length - 1] || state.cells[0];
-        updateFrostWolf(e, mesh, tail, dt);
+        const target = state.cells[0];
+        updateFrostWolf(e, mesh, target, dt);
         if (state.over) return;
         continue;
       }
