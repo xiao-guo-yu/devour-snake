@@ -116,14 +116,14 @@
   const ABYSS_OBSTACLE_COUNT = 8;
   const ABYSS_LORD_HP = 520;
   const ABYSS_LEVEL_BASE = 40;
-  const ABYSS_LORD_TRIGGER_RANGE = 8;
+  const ABYSS_LORD_TRIGGER_RANGE = 12;
   const ABYSS_LORD_THRUST_WINDUP = 0.35;
   const ABYSS_LORD_THRUST_TIME = 0.34;
   const ABYSS_LORD_THRUST_INTERVAL = 6;
   const ABYSS_LORD_THRUST_DAMAGE = 3;
   const ABYSS_LORD_THRUST_HIT_RADIUS = 2.2;
   const ABYSS_LORD_SHOT_INTERVAL = 3;
-  const ABYSS_LORD_SHOT_COUNT = 3;
+  const ABYSS_LORD_SHOT_COUNT = 5;
   const ABYSS_LORD_SHOT_SPREAD = 0.14;
   const ABYSS_LORD_BULLET_SPEED = 5.4;
   const ABYSS_LORD_BULLET_SIZE = 3;
@@ -6667,8 +6667,8 @@
 
   function fireAbyssLordVolley(b, hp) {
     const base = Math.atan2(hp.z - b.z, hp.x - b.x);
-    const offsets = [-ABYSS_LORD_SHOT_SPREAD, 0, ABYSS_LORD_SHOT_SPREAD];
-    for (const offset of offsets) {
+    for (let index = 0; index < ABYSS_LORD_SHOT_COUNT; index++) {
+      const offset = (index - (ABYSS_LORD_SHOT_COUNT - 1) / 2) * ABYSS_LORD_SHOT_SPREAD;
       spawnAbyssBullet(b.x, b.z, base + offset);
     }
     b.abyssShotTimer = ABYSS_LORD_SHOT_INTERVAL;
