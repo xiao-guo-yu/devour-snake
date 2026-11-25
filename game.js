@@ -7195,11 +7195,7 @@
         : (moveWarning ? 0xb7f4ff : (featherPose ? 0x79d7ff : 0xffffff))
     );
     bossMesh.position.set(b.x, 0, b.z);
-    bossMesh.rotation.y = dashPose
-      ? b.stormDashAngle
-      : (featherPose
-        ? Math.atan2(hp.x - b.x, hp.z - b.z)
-        : b.stormDashAngle);
+    bossMesh.rotation.y = dashPose ? b.stormDashAngle : 0;
     bossMesh.rotation.z = 0;
     bossMesh.scale.setScalar(b.renderScale || 2.55);
 
