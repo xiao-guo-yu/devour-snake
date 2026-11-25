@@ -93,10 +93,11 @@
   const STORM_EAGLE_FEATHER_RADIUS = 0.56;
   const STORM_EAGLE_FEATHER_INTERVAL = 6.2;
   const STORM_EAGLE_FEATHER_WARNING = 0.75;
+  const STORM_EAGLE_FEATHER_POSE_TIME = 0.65;
   const STORM_EAGLE_DASH_MIN_DISTANCE = 13;
   const STORM_EAGLE_DASH_WINDUP = 0.3;
   const STORM_EAGLE_DASH_TIME = 0.48;
-  const STORM_EAGLE_DASH_COOLDOWN = 0.55;
+  const STORM_EAGLE_DASH_COOLDOWN = 3;
   const STORM_EAGLE_RAM_DAMAGE = 1;
   const STORM_TORNADO_INTERVAL = 9;
   const STORM_TORNADO_FIRST_CAST = 5;
@@ -1494,14 +1495,16 @@
     'magma-colossus.png',
     spriteTexture(512, drawMagmaColossus)
   );
-  const STORM_EAGLE_SWOOP_TEX = loadIceEffectTexture('storm-eagle-swoop.png');
+  const STORM_EAGLE_DIVE_TEX = loadIceEffectTexture('storm-eagle-dive.png');
+  const STORM_EAGLE_FLAP_TEX = loadIceEffectTexture('storm-eagle-flap.png');
   const BOSS_TEX = {
     rootcoil: loadCharacterTexture('rootcoil.png', spriteTexture(512, drawBoss)),
     pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
     magma_colossus: magmaColossusTex,
     frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
     storm_eagle: loadCharacterTexture('storm-eagle.png', null),
-    storm_eagle_swoop: STORM_EAGLE_SWOOP_TEX,
+    storm_eagle_dive: STORM_EAGLE_DIVE_TEX,
+    storm_eagle_flap: STORM_EAGLE_FLAP_TEX,
     abyss_lord: loadCharacterTexture('abyss-lord.png', null),
     black_curse_servant: loadCharacterTexture('black-curse-attendant.png', null),
     blood_slave: loadCharacterTexture('blood-slave.png', null),
@@ -4500,7 +4503,9 @@
       stormDashTo: null,
       stormDashElapsed: 0,
       stormDashHit: false,
+      stormDashAngle: 0,
       stormFeatherTimer: isEagle ? 2.4 : 0,
+      stormFeatherPoseTimer: 0,
       stormFeatherCycle: 0,
       summonFlash: 0,
       shieldActive: isPharaoh,
@@ -4532,6 +4537,7 @@
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
     bossMesh.scale.setScalar(state.boss.renderScale);
+    bossMesh.rotation.y = 0;
     bossMesh.rotation.z = 0;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
@@ -7079,6 +7085,7 @@
         phase: Math.random() * Math.PI * 2,
       });
     }
+    b.stormFeatherPoseTimer = STORM_EAGLE_FEATHER_POSE_TIME;
     b.stormFeatherCycle += 1;
   }
 
@@ -7114,6 +7121,7 @@
 
   function updateStormEagle(b, dt, hp) {
     b.stormFeatherTimer -= dt;
+    b.stormFeatherPoseTimer = Math.max(0, (b.stormFeatherPoseTimer || 0) - dt);
     if (b.stormFeatherTimer <= 0) {
       b.stormFeatherTimer = STORM_EAGLE_FEATHER_INTERVAL;
       fireStormEagleFeatherFan(b, hp);
@@ -7123,6 +7131,10 @@
       b.stormMoveTimer -= dt;
       if (b.stormMoveTimer <= 0) {
         b.stormDashTo = chooseStormEagleDashTarget();
+        b.stormDashAngle = Math.atan2(
+          b.stormDashTo.x - b.x,
+          b.stormDashTo.z - b.z
+        );
         b.stormMoveState = 'windup';
         b.stormMoveTimer = STORM_EAGLE_DASH_WINDUP;
       }
@@ -7163,32 +7175,33 @@
       b.stormMoveTimer = STORM_EAGLE_DASH_COOLDOWN;
     }
 
-    const eagleTexture = b.stormMoveState === 'windup' || b.stormMoveState === 'dash'
-      ? BOSS_TEX.storm_eagle_swoop
-      : BOSS_TEX.storm_eagle;
+    const dashPose = b.stormMoveState === 'windup' || b.stormMoveState === 'dash';
+    const featherWarning = b.stormFeatherTimer > 0 &&
+      b.stormFeatherTimer <= STORM_EAGLE_FEATHER_WARNING;
+    const featherPose = !dashPose && (featherWarning || b.stormFeatherPoseTimer > 0);
+    const eagleTexture = dashPose
+      ? BOSS_TEX.storm_eagle_dive
+      : (featherPose ? BOSS_TEX.storm_eagle_flap : BOSS_TEX.storm_eagle);
     if (eagleTexture && bossPlaneMat.map !== eagleTexture) {
       bossPlaneMat.map = eagleTexture;
       bossPlaneMat.needsUpdate = true;
     }
     bossPlaneMat.opacity = 1;
 
-    const featherWarning = b.stormFeatherTimer > 0 &&
-      b.stormFeatherTimer <= STORM_EAGLE_FEATHER_WARNING;
     const moveWarning = b.stormMoveState === 'windup';
     bossPlaneMat.color.setHex(
       b.stormSummonState === 'warning'
         ? 0xcaf7ff
-        : (moveWarning ? 0xb7f4ff : (featherWarning ? 0x79d7ff : 0xffffff))
+        : (moveWarning ? 0xb7f4ff : (featherPose ? 0x79d7ff : 0xffffff))
     );
-    const flap = 1 + Math.sin(state.time * 3.2) * 0.025;
-    const dashPulse = b.stormMoveState === 'windup'
-      ? 1 + Math.sin(state.time * 26) * 0.055
-      : 1;
     bossMesh.position.set(b.x, 0, b.z);
-    bossMesh.rotation.z = b.stormMoveState === 'dash'
-      ? Math.sin(state.time * 26) * 0.08
-      : Math.sin(state.time * 2.1) * 0.025;
-    bossMesh.scale.setScalar((b.renderScale || 2.55) * flap * dashPulse);
+    bossMesh.rotation.y = dashPose
+      ? b.stormDashAngle
+      : (featherPose
+        ? Math.atan2(hp.x - b.x, hp.z - b.z)
+        : b.stormDashAngle);
+    bossMesh.rotation.z = 0;
+    bossMesh.scale.setScalar(b.renderScale || 2.55);
 
     b.stormSummonTimer -= dt;
     if (b.stormSummonTimer > 0) return;
@@ -8328,6 +8341,15 @@
       bossKind: state.boss?.kind || null,
       bossMoveState: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveState : null,
       bossMoveTimer: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveTimer : null,
+      bossPose: state.boss?.kind === 'storm_eagle'
+        ? (bossPlaneMat.map === BOSS_TEX.storm_eagle_dive
+          ? 'dive'
+          : (bossPlaneMat.map === BOSS_TEX.storm_eagle_flap ? 'flap' : 'idle'))
+        : null,
+      bossRotationY: state.boss?.kind === 'storm_eagle' ? bossMesh.rotation.y : null,
+      bossScale: state.boss?.kind === 'storm_eagle' ? bossMesh.scale.x : null,
+      dashAngle: state.boss?.kind === 'storm_eagle' ? state.boss.stormDashAngle : null,
+      dashCooldown: STORM_EAGLE_DASH_COOLDOWN,
       dashTarget: state.boss?.kind === 'storm_eagle' && state.boss.stormDashTo
         ? { ...state.boss.stormDashTo }
         : null,
