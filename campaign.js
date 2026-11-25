@@ -105,6 +105,26 @@
         { n: 8, room: 39, name: '风暴巨鹰', boss: true, icon: 'assets/storm-eagle.png' },
       ],
     },
+    {
+      id: 'abyss',
+      name: '深渊裂隙',
+      en: 'ABYSSAL RIFT',
+      subtitle: '紫黑裂隙之下，影主正等待吞噬者',
+      art: 'assets/abyss-lord.png',
+      accent: '#bd78ff',
+      accent2: '#4a1b78',
+      base: 40,
+      levels: [
+        { n: 1, room: 40, name: '裂隙外缘', icon: 'assets/abyss-tentacle.png' },
+        { n: 2, room: 41, name: '无声礁廊', icon: 'assets/abyss-tentacle.png' },
+        { n: 3, room: 42, name: '蜱巢裂口', icon: 'assets/abyss-tick.png' },
+        { n: 4, room: 43, name: '噬魂深井', icon: 'assets/abyss-wraith.png' },
+        { n: 5, room: 44, name: '三叉裂隙', icon: 'assets/abyss-tick.png' },
+        { n: 6, room: 45, name: '噬光坑道', icon: 'assets/abyss-wraith.png' },
+        { n: 7, room: 46, name: '影主前庭', icon: 'assets/abyss-wraith.png' },
+        { n: 8, room: 47, name: '深渊影主', boss: true, icon: 'assets/abyss-lord.png' },
+      ],
+    },
   ];
 
   const NODE_POSITIONS = [

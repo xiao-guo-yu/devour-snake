@@ -80,3 +80,14 @@ The Chapter 5 map, 2×2 rock obstacle, three regular enemies, Storm Eagle boss, 
 - `storm-skimmer.png`, `storm-moth.png`, `storm-falcon.png`, and `storm-eagle.png` are centered on square transparent canvases without distorting their aspect ratio.
 - `storm-lightning.png` and `storm-tornado.png` are runtime effects. They use additive blending so dark or low-alpha source pixels do not darken the arena.
 - Production files are reproducible with `tools/import_storm_assets.py`.
+
+## Abyss Rift Assets
+
+The Chapter 6 map, abyss rock obstacle, three regular enemies, Abyss Lord boss, black-hole reference, and boss enter/exit animation frames were supplied by the project owner.
+
+- `abyss-rift-map.jpg` keeps the central violet arena from the supplied map presentation.
+- `abyss-tentacle.png`, `abyss-tick.png`, `abyss-wraith.png`, and `abyss-lord.png` preserve the supplied transparent artwork on square canvases.
+- `abyss-rock.png` is the 2×2 arena obstacle.
+- `abyss-black-hole.png` is the Q-skill visual reference for the later mechanic phase.
+- `abyss-lord-enter-01.png` through `abyss-lord-enter-11.png` and `abyss-lord-exit-01.png` through `abyss-lord-exit-11.png` are extracted from the supplied enter/exit GIFs.
+- Production files are reproducible with `tools/import_abyss_assets.py`.

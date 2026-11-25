@@ -97,6 +97,9 @@
   const STORM_DIVE_TELEGRAPH = 0.82;
   const STORM_DIVE_TIME = 0.34;
   const STORM_DIVE_RECOVER = 0.7;
+  const ABYSS_OBSTACLE_COUNT = 8;
+  const ABYSS_LORD_HP = 520;
+  const ABYSS_LEVEL_BASE = 40;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   let DEBUG_START_LEVEL = 0;
   const DOOR_CELL = { i: 22, j: 1 };
@@ -202,6 +205,19 @@
       hp: 3, speed: 1.55, contactDamage: 2, contactCooldown: 1.25,
       contactRadius: 0.82, retreatSpeedMul: 0.4,
     },
+    // 第六章先接入场景与基础追踪；横扫、冲刺和魂弹等专属机制后续补充。
+    abyssTentacle: {
+      hp: 3, speed: 0.72, contactDamage: 2, contactCooldown: 1.4,
+      contactRadius: 1.02, retreatSpeedMul: 0.34,
+    },
+    voidTick: {
+      hp: 1, speed: 2.25, contactDamage: 1, contactCooldown: 1.1,
+      contactRadius: 0.72, retreatSpeedMul: 0.48,
+    },
+    soulWraith: {
+      hp: 2, speed: 1.08, contactDamage: 1, contactCooldown: 1.3,
+      contactRadius: 0.78, retreatSpeedMul: 0.4,
+    },
   };
 
   // 每个区域 7 个普通关 + 第 8 关 Boss；composition 表示三种小怪的具体数量。
@@ -250,6 +266,15 @@
     { theme: 'storm', kind: 'clear', composition: { stormMoth: 5, stormFalcon: 3 }, name: '风暴空域 · 暴风核心' },
     { theme: 'storm', kind: 'clear', composition: { stormFalcon: 8 }, name: '风暴空域 · 王座前庭' },
     { theme: 'storm', kind: 'boss', boss: 'storm_eagle', name: '风暴巨鹰 · STORM EAGLE' },
+
+    { theme: 'abyss', kind: 'clear', composition: { abyssTentacle: 8 }, name: '深渊裂隙 · 裂隙外缘' },
+    { theme: 'abyss', kind: 'clear', composition: { abyssTentacle: 5, voidTick: 3 }, name: '深渊裂隙 · 无声礁廊' },
+    { theme: 'abyss', kind: 'clear', composition: { voidTick: 8 }, name: '深渊裂隙 · 蜱巢裂口' },
+    { theme: 'abyss', kind: 'clear', composition: { abyssTentacle: 5, soulWraith: 3 }, name: '深渊裂隙 · 噬魂深井' },
+    { theme: 'abyss', kind: 'clear', composition: { abyssTentacle: 3, voidTick: 2, soulWraith: 3 }, name: '深渊裂隙 · 三叉裂隙' },
+    { theme: 'abyss', kind: 'clear', composition: { voidTick: 5, soulWraith: 3 }, name: '深渊裂隙 · 噬光坑道' },
+    { theme: 'abyss', kind: 'clear', composition: { soulWraith: 8 }, name: '深渊裂隙 · 影主前庭' },
+    { theme: 'abyss', kind: 'boss', boss: 'abyss_lord', name: '深渊影主 · ABYSSAL SHADE' },
   ];
   const ROOM_COUNT = ROOMS.length;
   DEBUG_START_LEVEL = (() => {
@@ -1420,6 +1445,9 @@
     stormSkimmer: loadCharacterTexture('storm-skimmer.png', null),
     stormMoth: loadCharacterTexture('storm-moth.png', null),
     stormFalcon: loadCharacterTexture('storm-falcon.png', null),
+    abyssTentacle: loadCharacterTexture('abyss-tentacle.png', null),
+    voidTick: loadCharacterTexture('abyss-tick.png', null),
+    soulWraith: loadCharacterTexture('abyss-wraith.png', null),
   };
   const ENEMY_MATS = {};
   for (const key of Object.keys(TEX)) {
@@ -1443,6 +1471,7 @@
     magma_colossus: magmaColossusTex,
     frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
     storm_eagle: loadCharacterTexture('storm-eagle.png', null),
+    abyss_lord: loadCharacterTexture('abyss-lord.png', null),
   };
   const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
   const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
@@ -1463,6 +1492,7 @@
   const STORM_LIGHTNING_TEX = loadIceEffectTexture('storm-lightning.png');
   const STORM_TORNADO_TEX = loadIceEffectTexture('storm-tornado.png');
   const STORM_ROCK_TEX = loadCharacterTexture('storm-rock.png', null);
+  const ABYSS_ROCK_TEX = loadCharacterTexture('abyss-rock.png', null);
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -1666,6 +1696,39 @@
       seeds.push([i, j]);
     }
     placeObstacles(seeds, STORM_ROCK_TEX);
+    clearIceObstacles();
+    clearStormArena();
+  }
+
+  const ABYSS_OBSTACLE_LAYOUTS = [
+    // 6-1 裂隙外缘：两翼礁石把入口视线引向中央。
+    [[7, 33], [14, 31], [28, 33], [35, 31], [10, 20], [16, 18], [29, 20], [35, 18]],
+    // 6-2 无声礁廊：断续横向门洞，保留中轴追击路线。
+    [[7, 28], [13, 25], [19, 31], [25, 31], [31, 26], [37, 23], [12, 14], [32, 12]],
+    // 6-3 蜱巢裂口：外圈碎岩包围四处短促折返区。
+    [[8, 7], [16, 9], [28, 7], [36, 10], [9, 25], [16, 29], [29, 29], [36, 24]],
+    // 6-4 噬魂深井：八方围合但不封死中心的井状礁阵。
+    [[10, 13], [34, 13], [10, 32], [34, 32], [22, 11], [22, 33], [14, 22], [30, 22]],
+    // 6-5 三叉裂隙：三条斜向通道在中心外围分流后重新汇合。
+    [[15, 13], [27, 13], [8, 21], [34, 21], [15, 30], [27, 30], [22, 7], [22, 37]],
+    // 6-6 噬光坑道：上下交错的双排礁石形成连续换线。
+    [[8, 17], [16, 17], [29, 17], [37, 17], [8, 28], [16, 28], [29, 28], [37, 28]],
+    // 6-7 影主前庭：四角掩体与四面门柱，中央通往影主王座。
+    [[11, 11], [31, 11], [11, 32], [31, 32], [22, 9], [22, 34], [7, 22], [36, 22]],
+    // 6-8 深渊影主：中心 12×12 完全净空，礁石只切成四个斜向掩体。
+    [[8, 8], [34, 8], [8, 34], [34, 34], [14, 14], [28, 14], [14, 28], [28, 28]],
+  ];
+
+  /** 第六章：固定 8 组 2×2 深渊礁石，入口、出口与影主中心保持净空。 */
+  function layoutAbyss(level) {
+    const localLevel = Math.max(0, Math.min(
+      ABYSS_OBSTACLE_LAYOUTS.length - 1,
+      level - ABYSS_LEVEL_BASE
+    ));
+    const seeds = ABYSS_OBSTACLE_LAYOUTS[localLevel]
+      .slice(0, ABYSS_OBSTACLE_COUNT)
+      .map(([i, j]) => [i, j]);
+    placeObstacles(seeds, ABYSS_ROCK_TEX);
     clearIceObstacles();
     clearStormArena();
   }
@@ -3830,6 +3893,9 @@
     if (type === 'stormSkimmer') return 0.84;
     if (type === 'stormMoth') return 0.98;
     if (type === 'stormFalcon') return 1.18;
+    if (type === 'abyssTentacle') return 1.34;
+    if (type === 'voidTick') return 0.88;
+    if (type === 'soulWraith') return 1.12;
     return 1;
   }
 
@@ -3940,6 +4006,7 @@
     volcano: { fog: 0x160705, a: 0x12100f, b: 0x1a1512, hemi: 0xff9a58, wall: 0x221814, ea: 0x4a1605, eb: 0x621d06 },
     frozen: { fog: 0x07172a, a: 0x416f8b, b: 0x5786a0, hemi: 0xc9f4ff, wall: 0x84adbf, ea: 0x0b3d57, eb: 0x0d4a66 },
     storm: { fog: 0x06111e, a: 0x263d4d, b: 0x35566b, hemi: 0xc7ebff, wall: 0x5c7180, ea: 0x0a314a, eb: 0x0e405b },
+    abyss: { fog: 0x09040f, a: 0x160d24, b: 0x211332, hemi: 0xc28aff, wall: 0x2b1938, ea: 0x26083f, eb: 0x350b55 },
   };
 
   function startLevel(idx) {
@@ -3959,6 +4026,7 @@
     else if (room.theme === 'volcano') layoutVolcano(idx);
     else if (room.theme === 'frozen') layoutFrozen(idx);
     else if (room.theme === 'storm') layoutStorm(idx);
+    else if (room.theme === 'abyss') layoutAbyss(idx);
     else layoutStumps(idx);
 
     state.enemies.forEach((e) => { e.alive = false; });
@@ -4065,7 +4133,9 @@
     matB.emissive.setHex(tint.eb);
     matA.emissiveIntensity = room.theme === 'volcano'
       ? 0.72
-      : ((room.theme === 'frozen' || room.theme === 'storm') ? 0.22 : 0.16);
+      : ((room.theme === 'frozen' || room.theme === 'storm')
+        ? 0.22
+        : (room.theme === 'abyss' ? 0.34 : 0.16));
     matB.emissiveIntensity = matA.emissiveIntensity;
     wallMat.color.setHex(tint.wall);
     hemi.color.setHex(tint.hemi);
@@ -4104,7 +4174,7 @@
       showLevelIntro(
         'BOSS RITE',
         room.name,
-        idx === ROOM_COUNT - 1 ? '击败风暴巨鹰 · 完成远征' : '击败首领 · 进入下一层'
+        idx === ROOM_COUNT - 1 ? '击败深渊影主 · 完成远征' : '击败首领 · 进入下一层'
       );
     }
     updateHud();
@@ -4116,23 +4186,46 @@
     const isColossus = kind === 'magma_colossus';
     const isDragon = kind === 'frost_dragon';
     const isEagle = kind === 'storm_eagle';
-    const isRootcoil = !isPharaoh && !isColossus && !isDragon && !isEagle;
-    const hp = isColossus ? 480 : (isDragon ? 440 : (isEagle ? STORM_EAGLE_HP : (isPharaoh ? 380 : BOSS_HP)));
+    const isAbyssLord = kind === 'abyss_lord';
+    const isRootcoil = !isPharaoh && !isColossus && !isDragon && !isEagle && !isAbyssLord;
+    const hp = isColossus
+      ? 480
+      : (isDragon
+        ? 440
+        : (isEagle
+          ? STORM_EAGLE_HP
+          : (isAbyssLord ? ABYSS_LORD_HP : (isPharaoh ? 380 : BOSS_HP))));
     const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      renderScale: isColossus ? COLOSSUS_RENDER_SCALE : (isDragon ? 2.325 : (isEagle ? 2.55 : (isPharaoh ? 1.425 : 2))),
-      bulletHitRadius: isRootcoil ? 4.6 : (isDragon ? 4.8 : (isEagle ? 4.55 : (isPharaoh ? 3.45 : 2.3))),
-      orbHitRadius: isRootcoil ? 5.2 : (isDragon ? 3.5 : (isEagle ? 4.15 : (isPharaoh ? 3.9 : 2.6))),
-      contactRadius: isRootcoil ? 4.8 : (isDragon ? 4.88 : (isEagle ? 4.35 : (isPharaoh ? 3.75 : 2.5))),
+      renderScale: isColossus
+        ? COLOSSUS_RENDER_SCALE
+        : (isDragon
+          ? 2.325
+          : (isEagle
+            ? 2.55
+            : (isAbyssLord ? 2.2 : (isPharaoh ? 1.425 : 2)))),
+      bulletHitRadius: isRootcoil
+        ? 4.6
+        : (isDragon
+          ? 4.8
+          : (isEagle ? 4.55 : (isAbyssLord ? 3.15 : (isPharaoh ? 3.45 : 2.3)))),
+      orbHitRadius: isRootcoil
+        ? 5.2
+        : (isDragon ? 3.5 : (isEagle ? 4.15 : (isAbyssLord ? 3.55 : (isPharaoh ? 3.9 : 2.6)))),
+      contactRadius: isRootcoil
+        ? 4.8
+        : (isDragon ? 4.88 : (isEagle ? 4.35 : (isAbyssLord ? 3.35 : (isPharaoh ? 3.75 : 2.5)))),
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
       z: start.z,
-      shootTimer: isPharaoh ? PHARAOH_BULLET_INTERVAL : (isDragon ? 99 : (isRootcoil ? ROOT_BULLET_INTERVAL : 3)),
+      shootTimer: isAbyssLord
+        ? 9999
+        : (isPharaoh ? PHARAOH_BULLET_INTERVAL : (isDragon ? 99 : (isRootcoil ? ROOT_BULLET_INTERVAL : 3))),
       jumpTimer: isColossus ? COLOSSUS_JUMP_COOLDOWN : 0,
       jumpElapsed: 0,
       jumpFrom: null,
@@ -4180,13 +4273,15 @@
     rootSummonRig.visible = false;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    el.bname.textContent = isDragon
-      ? '凛冬冰龙 · FROST DRAGON'
-      : (isEagle
-        ? '风暴巨鹰 · STORM EAGLE'
-        : (isColossus
-          ? '熔岩巨像 · MAGMA COLOSSUS'
-          : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL')));
+    el.bname.textContent = isAbyssLord
+      ? '深渊影主 · ABYSSAL SHADE'
+      : (isDragon
+        ? '凛冬冰龙 · FROST DRAGON'
+        : (isEagle
+          ? '风暴巨鹰 · STORM EAGLE'
+          : (isColossus
+            ? '熔岩巨像 · MAGMA COLOSSUS'
+            : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL'))));
   }
 
   function summonGreenhouseMinions() {
@@ -4275,7 +4370,8 @@
     clearWispCombatEffects();
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    state.phase = 'pick';
+    state.phase = bossKind === 'abyss_lord' ? 'exit' : 'pick';
+    state.doorOpen = bossKind === 'abyss_lord';
     // Boss 战结束也停止刷豆，场上豆子清空
     state.pelletsOff = true;
     state.pellets.length = 0;
@@ -4290,6 +4386,11 @@
     state.lavaPools.length = 0;
     state.enemies.forEach((enemy) => { enemy.alive = false; });
     enemyPool.forEach((mesh) => { mesh.visible = false; });
+    if (bossKind === 'abyss_lord') {
+      updateHud();
+      toast('深渊影主倒下', '场景占位战已完成 · 影主钻洞与暗影潜行将在下一阶段接入');
+      return;
+    }
     spawnSkillOrb(bossKind);
     updateHud();
     toast('Boss 倒下', '吞噬场地中央的发光核心，获得技能');
@@ -6003,6 +6104,10 @@
     const b = state.boss;
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
+    if (b.kind === 'abyss_lord') {
+      updateAbyssLordScene(b, dt);
+      return;
+    }
     if (b.kind === 'storm_eagle') {
       updateStormEagle(b, dt, hp);
       return;
@@ -6074,6 +6179,21 @@
           spawnBossBullet(b.x, b.z, Math.cos(ang) * spd, Math.sin(ang) * spd);
         }
       }
+    }
+  }
+
+  // 第六章场景阶段：影主固定在王座中心并保留接触伤害，钻洞与暗影弹稍后接入。
+  function updateAbyssLordScene(b, dt) {
+    b.x = cellX(BOSS_CELL.i);
+    b.z = cellZ(BOSS_CELL.j);
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 1.45) * 0.018;
+    const scale = (b.renderScale || 2.2) * (1 + Math.sin(state.time * 2.2) * 0.022);
+    bossMesh.scale.setScalar(scale);
+    if (b.cool > 0) b.cool -= dt;
+    if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
+      b.cool = 1.6;
+      damage(2, 'contact');
     }
   }
 
@@ -7037,7 +7157,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像、凛冬冰龙与风暴巨鹰，五片疆域都成了你的巢。';
+    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像、凛冬冰龙、风暴巨鹰与深渊影主，六片疆域都成了你的巢。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
