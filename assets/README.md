@@ -100,3 +100,13 @@ The Chapter 7 map, 2×2 rune obstacle, three miniboss portraits, and Black Wizar
 - `black-rune-block.png` is the supplied transparent 2×2 arena obstacle, trimmed and normalized to a square canvas.
 - `black-curse-attendant.png`, `blood-slave.png`, `black-mist-servant.png`, and `black-wizard.png` preserve the supplied transparent artwork without distorting its aspect ratio.
 - Production files are reproducible with `tools/import_black_gorge_assets.py`.
+
+## Chapters 1-3 Campaign Map Backgrounds
+
+The first three campaign-map backgrounds reuse the stone-map composition of the supplied later-chapter backgrounds and repaint it for each chapter's environment.
+
+- `verdant-ruins-map.jpg` uses wet green masonry with roots, vines, moss, and standing water.
+- `sunken-temple-map.jpg` uses warm sandstone with ruined columns, gold glyph ornaments, and dust.
+- `molten-vein-map.jpg` uses dark stone with lava fissures, soot, and embers.
+- The images contain environment art only; route lines, labels, nodes, and interface elements are rendered by the game.
+- Production files are deterministic and reproducible with `tools/generate_first_three_map_backgrounds.py`.

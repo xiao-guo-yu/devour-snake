@@ -1185,13 +1185,44 @@
       linear-gradient(180deg, transparent, rgba(6,19,17,.78) 66%);
     filter: blur(12px);
   }
+  body[data-campaign-theme="green"] .campaign-screen {
+    background:
+      linear-gradient(180deg, rgba(2,10,6,.74), rgba(7,31,19,.78) 52%, rgba(1,7,4,.95)),
+      radial-gradient(circle at 50% 7%, rgba(118,206,157,.2), transparent 30%),
+      url("assets/verdant-ruins-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #06160c, #020805);
+  }
   body[data-campaign-theme="temple"] .campaign-screen {
     --map-accent: #f0c66c;
     --map-accent-deep: #88612a;
+    background:
+      linear-gradient(180deg, rgba(13,8,2,.72), rgba(42,26,9,.78) 52%, rgba(9,5,1,.95)),
+      radial-gradient(circle at 50% 7%, rgba(240,198,108,.2), transparent 30%),
+      url("assets/sunken-temple-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #1b1105, #070401);
+  }
+  body[data-campaign-theme="temple"] .campaign-screen::after {
+    background:
+      radial-gradient(ellipse at 20% 24%, rgba(239,191,95,.14), transparent 26%),
+      radial-gradient(ellipse at 54% 6%, rgba(196,133,48,.16), transparent 32%),
+      radial-gradient(ellipse at 82% 22%, rgba(239,205,128,.1), transparent 25%),
+      linear-gradient(180deg, transparent, rgba(21,12,3,.8) 66%);
   }
   body[data-campaign-theme="volcano"] .campaign-screen {
     --map-accent: #ff9a47;
     --map-accent-deep: #a63712;
+    background:
+      linear-gradient(180deg, rgba(10,3,2,.74), rgba(34,10,5,.8) 52%, rgba(7,2,1,.96)),
+      radial-gradient(circle at 50% 7%, rgba(255,106,42,.22), transparent 30%),
+      url("assets/molten-vein-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #180704, #050201);
+  }
+  body[data-campaign-theme="volcano"] .campaign-screen::after {
+    background:
+      radial-gradient(ellipse at 20% 24%, rgba(255,101,42,.13), transparent 26%),
+      radial-gradient(ellipse at 54% 6%, rgba(183,53,17,.17), transparent 32%),
+      radial-gradient(ellipse at 82% 22%, rgba(255,139,65,.1), transparent 25%),
+      linear-gradient(180deg, transparent, rgba(20,4,2,.82) 66%);
   }
   body[data-campaign-theme="frozen"] .campaign-screen {
     --map-accent: #8bd8ff;
@@ -1649,6 +1680,27 @@
       radial-gradient(circle at 67% 26%, color-mix(in srgb, var(--map-accent) 16%, transparent), transparent 23%),
       radial-gradient(ellipse at 24% 76%, rgba(51,161,130,.16), transparent 31%),
       linear-gradient(180deg, #061715, #0a2925 58%, #071411);
+  }
+  body[data-campaign-theme="green"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(2,10,6,.72), rgba(7,31,19,.78) 55%, rgba(1,7,4,.96)),
+      radial-gradient(circle at 50% 10%, rgba(118,206,157,.19), transparent 28%),
+      url("assets/verdant-ruins-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #06160c, #020805);
+  }
+  body[data-campaign-theme="temple"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(13,8,2,.7), rgba(42,26,9,.8) 55%, rgba(9,5,1,.96)),
+      radial-gradient(circle at 50% 10%, rgba(240,198,108,.19), transparent 28%),
+      url("assets/sunken-temple-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #1b1105, #070401);
+  }
+  body[data-campaign-theme="volcano"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(10,3,2,.72), rgba(34,10,5,.8) 55%, rgba(7,2,1,.97)),
+      radial-gradient(circle at 50% 10%, rgba(255,106,42,.2), transparent 28%),
+      url("assets/molten-vein-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #180704, #050201);
   }
   body[data-campaign-theme="frozen"] #levelMapScreen {
     background:
