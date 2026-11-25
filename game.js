@@ -104,9 +104,10 @@
   const STORM_TORNADO_WARNING = 1.05;
   const STORM_TORNADO_LIFE = 6;
   const STORM_TORNADO_COUNT = 3;
-  const STORM_TORNADO_FOOTPRINT = 6;
-  const STORM_TORNADO_SIZE = 4.8;
+  const STORM_TORNADO_FOOTPRINT = 7;
+  const STORM_TORNADO_SIZE = 5.6;
   const STORM_TORNADO_HIT_COOLDOWN = 1.2;
+  const STORM_TORNADO_SLOW_TIME = 3;
   const STORM_BOLT_SPEED = 4.6;
   const STORM_DIVE_RANGE = 10;
   const STORM_DIVE_TELEGRAPH = 0.82;
@@ -7484,7 +7485,8 @@
         const previousDamage = state.damageTaken;
         damage(1, 'hazard');
         if (state.damageTaken > previousDamage && !state.over) {
-          toast('卷入龙卷', '体长 -1 · 立即离开 6×6 风眼');
+          state.slowTimer = Math.max(state.slowTimer, STORM_TORNADO_SLOW_TIME);
+          toast('卷入龙卷', '体长 -1 · 移动速度降低 3 秒');
         }
       }
       if (tornado.life <= 0) {
@@ -8334,6 +8336,7 @@
       })),
       bolts: state.stormBolts.length,
       feathers: state.stormFeathers.length,
+      slowTimer: state.slowTimer,
       bossKind: state.boss?.kind || null,
       bossMoveState: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveState : null,
       bossMoveTimer: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveTimer : null,
