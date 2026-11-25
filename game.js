@@ -86,11 +86,25 @@
   const STORM_LIGHTNING_DAMAGE = 1;
   const STORM_OBSTACLE_COUNT = 8;
   const STORM_EAGLE_HP = 470;
+  const STORM_EAGLE_FEATHER_COUNT = 27;
+  const STORM_EAGLE_FEATHER_SPAN = Math.PI * 0.66;
+  const STORM_EAGLE_FEATHER_SPEED = 8.8;
+  const STORM_EAGLE_FEATHER_LIFE = 8;
+  const STORM_EAGLE_FEATHER_RADIUS = 0.56;
+  const STORM_EAGLE_FEATHER_INTERVAL = 6.2;
+  const STORM_EAGLE_FEATHER_WARNING = 0.75;
+  const STORM_EAGLE_DASH_MIN_DISTANCE = 13;
+  const STORM_EAGLE_DASH_WINDUP = 0.3;
+  const STORM_EAGLE_DASH_TIME = 0.48;
+  const STORM_EAGLE_DASH_COOLDOWN = 0.55;
+  const STORM_EAGLE_RAM_DAMAGE = 1;
   const STORM_TORNADO_INTERVAL = 9;
   const STORM_TORNADO_FIRST_CAST = 5;
   const STORM_TORNADO_WARNING = 1.05;
   const STORM_TORNADO_LIFE = 6;
-  const STORM_TORNADO_SIZE = 2.25;
+  const STORM_TORNADO_COUNT = 3;
+  const STORM_TORNADO_FOOTPRINT = 6;
+  const STORM_TORNADO_SIZE = 4.8;
   const STORM_TORNADO_HIT_COOLDOWN = 1.2;
   const STORM_BOLT_SPEED = 4.6;
   const STORM_DIVE_RANGE = 10;
@@ -1480,12 +1494,14 @@
     'magma-colossus.png',
     spriteTexture(512, drawMagmaColossus)
   );
+  const STORM_EAGLE_SWOOP_TEX = loadIceEffectTexture('storm-eagle-swoop.png');
   const BOSS_TEX = {
     rootcoil: loadCharacterTexture('rootcoil.png', spriteTexture(512, drawBoss)),
     pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
     magma_colossus: magmaColossusTex,
     frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
     storm_eagle: loadCharacterTexture('storm-eagle.png', null),
+    storm_eagle_swoop: STORM_EAGLE_SWOOP_TEX,
     abyss_lord: loadCharacterTexture('abyss-lord.png', null),
     black_curse_servant: loadCharacterTexture('black-curse-attendant.png', null),
     blood_slave: loadCharacterTexture('blood-slave.png', null),
@@ -1510,6 +1526,7 @@
   );
   const STORM_LIGHTNING_TEX = loadIceEffectTexture('storm-lightning.png');
   const STORM_TORNADO_TEX = loadIceEffectTexture('storm-tornado.png');
+  const STORM_FEATHER_TEX = loadIceEffectTexture('storm-feather.png');
   const STORM_ROCK_TEX = loadCharacterTexture('storm-rock.png', null);
   const ABYSS_ROCK_TEX = loadCharacterTexture('abyss-rock.png', null);
   const BLACK_RUNE_BLOCK_TEX = loadCharacterTexture('black-rune-block.png', null);
@@ -2209,6 +2226,30 @@
     mesh.visible = false;
     scene.add(mesh);
     stormBoltPool.push(mesh);
+  }
+
+  const stormFeatherPool = [];
+  for (let i = 0; i < 192; i++) {
+    const group = new THREE.Group();
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, 0.51),
+      new THREE.MeshBasicMaterial({
+        map: STORM_FEATHER_TEX || null,
+        color: STORM_FEATHER_TEX ? 0xffffff : 0x74ddff,
+        transparent: true,
+        opacity: 0.98,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    group.add(plane);
+    group.userData.featherPlane = plane;
+    group.visible = false;
+    scene.add(group);
+    stormFeatherPool.push(group);
   }
 
   // ---------- 子弹 ----------
@@ -2918,6 +2959,7 @@
     stormLightningStrikes: [],
     stormTornadoes: [],
     stormBolts: [],
+    stormFeathers: [],
     stormLightningTimer: STORM_LIGHTNING_INTERVAL,
     stormSummon: null,
     stormIntroShown: false,
@@ -4452,6 +4494,14 @@
       summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
       stormSummonTimer: isEagle ? STORM_TORNADO_FIRST_CAST : 0,
       stormSummonState: 'idle',
+      stormMoveState: isEagle ? 'cooldown' : 'none',
+      stormMoveTimer: isEagle ? 1.2 : 0,
+      stormDashFrom: null,
+      stormDashTo: null,
+      stormDashElapsed: 0,
+      stormDashHit: false,
+      stormFeatherTimer: isEagle ? 2.4 : 0,
+      stormFeatherCycle: 0,
       summonFlash: 0,
       shieldActive: isPharaoh,
       shieldHp: isPharaoh ? PHARAOH_SHIELD_HP : 0,
@@ -4474,6 +4524,10 @@
     bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
     bossPlaneMat.color.setHex(bossPlaneMat.map ? 0xffffff : 0x6b4a2f);
+    bossPlaneMat.transparent = !isEagle;
+    bossPlaneMat.alphaTest = isEagle ? 0.08 : 0;
+    bossPlaneMat.depthWrite = isEagle;
+    bossPlaneMat.opacity = 1;
     bossPlaneMat.needsUpdate = true;
     bossMesh.visible = true;
     bossMesh.position.set(state.boss.x, 0, state.boss.z);
@@ -6947,28 +7001,194 @@
 
   function startStormEagleSummon(b) {
     const anchors = [];
-    anchors.push(chooseStormAnchor(anchors, true));
-    anchors.push(chooseStormAnchor(anchors, true));
+    for (let index = 0; index < STORM_TORNADO_COUNT; index++) {
+      anchors.push(chooseStormAnchor(anchors, true, STORM_TORNADO_FOOTPRINT));
+    }
     anchors.forEach((anchor) => showStormWarning(anchor, 'tornado', STORM_TORNADO_WARNING));
     b.stormSummonState = 'warning';
     b.stormSummonTimer = STORM_TORNADO_WARNING;
-    toast('风暴巨鹰 · 双旋召来', '两处 2×2 风眼预警 1 秒 · 持续 6 秒');
+    toast('风暴巨鹰 · 三重风暴', '三处 6×6 风眼预警 1 秒 · 持续 6 秒');
+  }
+
+  function chooseStormEagleDashTarget() {
+    let fallback = null;
+    let fallbackDistance = -1;
+    for (let tries = 0; tries < 80; tries++) {
+      const i = 3 + randInt(N - 6);
+      const j = 3 + randInt(N - 6);
+      if (isObstacle(i, j)) continue;
+      const x = cellX(i);
+      const z = cellZ(j);
+      const distance = Math.hypot(x - state.boss.x, z - state.boss.z);
+      if (distance > fallbackDistance) {
+        fallback = { i, j, x, z };
+        fallbackDistance = distance;
+      }
+      if (distance >= STORM_EAGLE_DASH_MIN_DISTANCE) return { i, j, x, z };
+    }
+    return fallback || {
+      i: BOSS_CELL.i,
+      j: BOSS_CELL.j,
+      x: cellX(BOSS_CELL.i),
+      z: cellZ(BOSS_CELL.j),
+    };
+  }
+
+  function stormEagleDashTouchesBody(fromX, fromZ, toX, toZ, radius) {
+    const dx = toX - fromX;
+    const dz = toZ - fromZ;
+    const lengthSq = dx * dx + dz * dz;
+    const radiusSq = radius * radius;
+    return state.cells.some((cell) => {
+      const pointX = cellX(cell.i);
+      const pointZ = cellZ(cell.j);
+      const t = lengthSq > 0.0001
+        ? Math.max(0, Math.min(1, ((pointX - fromX) * dx + (pointZ - fromZ) * dz) / lengthSq))
+        : 0;
+      const nearestX = fromX + dx * t;
+      const nearestZ = fromZ + dz * t;
+      const offsetX = pointX - nearestX;
+      const offsetZ = pointZ - nearestZ;
+      return offsetX * offsetX + offsetZ * offsetZ <= radiusSq;
+    });
+  }
+
+  function fireStormEagleFeatherFan(b, target) {
+    const base = Math.atan2(target.z - b.z, target.x - b.x);
+    const count = STORM_EAGLE_FEATHER_COUNT;
+    for (let index = 0; index < count; index++) {
+      const mesh = stormFeatherPool.find((item) => !item.visible);
+      if (!mesh) break;
+      const ratio = count > 1 ? index / (count - 1) - 0.5 : 0;
+      const angle = base + ratio * STORM_EAGLE_FEATHER_SPAN + (Math.random() - 0.5) * 0.025;
+      const speed = STORM_EAGLE_FEATHER_SPEED * (0.93 + Math.random() * 0.14);
+      const x = b.x + Math.cos(angle) * 2.4;
+      const z = b.z + Math.sin(angle) * 2.4;
+      mesh.visible = true;
+      mesh.position.set(x, 0.66, z);
+      mesh.rotation.y = -angle;
+      mesh.scale.setScalar(1);
+      state.stormFeathers.push({
+        mesh,
+        x,
+        z,
+        vx: Math.cos(angle) * speed,
+        vz: Math.sin(angle) * speed,
+        angle,
+        life: STORM_EAGLE_FEATHER_LIFE,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    b.stormFeatherCycle += 1;
+  }
+
+  function updateStormFeathers(dt) {
+    for (let k = state.stormFeathers.length - 1; k >= 0; k--) {
+      const feather = state.stormFeathers[k];
+      feather.life -= dt;
+      feather.x += feather.vx * dt;
+      feather.z += feather.vz * dt;
+      feather.mesh.position.set(
+        feather.x,
+        0.66 + Math.sin(state.time * 18 + feather.phase) * 0.045,
+        feather.z
+      );
+      feather.mesh.rotation.y = -feather.angle;
+      feather.mesh.scale.setScalar(1 + Math.sin(state.time * 24 + feather.phase) * 0.07);
+
+      // 羽毛会穿过多地图障碍，只在地图边界和寿命结束时回收。
+      let dead = feather.life <= 0 ||
+        Math.abs(feather.x) > HALF + 2 ||
+        Math.abs(feather.z) > HALF + 2;
+      if (!dead && bodyDistanceSq(feather.x, feather.z) <
+        STORM_EAGLE_FEATHER_RADIUS * STORM_EAGLE_FEATHER_RADIUS) {
+        damage(1, 'projectile');
+        dead = true;
+      }
+      if (dead) {
+        feather.mesh.visible = false;
+        state.stormFeathers.splice(k, 1);
+      }
+    }
   }
 
   function updateStormEagle(b, dt, hp) {
-    b.x = cellX(BOSS_CELL.i);
-    b.z = cellZ(BOSS_CELL.j);
-    const flap = 1 + Math.sin(state.time * 3.2) * 0.025;
-    bossMesh.position.set(b.x, 0, b.z);
-    bossMesh.rotation.z = Math.sin(state.time * 2.1) * 0.025;
-    bossMesh.scale.setScalar((b.renderScale || 2.55) * flap);
-    bossPlaneMat.color.setHex(b.stormSummonState === 'warning' ? 0xcaf7ff : 0xffffff);
-    if (b.cool > 0) b.cool -= dt;
-    if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
-      b.cool = 1.6;
-      damage(2, 'contact');
-      if (state.over) return;
+    b.stormFeatherTimer -= dt;
+    if (b.stormFeatherTimer <= 0) {
+      b.stormFeatherTimer = STORM_EAGLE_FEATHER_INTERVAL;
+      fireStormEagleFeatherFan(b, hp);
     }
+
+    if (b.stormMoveState === 'cooldown') {
+      b.stormMoveTimer -= dt;
+      if (b.stormMoveTimer <= 0) {
+        b.stormDashTo = chooseStormEagleDashTarget();
+        b.stormMoveState = 'windup';
+        b.stormMoveTimer = STORM_EAGLE_DASH_WINDUP;
+      }
+    } else if (b.stormMoveState === 'windup') {
+      b.stormMoveTimer -= dt;
+      if (b.stormMoveTimer <= 0) {
+        b.stormMoveState = 'dash';
+        b.stormMoveTimer = STORM_EAGLE_DASH_TIME;
+        b.stormDashElapsed = 0;
+        b.stormDashHit = false;
+        b.stormDashFrom = { x: b.x, z: b.z };
+      }
+    } else if (b.stormMoveState === 'dash') {
+      const previousX = b.x;
+      const previousZ = b.z;
+      b.stormMoveTimer = Math.max(0, b.stormMoveTimer - dt);
+      b.stormDashElapsed += dt;
+      const progress = Math.min(1, b.stormDashElapsed / STORM_EAGLE_DASH_TIME);
+      const eased = progress * progress * (3 - 2 * progress);
+      const from = b.stormDashFrom || { x: b.x, z: b.z };
+      const to = b.stormDashTo || from;
+      b.x = from.x + (to.x - from.x) * eased;
+      b.z = from.z + (to.z - from.z) * eased;
+      if (!b.stormDashHit &&
+        stormEagleDashTouchesBody(previousX, previousZ, b.x, b.z, b.contactRadius)) {
+        b.stormDashHit = true;
+        damage(STORM_EAGLE_RAM_DAMAGE, 'contact');
+        if (state.over) return;
+      }
+      if (progress >= 1) {
+        b.stormMoveState = 'cooldown';
+        b.stormMoveTimer = STORM_EAGLE_DASH_COOLDOWN;
+        b.stormDashFrom = null;
+        b.stormDashTo = null;
+      }
+    } else {
+      b.stormMoveState = 'cooldown';
+      b.stormMoveTimer = STORM_EAGLE_DASH_COOLDOWN;
+    }
+
+    const eagleTexture = b.stormMoveState === 'windup' || b.stormMoveState === 'dash'
+      ? BOSS_TEX.storm_eagle_swoop
+      : BOSS_TEX.storm_eagle;
+    if (eagleTexture && bossPlaneMat.map !== eagleTexture) {
+      bossPlaneMat.map = eagleTexture;
+      bossPlaneMat.needsUpdate = true;
+    }
+    bossPlaneMat.opacity = 1;
+
+    const featherWarning = b.stormFeatherTimer > 0 &&
+      b.stormFeatherTimer <= STORM_EAGLE_FEATHER_WARNING;
+    const moveWarning = b.stormMoveState === 'windup';
+    bossPlaneMat.color.setHex(
+      b.stormSummonState === 'warning'
+        ? 0xcaf7ff
+        : (moveWarning ? 0xb7f4ff : (featherWarning ? 0x79d7ff : 0xffffff))
+    );
+    const flap = 1 + Math.sin(state.time * 3.2) * 0.025;
+    const dashPulse = b.stormMoveState === 'windup'
+      ? 1 + Math.sin(state.time * 26) * 0.055
+      : 1;
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = b.stormMoveState === 'dash'
+      ? Math.sin(state.time * 26) * 0.08
+      : Math.sin(state.time * 2.1) * 0.025;
+    bossMesh.scale.setScalar((b.renderScale || 2.55) * flap * dashPulse);
 
     b.stormSummonTimer -= dt;
     if (b.stormSummonTimer > 0) return;
@@ -7086,24 +7306,32 @@
     ));
   }
 
-  function chooseStormAnchor(used = [], avoidBoss = false) {
+  function chooseStormAnchor(used = [], avoidBoss = false, footprint = 2) {
     const head = state.cells[0] || { i: HALF, j: HALF };
+    const footprintSize = Math.max(2, Math.min(N - 2, Math.floor(footprint)));
+    const maxAnchor = N - footprintSize;
+    const scatter = Math.max(3, Math.ceil(footprintSize / 2));
     for (let tries = 0; tries < 80; tries++) {
       let i;
       let j;
       if (Math.random() < 0.36) {
-        i = head.i + randInt(7) - 3;
-        j = head.j + randInt(7) - 3;
+        i = head.i + randInt(scatter * 2 + 1) - scatter;
+        j = head.j + randInt(scatter * 2 + 1) - scatter;
       } else {
-        i = 2 + randInt(N - 5);
-        j = 2 + randInt(N - 5);
+        i = 1 + randInt(Math.max(1, maxAnchor));
+        j = 1 + randInt(Math.max(1, maxAnchor));
       }
-      i = Math.max(1, Math.min(N - 3, i));
-      j = Math.max(1, Math.min(N - 3, j));
-      if (avoidBoss && Math.abs(i - BOSS_CELL.i) < 6 && Math.abs(j - BOSS_CELL.j) < 6) {
+      i = Math.max(1, Math.min(maxAnchor, i));
+      j = Math.max(1, Math.min(maxAnchor, j));
+      if (avoidBoss &&
+        Math.abs(i - BOSS_CELL.i) < footprintSize + 2 &&
+        Math.abs(j - BOSS_CELL.j) < footprintSize + 2) {
         continue;
       }
-      if (used.some((anchor) => Math.abs(anchor.i - i) < 3 && Math.abs(anchor.j - j) < 3)) {
+      if (used.some((anchor) => (
+        Math.abs(anchor.i - i) < footprintSize &&
+        Math.abs(anchor.j - j) < footprintSize
+      ))) {
         continue;
       }
       return { i, j };
@@ -7115,8 +7343,11 @@
     const mesh = stormWarningPool.find((item) => !item.visible);
     if (!mesh) return null;
     const lightning = kind === 'lightning';
+    const footprint = lightning ? 2 : STORM_TORNADO_FOOTPRINT;
+    const centerOffset = footprint / 2 - 0.5;
     mesh.visible = true;
-    mesh.position.set(cellX(anchor.i + 0.5), 0.17, cellZ(anchor.j + 0.5));
+    mesh.position.set(cellX(anchor.i + centerOffset), 0.17, cellZ(anchor.j + centerOffset));
+    mesh.scale.set(footprint / 2, 1, footprint / 2);
     mesh.userData.plane.material.color.setHex(lightning ? 0xffc94f : 0xff8f64);
     mesh.userData.border.material.color.setHex(lightning ? 0xfff2b8 : 0xffd5c4);
     const warning = {
@@ -7157,7 +7388,10 @@
     if (!mesh) return;
     mesh.visible = true;
     mesh.material.opacity = 0.86;
-    mesh.position.set(cellX(anchor.i + 0.5), 0.3, cellZ(anchor.j + 0.5));
+    mesh.rotation.set(-Math.PI / 2, 0, 0);
+    mesh.scale.setScalar(1);
+    const centerOffset = STORM_TORNADO_FOOTPRINT / 2 - 0.5;
+    mesh.position.set(cellX(anchor.i + centerOffset), 0.3, cellZ(anchor.j + centerOffset));
     state.stormTornadoes.push({
       mesh,
       anchor: { ...anchor },
@@ -7185,6 +7419,13 @@
       if (bolt.mesh) bolt.mesh.visible = false;
     });
     state.stormBolts.length = 0;
+    state.stormFeathers.forEach((feather) => {
+      if (feather.mesh) feather.mesh.visible = false;
+    });
+    state.stormFeathers.length = 0;
+    stormFeatherPool.forEach((mesh) => {
+      mesh.visible = false;
+    });
     state.stormWarnings.length = 0;
     state.stormSummon = null;
     state.stormLightningTimer = STORM_LIGHTNING_INTERVAL;
@@ -7225,16 +7466,16 @@
       const tornado = state.stormTornadoes[k];
       tornado.life -= dt;
       tornado.hitCooldown = Math.max(0, tornado.hitCooldown - dt);
-      tornado.mesh.rotation.z += dt * 0.72;
       tornado.mesh.material.opacity = Math.min(0.9, Math.max(0, tornado.life) * 2.5) *
         (0.88 + Math.sin(state.time * 5 + tornado.phase) * 0.08);
       tornado.mesh.scale.setScalar(0.96 + Math.sin(state.time * 4.2 + tornado.phase) * 0.04);
-      if (tornado.hitCooldown <= 0 && stormFootprintContainsBody(tornado.anchor, 2)) {
+      if (tornado.hitCooldown <= 0 &&
+        stormFootprintContainsBody(tornado.anchor, STORM_TORNADO_FOOTPRINT)) {
         tornado.hitCooldown = STORM_TORNADO_HIT_COOLDOWN;
         const previousDamage = state.damageTaken;
         damage(1, 'hazard');
         if (state.damageTaken > previousDamage && !state.over) {
-          toast('卷入龙卷', '体长 -1 · 立即离开 2×2 风眼');
+          toast('卷入龙卷', '体长 -1 · 立即离开 6×6 风眼');
         }
       }
       if (tornado.life <= 0) {
@@ -7989,6 +8230,7 @@
       updateWispDissolves(dt);
       updateWispSpikes(dt);
       updateStormBolts(dt);
+      updateStormFeathers(dt);
       updateStormArena(dt);
       updateBlackGorgeEffects(dt);
       updateBullets(dt);
@@ -8069,11 +8311,26 @@
     getStormArena: () => ({
       theme: ROOMS[state.level]?.theme || null,
       lightningTimer: state.stormLightningTimer,
-      warnings: state.stormWarnings.map(({ anchor, kind, remaining }) => ({ ...anchor, kind, remaining })),
+      warnings: state.stormWarnings.map(({ anchor, kind, remaining }) => ({
+        ...anchor,
+        kind,
+        remaining,
+        footprint: kind === 'tornado' ? STORM_TORNADO_FOOTPRINT : 2,
+      })),
       strikes: state.stormLightningStrikes.length,
-      tornadoes: state.stormTornadoes.map(({ anchor, life }) => ({ ...anchor, life })),
+      tornadoes: state.stormTornadoes.map(({ anchor, life }) => ({
+        ...anchor,
+        life,
+        footprint: STORM_TORNADO_FOOTPRINT,
+      })),
       bolts: state.stormBolts.length,
+      feathers: state.stormFeathers.length,
       bossKind: state.boss?.kind || null,
+      bossMoveState: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveState : null,
+      bossMoveTimer: state.boss?.kind === 'storm_eagle' ? state.boss.stormMoveTimer : null,
+      dashTarget: state.boss?.kind === 'storm_eagle' && state.boss.stormDashTo
+        ? { ...state.boss.stormDashTo }
+        : null,
     }),
     spawnBlackRune,
     spawnBlackPool,
