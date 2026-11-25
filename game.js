@@ -100,6 +100,17 @@
   const ABYSS_OBSTACLE_COUNT = 8;
   const ABYSS_LORD_HP = 520;
   const ABYSS_LEVEL_BASE = 40;
+  const BLACK_GORGE_LEVEL_BASE = 48;
+  const BLACK_GORGE_OBSTACLE_COUNT = 8;
+  const BLACK_CURSE_ATTENDANT_HP = 290;
+  const BLOOD_SLAVE_HP = 360;
+  const BLACK_MIST_SERVANT_HP = 430;
+  const BLACK_WIZARD_HP = 760;
+  const BLACK_RUNE_WARNING = 0.9;
+  const BLACK_RUNE_ACTIVE = 0.48;
+  const BLACK_MIST_TIME = 2.1;
+  const BLACK_MIST_SOLID_TIME = 4.4;
+  const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   let DEBUG_START_LEVEL = 0;
   const DOOR_CELL = { i: 22, j: 1 };
@@ -275,6 +286,10 @@
     { theme: 'abyss', kind: 'clear', composition: { voidTick: 5, soulWraith: 3 }, name: '深渊裂隙 · 噬光坑道' },
     { theme: 'abyss', kind: 'clear', composition: { soulWraith: 8 }, name: '深渊裂隙 · 影主前庭' },
     { theme: 'abyss', kind: 'boss', boss: 'abyss_lord', name: '深渊影主 · ABYSSAL SHADE' },
+    { theme: 'blackgorge', kind: 'boss', boss: 'black_curse_servant', name: '黑咒侍从 · BLACK CURSE ATTENDANT' },
+    { theme: 'blackgorge', kind: 'boss', boss: 'blood_slave', name: '畸变血奴 · MUTATED BLOOD SLAVE' },
+    { theme: 'blackgorge', kind: 'boss', boss: 'black_mist_servant', name: '黑雾魔侍 · BLACK MIST SERVANT' },
+    { theme: 'blackgorge', kind: 'boss', boss: 'black_wizard', name: '黑巫师 · THE BLACK WIZARD' },
   ];
   const ROOM_COUNT = ROOMS.length;
   DEBUG_START_LEVEL = (() => {
@@ -1472,6 +1487,10 @@
     frost_dragon: loadCharacterTexture('frost-dragon-idle.png', null),
     storm_eagle: loadCharacterTexture('storm-eagle.png', null),
     abyss_lord: loadCharacterTexture('abyss-lord.png', null),
+    black_curse_servant: loadCharacterTexture('black-curse-attendant.png', null),
+    blood_slave: loadCharacterTexture('blood-slave.png', null),
+    black_mist_servant: loadCharacterTexture('black-mist-servant.png', null),
+    black_wizard: loadCharacterTexture('black-wizard.png', null),
   };
   const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
   const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
@@ -1493,6 +1512,7 @@
   const STORM_TORNADO_TEX = loadIceEffectTexture('storm-tornado.png');
   const STORM_ROCK_TEX = loadCharacterTexture('storm-rock.png', null);
   const ABYSS_ROCK_TEX = loadCharacterTexture('abyss-rock.png', null);
+  const BLACK_RUNE_BLOCK_TEX = loadCharacterTexture('black-rune-block.png', null);
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -1729,6 +1749,31 @@
       .slice(0, ABYSS_OBSTACLE_COUNT)
       .map(([i, j]) => [i, j]);
     placeObstacles(seeds, ABYSS_ROCK_TEX);
+    clearIceObstacles();
+    clearStormArena();
+  }
+
+  const BLACK_GORGE_OBSTACLE_LAYOUTS = [
+    // 7-1: broken ritual ring; central duel and both doors stay open.
+    [[8, 8], [35, 8], [8, 34], [35, 34], [14, 18], [29, 18], [14, 27], [29, 27]],
+    // 7-2: two hunting lanes with side alcoves for the Blood Slave charge.
+    [[6, 13], [37, 13], [6, 29], [37, 29], [15, 15], [28, 15], [15, 31], [28, 31]],
+    // 7-3: mist gates split the arena without closing the north-south route.
+    [[5, 19], [10, 19], [16, 19], [27, 19], [33, 19], [38, 19], [22, 6], [22, 35]],
+    // 7-4: four corner pylons and an empty central court for the wizard's rays.
+    [[6, 6], [37, 6], [6, 37], [37, 37], [14, 11], [29, 11], [14, 32], [29, 32]],
+  ];
+
+  /** Chapter 7: four fixed 2x2 rune layouts, always eight groups. */
+  function layoutBlackGorge(level) {
+    const localLevel = Math.max(0, Math.min(
+      BLACK_GORGE_OBSTACLE_LAYOUTS.length - 1,
+      level - BLACK_GORGE_LEVEL_BASE
+    ));
+    const seeds = BLACK_GORGE_OBSTACLE_LAYOUTS[localLevel]
+      .slice(0, BLACK_GORGE_OBSTACLE_COUNT)
+      .map(([i, j]) => [i, j]);
+    placeObstacles(seeds, BLACK_RUNE_BLOCK_TEX);
     clearIceObstacles();
     clearStormArena();
   }
@@ -2414,6 +2459,87 @@
   bossMesh.visible = false;
   scene.add(bossMesh);
 
+  const blackRunePool = [];
+  for (let i = 0; i < 32; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.RingGeometry(0.82, 1.38, 4, 1),
+      new THREE.MeshBasicMaterial({
+        color: 0xff2e2a,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = Math.PI / 4;
+    mesh.position.y = 0.14;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackRunePool.push(mesh);
+  }
+
+  const blackPoolPool = [];
+  for (let i = 0; i < 20; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.CircleGeometry(1.36, 36),
+      new THREE.MeshBasicMaterial({
+        color: 0x6f0508,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.1;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackPoolPool.push(mesh);
+  }
+
+  const blackBeamPool = [];
+  for (let i = 0; i < 16; i++) {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.translate(0.5, 0, 0);
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0xff312e,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.25;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackBeamPool.push(mesh);
+  }
+
+  const blackClones = [];
+  for (let i = 0; i < 2; i++) {
+    const material = new THREE.MeshBasicMaterial({
+      map: BOSS_TEX.black_wizard || null,
+      color: 0xff5b58,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 4.5), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.54;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackClones.push(mesh);
+  }
+
   const pharaohShieldRig = new THREE.Group();
   const pharaohShieldDisc = new THREE.Mesh(
     new THREE.CircleGeometry(4.35, 64),
@@ -2753,6 +2879,9 @@
     magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     frost_dragon: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
     storm_eagle: { id: 'yellow', color: 0x9fe6ff, core: 0xf1fdff, emissive: 0x3b9cc5 },
+    black_curse_servant: { id: 'green', color: 0x68e7b8, core: 0xcaffea, emissive: 0x28b685 },
+    blood_slave: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
+    black_mist_servant: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
   };
 
   // ---------- 状态 ----------
@@ -2792,6 +2921,10 @@
     stormLightningTimer: STORM_LIGHTNING_INTERVAL,
     stormSummon: null,
     stormIntroShown: false,
+    blackRunes: [],
+    blackPools: [],
+    blackBeamEffects: [],
+    blackClones: [],
     lavaBalls: [],
     lavaPools: [],
     skillOrb: null,
@@ -3864,11 +3997,19 @@
     }
   }
 
+  const CAMPAIGN_LEVEL_COUNTS = [8, 8, 8, 8, 8, 8, 4];
+
   function campaignPosition(levelIndex) {
     const safe = Math.max(0, Math.min(ROOM_COUNT - 1, levelIndex));
-    const region = Math.floor(safe / 8);
-    const node = (safe % 8) + 1;
-    return { region, node };
+    let offset = 0;
+    for (let region = 0; region < CAMPAIGN_LEVEL_COUNTS.length; region++) {
+      const count = CAMPAIGN_LEVEL_COUNTS[region];
+      if (safe < offset + count) {
+        return { region, node: safe - offset + 1, count };
+      }
+      offset += count;
+    }
+    return { region: CAMPAIGN_LEVEL_COUNTS.length - 1, node: 1, count: 4 };
   }
 
   function roomEnemyTypes(room) {
@@ -3908,7 +4049,7 @@
   function updateHud() {
     const len = state.cells.length;
     const position = campaignPosition(state.level);
-    el.level.textContent = `${position.region + 1}-${position.node} / 8`;
+    el.level.textContent = `${position.region + 1}-${position.node} / ${position.count}`;
     el.len.textContent = String(len);
     el.score.textContent = String(state.score);
     el.kills.textContent = String(state.kills);
@@ -3917,12 +4058,23 @@
     if (state.phase === 'boss' && state.boss && state.boss.alive) {
       el.bossbar.style.display = 'block';
       el.bfill.style.width = `${Math.max(0, (state.boss.hp / state.boss.max) * 100)}%`;
-      const showShield = state.boss.kind === 'pharaoh';
+      const isBlackBoss = isBlackGorgeBoss(state.boss.kind);
+      const showShield = state.boss.kind === 'pharaoh' || isBlackBoss;
       el.bshield.hidden = !showShield;
       if (showShield) {
-        el.bshield.textContent = state.boss.shieldActive
-          ? `金盾 ${state.boss.shieldHp} / ${PHARAOH_SHIELD_HP}`
-          : `金盾重筑 ${Math.max(0, Math.ceil(state.boss.shieldRespawnTimer))}s`;
+        if (isBlackBoss) {
+          const hpPercent = Math.ceil((state.boss.hp / state.boss.max) * 100);
+          el.bshield.textContent = state.boss.kind === 'black_mist_servant' &&
+            state.boss.blackInvulnerable
+            ? '雾化 · 免疫伤害'
+            : (state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
+              ? `狂暴阶段 · ${hpPercent}%`
+              : `首领阶段 1 · ${hpPercent}%`);
+        } else {
+          el.bshield.textContent = state.boss.shieldActive
+            ? `金盾 ${state.boss.shieldHp} / ${PHARAOH_SHIELD_HP}`
+            : `金盾重筑 ${Math.max(0, Math.ceil(state.boss.shieldRespawnTimer))}s`;
+        }
       }
     } else {
       el.bossbar.style.display = 'none';
@@ -4007,6 +4159,10 @@
     frozen: { fog: 0x07172a, a: 0x416f8b, b: 0x5786a0, hemi: 0xc9f4ff, wall: 0x84adbf, ea: 0x0b3d57, eb: 0x0d4a66 },
     storm: { fog: 0x06111e, a: 0x263d4d, b: 0x35566b, hemi: 0xc7ebff, wall: 0x5c7180, ea: 0x0a314a, eb: 0x0e405b },
     abyss: { fog: 0x09040f, a: 0x160d24, b: 0x211332, hemi: 0xc28aff, wall: 0x2b1938, ea: 0x26083f, eb: 0x350b55 },
+    blackgorge: {
+      fog: 0x050203, a: 0x0e0507, b: 0x150709, hemi: 0xd65d56,
+      wall: 0x1c1012, ea: 0x2d0304, eb: 0x3a0405,
+    },
   };
 
   function startLevel(idx) {
@@ -4027,6 +4183,7 @@
     else if (room.theme === 'frozen') layoutFrozen(idx);
     else if (room.theme === 'storm') layoutStorm(idx);
     else if (room.theme === 'abyss') layoutAbyss(idx);
+    else if (room.theme === 'blackgorge') layoutBlackGorge(idx);
     else layoutStumps(idx);
 
     state.enemies.forEach((e) => { e.alive = false; });
@@ -4071,6 +4228,7 @@
     shieldHaloRig.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
+    clearBlackGorgeEffects();
     clearFrostDragonArena();
     clearWispCombatEffects();
     playerFrostRig.visible = false;
@@ -4135,10 +4293,16 @@
       ? 0.72
       : ((room.theme === 'frozen' || room.theme === 'storm')
         ? 0.22
-        : (room.theme === 'abyss' ? 0.34 : 0.16));
+        : (room.theme === 'abyss'
+          ? 0.34
+          : (room.theme === 'blackgorge' ? 0.3 : 0.16)));
     matB.emissiveIntensity = matA.emissiveIntensity;
     wallMat.color.setHex(tint.wall);
     hemi.color.setHex(tint.hemi);
+    hemi.groundColor.setHex(room.theme === 'blackgorge' ? 0x080203 : 0x07100b);
+    hemi.intensity = room.theme === 'blackgorge' ? 0.42 : 0.82;
+    sun.color.setHex(room.theme === 'blackgorge' ? 0xff5f56 : 0xffd99b);
+    sun.intensity = room.theme === 'blackgorge' ? 0.56 : 1.05;
     lavaUnderlay.visible = room.theme === 'volcano';
     if (document.body && document.body.dataset) document.body.dataset.gameTheme = room.theme;
 
@@ -4165,7 +4329,7 @@
       for (let k = 0; k < types.length; k++) spawnEnemy(safeDistance);
       const position = campaignPosition(idx);
       showLevelIntro(
-        `REGION ${position.region + 1} · LEVEL ${String(position.node).padStart(2, '0')} / 08`,
+        `REGION ${position.region + 1} · LEVEL ${String(position.node).padStart(2, '0')} / ${String(position.count).padStart(2, '0')}`,
         room.name,
         `敌人 ${types.length} · 清除后开启传送门`
       );
@@ -4174,7 +4338,7 @@
       showLevelIntro(
         'BOSS RITE',
         room.name,
-        idx === ROOM_COUNT - 1 ? '击败深渊影主 · 完成远征' : '击败首领 · 进入下一层'
+        idx === ROOM_COUNT - 1 ? '击败黑巫师 · 完成远征' : '击败首领 · 进入下一层'
       );
     }
     updateHud();
@@ -4187,38 +4351,75 @@
     const isDragon = kind === 'frost_dragon';
     const isEagle = kind === 'storm_eagle';
     const isAbyssLord = kind === 'abyss_lord';
-    const isRootcoil = !isPharaoh && !isColossus && !isDragon && !isEagle && !isAbyssLord;
+    const isBlackCurse = kind === 'black_curse_servant';
+    const isBloodSlave = kind === 'blood_slave';
+    const isBlackMist = kind === 'black_mist_servant';
+    const isBlackWizard = kind === 'black_wizard';
+    const isBlackBoss = isBlackCurse || isBloodSlave || isBlackMist || isBlackWizard;
+    const isRootcoil = !isPharaoh && !isColossus && !isDragon && !isEagle && !isAbyssLord && !isBlackBoss;
     const hp = isColossus
       ? 480
       : (isDragon
         ? 440
         : (isEagle
           ? STORM_EAGLE_HP
-          : (isAbyssLord ? ABYSS_LORD_HP : (isPharaoh ? 380 : BOSS_HP))));
+          : (isAbyssLord
+            ? ABYSS_LORD_HP
+            : (isBlackCurse
+              ? BLACK_CURSE_ATTENDANT_HP
+              : (isBloodSlave
+                ? BLOOD_SLAVE_HP
+                : (isBlackMist
+                  ? BLACK_MIST_SERVANT_HP
+                  : (isBlackWizard ? BLACK_WIZARD_HP : (isPharaoh ? 380 : BOSS_HP))))))));
+    const renderScale = isColossus
+      ? COLOSSUS_RENDER_SCALE
+      : (isDragon
+        ? 2.325
+        : (isEagle
+          ? 2.55
+          : (isAbyssLord
+            ? 2.2
+            : (isBlackWizard
+              ? 2.45
+              : (isBlackBoss ? 2.05 : (isPharaoh ? 1.425 : 2))))));
+    const bulletHitRadius = isRootcoil
+      ? 4.6
+      : (isDragon
+        ? 4.8
+        : (isEagle
+          ? 4.55
+          : (isAbyssLord
+            ? 3.15
+            : (isBlackBoss ? (isBlackWizard ? 3.8 : 3.15) : (isPharaoh ? 3.45 : 2.3)))));
+    const orbHitRadius = isRootcoil
+      ? 5.2
+      : (isDragon
+        ? 3.5
+        : (isEagle
+          ? 4.15
+          : (isAbyssLord
+            ? 3.55
+            : (isBlackBoss ? (isBlackWizard ? 4.1 : 3.4) : (isPharaoh ? 3.9 : 2.6)))));
+    const contactRadius = isRootcoil
+      ? 4.8
+      : (isDragon
+        ? 4.88
+        : (isEagle
+          ? 4.35
+          : (isAbyssLord
+            ? 3.35
+            : (isBlackBoss ? (isBlackWizard ? 3.5 : 3.0) : (isPharaoh ? 3.75 : 2.5)))));
     const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
     state.boss = {
       alive: true,
       kind,
       hp,
       max: hp,
-      renderScale: isColossus
-        ? COLOSSUS_RENDER_SCALE
-        : (isDragon
-          ? 2.325
-          : (isEagle
-            ? 2.55
-            : (isAbyssLord ? 2.2 : (isPharaoh ? 1.425 : 2)))),
-      bulletHitRadius: isRootcoil
-        ? 4.6
-        : (isDragon
-          ? 4.8
-          : (isEagle ? 4.55 : (isAbyssLord ? 3.15 : (isPharaoh ? 3.45 : 2.3)))),
-      orbHitRadius: isRootcoil
-        ? 5.2
-        : (isDragon ? 3.5 : (isEagle ? 4.15 : (isAbyssLord ? 3.55 : (isPharaoh ? 3.9 : 2.6)))),
-      contactRadius: isRootcoil
-        ? 4.8
-        : (isDragon ? 4.88 : (isEagle ? 4.35 : (isAbyssLord ? 3.35 : (isPharaoh ? 3.75 : 2.5)))),
+      renderScale,
+      bulletHitRadius,
+      orbHitRadius,
+      contactRadius,
       crushRadius: isColossus ? COLOSSUS_CRUSH_RADIUS : 0,
       jumpDuration: isColossus ? COLOSSUS_JUMP_TIME : 0,
       x: start.x,
@@ -4257,6 +4458,18 @@
       shieldRespawnTimer: 0,
       shieldFlash: 0,
       shieldHudSecond: -1,
+      blackAttackTimer: isBlackCurse ? 2.2 : (isBloodSlave ? 2.8 : (isBlackMist ? 1.2 : 2.4)),
+      blackAttackCycle: 0,
+      blackState: isBloodSlave ? 'stalk' : (isBlackMist ? 'solid' : 'idle'),
+      blackStateTimer: isBlackMist ? BLACK_MIST_SOLID_TIME : 0,
+      blackInvulnerable: false,
+      blackChargeFrom: null,
+      blackChargeTo: null,
+      blackChargeHit: false,
+      blackBeam: null,
+      blackClonesSpawned: false,
+      blackPhase: 1,
+      blackVolleyTimer: isBlackMist ? 0.8 : 1.5,
     };
     bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -4269,19 +4482,24 @@
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
     if (isDragon) clearFrostDragonArena();
+    clearBlackGorgeEffects();
     pharaohShieldRig.visible = false;
     rootSummonRig.visible = false;
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    el.bname.textContent = isAbyssLord
-      ? '深渊影主 · ABYSSAL SHADE'
-      : (isDragon
-        ? '凛冬冰龙 · FROST DRAGON'
-        : (isEagle
-          ? '风暴巨鹰 · STORM EAGLE'
-          : (isColossus
-            ? '熔岩巨像 · MAGMA COLOSSUS'
-            : (isPharaoh ? '黄金法老 · PHARAOH' : '枯树 · ROOTCOIL'))));
+    const bossNames = {
+      black_curse_servant: '黑咒侍从 · BLACK CURSE ATTENDANT',
+      blood_slave: '畸变血奴 · MUTATED BLOOD SLAVE',
+      black_mist_servant: '黑雾魔侍 · BLACK MIST SERVANT',
+      black_wizard: '黑巫师 · THE BLACK WIZARD',
+      abyss_lord: '深渊影主 · ABYSSAL SHADE',
+      frost_dragon: '凛冬冰龙 · FROST DRAGON',
+      storm_eagle: '风暴巨鹰 · STORM EAGLE',
+      magma_colossus: '熔岩巨像 · MAGMA COLOSSUS',
+      pharaoh: '黄金法老 · PHARAOH',
+      rootcoil: '枯树 · ROOTCOIL',
+    };
+    el.bname.textContent = bossNames[kind] || bossNames.rootcoil;
   }
 
   function summonGreenhouseMinions() {
@@ -4368,10 +4586,12 @@
     if (bossKind === 'frost_dragon') clearFrostDragonArena();
     if (bossKind === 'storm_eagle') clearStormArena();
     clearWispCombatEffects();
+    clearBlackGorgeEffects();
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    state.phase = bossKind === 'abyss_lord' ? 'exit' : 'pick';
-    state.doorOpen = bossKind === 'abyss_lord';
+    const finalBoss = bossKind === 'abyss_lord' || bossKind === 'black_wizard';
+    state.phase = finalBoss ? 'exit' : 'pick';
+    state.doorOpen = finalBoss;
     // Boss 战结束也停止刷豆，场上豆子清空
     state.pelletsOff = true;
     state.pellets.length = 0;
@@ -4388,7 +4608,12 @@
     enemyPool.forEach((mesh) => { mesh.visible = false; });
     if (bossKind === 'abyss_lord') {
       updateHud();
-      toast('深渊影主倒下', '场景占位战已完成 · 影主钻洞与暗影潜行将在下一阶段接入');
+      toast('深渊影主倒下', '裂隙尽头传来血色咒印的低鸣 · 前往黑色峡谷');
+      return;
+    }
+    if (bossKind === 'black_wizard') {
+      updateHud();
+      toast('黑巫师倒下', '黑色峡谷的咒印熄灭 · 前往终局传送门');
       return;
     }
     spawnSkillOrb(bossKind);
@@ -4553,6 +4778,7 @@
       // 蛇身逐节从底部传送门钻出，暂不收尾
       state.spawnPending -= 1;
       state.prevTail = null;
+      updateHud();
     } else {
       state.prevTail = state.cells.pop(); // 记录被裁掉的尾格，用于平滑收尾
       if (state.cells.length > MAX_BODY) state.cells.pop();
@@ -6104,6 +6330,22 @@
     const b = state.boss;
     if (!b || !b.alive) return;
     const hp = headPosition(_tmpA).clone();
+    if (b.kind === 'black_curse_servant') {
+      updateBlackCurseServant(b, dt, hp);
+      return;
+    }
+    if (b.kind === 'blood_slave') {
+      updateBloodSlave(b, dt, hp);
+      return;
+    }
+    if (b.kind === 'black_mist_servant') {
+      updateBlackMistServant(b, dt, hp);
+      return;
+    }
+    if (b.kind === 'black_wizard') {
+      updateBlackWizard(b, dt, hp);
+      return;
+    }
     if (b.kind === 'abyss_lord') {
       updateAbyssLordScene(b, dt);
       return;
@@ -6194,6 +6436,512 @@
     if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
       b.cool = 1.6;
       damage(2, 'contact');
+    }
+  }
+
+  function isBlackGorgeBoss(kind = state.boss?.kind) {
+    return kind === 'black_curse_servant' ||
+      kind === 'blood_slave' ||
+      kind === 'black_mist_servant' ||
+      kind === 'black_wizard';
+  }
+
+  function blackBossInvulnerable(b = state.boss) {
+    return Boolean(b && b.alive && b.blackInvulnerable);
+  }
+
+  function bodyInBlackArea(i, j) {
+    return state.cells.some((cell) => (
+      cell.i >= i && cell.i <= i + 1 &&
+      cell.j >= j && cell.j <= j + 1
+    ));
+  }
+
+  function spawnBlackRune(i, j, delay = BLACK_RUNE_WARNING, color = 0xff2f2c) {
+    const mesh = blackRunePool.find((item) => !item.visible);
+    if (!mesh) return;
+    i = Math.max(0, Math.min(N - 2, Math.round(i)));
+    j = Math.max(0, Math.min(N - 2, Math.round(j)));
+    mesh.material.color.setHex(color);
+    mesh.material.opacity = 0.2;
+    mesh.position.set(cellX(i + 0.5), 0.14, cellZ(j + 0.5));
+    mesh.scale.setScalar(1);
+    mesh.visible = true;
+    state.blackRunes.push({
+      mesh, i, j, age: 0, delay, active: BLACK_RUNE_ACTIVE, hit: false,
+    });
+    return state.blackRunes[state.blackRunes.length - 1];
+  }
+
+  function updateBlackRunes(dt) {
+    for (let k = state.blackRunes.length - 1; k >= 0; k--) {
+      const rune = state.blackRunes[k];
+      rune.age += dt;
+      const warning = rune.age < rune.delay;
+      if (warning) {
+        const pulse = 0.4 + Math.sin(state.time * 18 + rune.i) * 0.1;
+        rune.mesh.material.opacity = pulse + (rune.age / rune.delay) * 0.24;
+        rune.mesh.scale.setScalar(0.82 + (rune.age / rune.delay) * 0.2);
+      } else {
+        rune.mesh.material.opacity = Math.max(
+          0,
+          0.95 * (1 - (rune.age - rune.delay) / rune.active)
+        );
+        rune.mesh.scale.setScalar(1.05 + (rune.age - rune.delay) * 0.4);
+        if (!rune.hit) {
+          rune.hit = true;
+          if (bodyInBlackArea(rune.i, rune.j)) damage(1, 'hazard');
+          if (state.over) return;
+        }
+      }
+      if (rune.age >= rune.delay + rune.active) {
+        rune.mesh.visible = false;
+        state.blackRunes.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnBlackPool(i, j, life = 4.2) {
+    const mesh = blackPoolPool.find((item) => !item.visible);
+    if (!mesh) return;
+    i = Math.max(0, Math.min(N - 2, Math.round(i)));
+    j = Math.max(0, Math.min(N - 2, Math.round(j)));
+    mesh.position.set(cellX(i + 0.5), 0.1, cellZ(j + 0.5));
+    mesh.material.opacity = 0;
+    mesh.scale.setScalar(0.7);
+    mesh.visible = true;
+    state.blackPools.push({ mesh, i, j, life, maxLife: life, hit: false });
+  }
+
+  function updateBlackPools(dt) {
+    for (let k = state.blackPools.length - 1; k >= 0; k--) {
+      const pool = state.blackPools[k];
+      pool.life -= dt;
+      const fade = Math.min(1, (pool.maxLife - pool.life) * 4, pool.life * 2);
+      pool.mesh.material.opacity = Math.max(0, fade * 0.62);
+      pool.mesh.scale.setScalar(0.75 + Math.min(1, (pool.maxLife - pool.life) * 3) * 0.25);
+      if (!pool.hit && bodyInBlackArea(pool.i, pool.j)) {
+        pool.hit = true;
+        state.slowTimer = Math.max(state.slowTimer, 2.5);
+        damage(1, 'hazard');
+        if (state.over) return;
+      }
+      if (pool.life <= 0) {
+        pool.mesh.visible = false;
+        state.blackPools.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnBlackBeam({
+    x, z, angle, length = 18, width = 0.7, warning = 0.9,
+    active = 1.2, color = 0xff3732, spin = 0,
+  }) {
+    const mesh = blackBeamPool.find((item) => !item.visible);
+    if (!mesh) return null;
+    mesh.material.color.setHex(color);
+    mesh.material.opacity = 0;
+    mesh.visible = true;
+    mesh.position.set(x, 0.25, z);
+    const effect = {
+      mesh, x, z, angle, length, width, warning, active, spin,
+      age: 0, hit: false,
+    };
+    state.blackBeamEffects.push(effect);
+    return effect;
+  }
+
+  function blackBodyHitsBeam(effect) {
+    const dirX = Math.cos(effect.angle);
+    const dirZ = Math.sin(effect.angle);
+    return state.cells.some((cell) => {
+      const dx = cellX(cell.i) - effect.x;
+      const dz = cellZ(cell.j) - effect.z;
+      const projection = dx * dirX + dz * dirZ;
+      if (projection < 0 || projection > effect.length) return false;
+      return Math.abs(-dx * dirZ + dz * dirX) <= effect.width * 0.52;
+    });
+  }
+
+  function updateBlackBeams(dt) {
+    for (let k = state.blackBeamEffects.length - 1; k >= 0; k--) {
+      const effect = state.blackBeamEffects[k];
+      effect.age += dt;
+      if (effect.spin) effect.angle += effect.spin * dt;
+      const active = effect.age >= effect.warning;
+      effect.mesh.rotation.y = Math.atan2(-Math.sin(effect.angle), Math.cos(effect.angle));
+      effect.mesh.scale.set(effect.length, effect.width, 1);
+      if (active) {
+        effect.mesh.material.opacity = 0.58 + Math.sin(state.time * 24) * 0.12;
+        if (!effect.hit && blackBodyHitsBeam(effect)) {
+          effect.hit = true;
+          damage(1, 'projectile');
+          if (state.over) return;
+        }
+      } else {
+        effect.mesh.material.opacity = 0.12 + (effect.age / effect.warning) * 0.28;
+      }
+      if (effect.age >= effect.warning + effect.active) {
+        effect.mesh.visible = false;
+        state.blackBeamEffects.splice(k, 1);
+      }
+    }
+  }
+
+  function spawnBlackClonePair(b) {
+    const offsets = [
+      { x: b.x - 12, z: b.z + 7 },
+      { x: b.x + 12, z: b.z + 7 },
+    ];
+    for (let i = 0; i < blackClones.length; i++) {
+      const mesh = blackClones[i];
+      const point = offsets[i];
+      mesh.position.set(point.x, 0.54, point.z);
+      mesh.scale.setScalar(0.92);
+      mesh.material.opacity = 0;
+      mesh.visible = true;
+      state.blackClones.push({ mesh, x: point.x, z: point.z, age: 0, fired: false, side: i });
+    }
+  }
+
+  function updateBlackClones(dt) {
+    for (let k = state.blackClones.length - 1; k >= 0; k--) {
+      const clone = state.blackClones[k];
+      clone.age += dt;
+      clone.mesh.material.opacity = Math.min(0.44, clone.age * 1.4) *
+        Math.max(0, Math.min(1, 2.1 - clone.age));
+      clone.mesh.position.y = 0.54 + Math.sin(state.time * 3 + clone.side) * 0.06;
+      if (!clone.fired && clone.age >= 0.78) {
+        clone.fired = true;
+        const target = headPosition(_tmpA);
+        const base = Math.atan2(target.z - clone.z, target.x - clone.x);
+        for (let shot = -2; shot <= 2; shot++) {
+          const angle = base + shot * 0.13;
+          spawnBossBullet(
+            clone.x, clone.z,
+            Math.cos(angle) * 4.7,
+            Math.sin(angle) * 4.7,
+            4.4
+          );
+        }
+      }
+      if (clone.age >= 2.1) {
+        clone.mesh.visible = false;
+        state.blackClones.splice(k, 1);
+      }
+    }
+  }
+
+  function clearBlackGorgeEffects() {
+    state.blackRunes.forEach((rune) => { rune.mesh.visible = false; });
+    state.blackRunes.length = 0;
+    state.blackPools.forEach((pool) => { pool.mesh.visible = false; });
+    state.blackPools.length = 0;
+    state.blackBeamEffects.forEach((effect) => { effect.mesh.visible = false; });
+    state.blackBeamEffects.length = 0;
+    state.blackClones.forEach((clone) => { clone.mesh.visible = false; });
+    state.blackClones.length = 0;
+    blackRunePool.forEach((mesh) => { mesh.visible = false; });
+    blackPoolPool.forEach((mesh) => { mesh.visible = false; });
+    blackBeamPool.forEach((mesh) => { mesh.visible = false; });
+    blackClones.forEach((mesh) => {
+      mesh.visible = false;
+      mesh.material.opacity = 0;
+    });
+    bossPlaneMat.opacity = 1;
+  }
+
+  function updateBlackGorgeEffects(dt) {
+    updateBlackRunes(dt);
+    updateBlackPools(dt);
+    updateBlackBeams(dt);
+    updateBlackClones(dt);
+  }
+
+  function moveBlackBossToward(b, target, speed, dt) {
+    const dx = target.x - b.x;
+    const dz = target.z - b.z;
+    const distance = Math.hypot(dx, dz) || 1;
+    if (distance > 8.5) {
+      b.x += (dx / distance) * speed * dt;
+      b.z += (dz / distance) * speed * dt;
+    } else if (distance < 5) {
+      b.x -= (dx / distance) * speed * 0.42 * dt;
+      b.z -= (dz / distance) * speed * 0.42 * dt;
+    }
+    b.x = Math.max(-HALF + 2, Math.min(HALF - 2, b.x));
+    b.z = Math.max(-HALF + 2, Math.min(HALF - 2, b.z));
+  }
+
+  function blackBossContact(b, dt, radius = 3, damageAmount = 2) {
+    if (b.cool > 0) b.cool = Math.max(0, b.cool - dt);
+    if (bodyDistanceSq(b.x, b.z) < radius * radius && b.cool <= 0) {
+      b.cool = 1.35;
+      damage(damageAmount, 'contact');
+    }
+  }
+
+  function updateBlackCurseServant(b, dt, hp) {
+    bossPlaneMat.opacity = 1;
+    moveBlackBossToward(b, hp, 1.05, dt);
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 1.8) * 0.028;
+    bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 2.3) * 0.022));
+    blackBossContact(b, dt, 3, 1);
+    if (state.over) return;
+
+    b.blackAttackTimer -= dt;
+    if (b.blackAttackTimer > 0) return;
+    b.blackAttackTimer = 5.1;
+    b.blackAttackCycle += 1;
+    if (b.blackAttackCycle % 2 === 1) {
+      const head = state.cells[0] || BOSS_CELL;
+      const anchors = [
+        [head.i - 1, head.j - 1],
+        [head.i + 2, head.j - 1],
+        [head.i - 3, head.j + 2],
+      ];
+      anchors.forEach(([i, j]) => spawnBlackRune(i, j));
+      toast('黑咒侍从 · 禁书封印', '三处 2×2 咒印即将爆裂');
+    } else {
+      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+      for (const offset of [-0.42, 0, 0.42]) {
+        for (let shot = -1; shot <= 1; shot++) {
+          const angle = base + offset + shot * 0.08;
+          spawnBossBullet(
+            b.x, b.z,
+            Math.cos(angle) * 4.4,
+            Math.sin(angle) * 4.4,
+            5
+          );
+        }
+      }
+      toast('黑咒侍从 · 书页齐射', '三道诅咒弹幕封锁直线');
+    }
+  }
+
+  function startBloodSlaveCharge(b, hp) {
+    const dx = hp.x - b.x;
+    const dz = hp.z - b.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const dirX = dx / len;
+    const dirZ = dz / len;
+    b.blackState = 'windup';
+    b.blackStateTimer = 0.94;
+    b.blackChargeHit = false;
+    b.blackChargeFrom = { x: b.x, z: b.z };
+    b.blackChargeTo = {
+      x: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.x + dirX * 13)),
+      z: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.z + dirZ * 13)),
+    };
+    const angle = Math.atan2(dirZ, dirX);
+    b.blackBeam = spawnBlackBeam({
+      x: b.x, z: b.z, angle, length: 13.5, width: 0.9,
+      warning: 0.94, active: 0.38, color: 0xff1f24,
+    });
+    toast('畸变血奴 · 锁链冲锋', '红色直线预警后高速扑击');
+  }
+
+  function updateBloodSlave(b, dt, hp) {
+    bossPlaneMat.opacity = 1;
+    if (b.blackState === 'windup') {
+      b.blackStateTimer -= dt;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = Math.sin(state.time * 28) * 0.045;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + (0.94 - b.blackStateTimer) * 0.07));
+      if (b.blackStateTimer <= 0) {
+        b.blackState = 'charge';
+        b.blackStateTimer = 0.36;
+      }
+      return;
+    }
+
+    if (b.blackState === 'charge') {
+      const progress = 1 - Math.max(0, b.blackStateTimer / 0.36);
+      b.x = b.blackChargeFrom.x + (b.blackChargeTo.x - b.blackChargeFrom.x) * progress;
+      b.z = b.blackChargeFrom.z + (b.blackChargeTo.z - b.blackChargeFrom.z) * progress;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = Math.sin(progress * Math.PI) * 0.16;
+      if (!b.blackChargeHit && bodyDistanceSq(b.x, b.z) < 1.25 * 1.25) {
+        b.blackChargeHit = true;
+        damage(2, 'contact');
+        if (state.over) return;
+      }
+      b.blackStateTimer -= dt;
+      if (b.blackStateTimer <= 0) {
+        b.blackState = 'stun';
+        b.blackStateTimer = 1.05;
+        b.blackBeam = null;
+        spawnBlackPool(b.x + HALF - 0.5, b.z + HALF - 0.5, 4.5);
+      }
+      return;
+    }
+
+    if (b.blackState === 'stun') {
+      b.blackStateTimer -= dt;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = -0.16 + Math.sin(state.time * 8) * 0.02;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * 0.94);
+      if (b.blackStateTimer <= 0) {
+        b.blackState = 'stalk';
+        b.blackAttackTimer = 3.2;
+      }
+      return;
+    }
+
+    moveBlackBossToward(b, hp, 1.18, dt);
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 2.1) * 0.04;
+    bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 3) * 0.025));
+    blackBossContact(b, dt, 2.8, 1);
+    if (state.over) return;
+    b.blackAttackTimer -= dt;
+    if (b.blackAttackTimer <= 0) startBloodSlaveCharge(b, hp);
+  }
+
+  function updateBlackMistServant(b, dt, hp) {
+    if (b.blackState === 'mist') {
+      b.blackStateTimer -= dt;
+      const half = BLACK_MIST_TIME * 0.5;
+      if (b.blackStateTimer <= half && !b.blackMistTeleported) {
+        b.blackMistTeleported = true;
+        b.x = b.blackMistTarget.x;
+        b.z = b.blackMistTarget.z;
+      }
+      bossPlaneMat.opacity = Math.max(0.14, b.blackStateTimer / BLACK_MIST_TIME * 0.46);
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z += dt * 0.8;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * (1.04 - b.blackStateTimer * 0.05));
+      if (b.blackStateTimer <= 0) {
+        b.blackState = 'solid';
+        b.blackStateTimer = BLACK_MIST_SOLID_TIME;
+        b.blackInvulnerable = false;
+        b.blackVolleyTimer = 0.55;
+        b.blackMistTeleported = false;
+        bossPlaneMat.opacity = 1;
+        updateHud();
+        for (let shot = 0; shot < 14; shot++) {
+          const angle = (shot / 14) * Math.PI * 2 + state.time * 0.3;
+          spawnBossBullet(
+            b.x, b.z,
+            Math.cos(angle) * 4.7,
+            Math.sin(angle) * 4.7,
+            4.8
+          );
+        }
+      }
+      return;
+    }
+
+    b.blackStateTimer -= dt;
+    moveBlackBossToward(b, hp, 1.12, dt);
+    bossPlaneMat.opacity = 1;
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 2.8) * 0.03;
+    bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 4.1) * 0.02));
+    blackBossContact(b, dt, 2.9, 1);
+    if (state.over) return;
+
+    b.blackVolleyTimer -= dt;
+    if (b.blackVolleyTimer <= 0) {
+      b.blackVolleyTimer = 1.7;
+      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+      for (let shot = 0; shot < 8; shot++) {
+        const angle = base + (shot / 8) * Math.PI * 2 + state.time * 0.4;
+        spawnBossBullet(
+          b.x, b.z,
+          Math.cos(angle) * 4.2,
+          Math.sin(angle) * 4.2,
+          4.5
+        );
+      }
+    }
+
+    if (b.blackStateTimer <= 0) {
+      b.blackState = 'mist';
+      b.blackStateTimer = BLACK_MIST_TIME;
+      b.blackInvulnerable = true;
+      b.blackMistTeleported = false;
+      const target = randomFreeCell();
+      b.blackMistTarget = { x: cellX(target.i), z: cellZ(target.j) };
+      spawnBlackRune(target.i - 0.5, target.j - 0.5, BLACK_MIST_TIME * 0.5, 0xa133ff);
+      updateHud();
+      toast('黑雾魔侍 · 雾化', '雾化期间免疫伤害 · 紫色落点即将显形');
+    }
+  }
+
+  function updateBlackWizard(b, dt, hp) {
+    bossPlaneMat.opacity = 0.9 + Math.sin(state.time * 3) * 0.1;
+    b.x = cellX(BOSS_CELL.i);
+    b.z = cellZ(BOSS_CELL.j);
+    bossMesh.position.set(b.x, 0, b.z);
+    bossMesh.rotation.z = Math.sin(state.time * 1.9) * 0.02;
+    bossMesh.scale.setScalar((b.renderScale || 2.45) * (1 + Math.sin(state.time * 2.5) * 0.02));
+    blackBossContact(b, dt, 3.5, 2);
+    if (state.over) return;
+
+    if (b.blackPhase === 1 && b.hp <= b.max * BLACK_WIZARD_ENRAGE_RATIO) {
+      b.blackPhase = 2;
+      b.blackAttackTimer = 1.2;
+      updateHud();
+      for (let shot = 0; shot < 24; shot++) {
+        const angle = (shot / 24) * Math.PI * 2;
+        spawnBossBullet(
+          b.x, b.z,
+          Math.cos(angle) * 5.1,
+          Math.sin(angle) * 5.1,
+          5
+        );
+      }
+      toast('黑巫师 · 血色狂暴', '咒印加速，双环弹幕即将展开');
+    }
+
+    b.blackAttackTimer -= dt;
+    if (b.blackAttackTimer > 0) return;
+    b.blackAttackTimer = b.blackPhase === 2 ? 3.7 : 4.8;
+    b.blackAttackCycle += 1;
+    const cycle = b.blackAttackCycle % 3;
+
+    if (cycle === 1) {
+      const base = state.time * 0.32;
+      const count = b.blackPhase === 2 ? 6 : 4;
+      for (let i = 0; i < count; i++) {
+        spawnBlackBeam({
+          x: b.x, z: b.z,
+          angle: base + (i / count) * Math.PI * 2,
+          length: 22, width: 0.52,
+          warning: 0.92, active: b.blackPhase === 2 ? 1.7 : 1.45,
+          color: 0xff2626,
+          spin: b.blackPhase === 2 ? 0.34 : 0.22,
+        });
+      }
+      toast('黑巫师 · 咒印轮转', '光柱预警结束后开始旋转');
+    } else if (cycle === 2) {
+      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+      for (let shot = -4; shot <= 4; shot++) {
+        const angle = base + shot * 0.13;
+        spawnBossBullet(
+          b.x, b.z,
+          Math.cos(angle) * 5.4,
+          Math.sin(angle) * 5.4,
+          5.2
+        );
+      }
+      if (b.blackPhase === 2) {
+        for (let shot = 0; shot < 18; shot++) {
+          const angle = (shot / 18) * Math.PI * 2 + Math.PI / 18;
+          spawnBossBullet(
+            b.x, b.z,
+            Math.cos(angle) * 3.7,
+            Math.sin(angle) * 3.7,
+            5
+          );
+        }
+      }
+      toast('黑巫师 · 法球锁定', b.blackPhase === 2 ? '正面扇形与内环双层弹幕' : '九枚法球扇形齐射');
+    } else {
+      spawnBlackClonePair(b);
+      toast('黑巫师 · 黑镜幻影', '两名幻影将从两侧夹击');
     }
   }
 
@@ -6679,9 +7427,11 @@
         orb.boomX = state.boss.x;
         orb.boomZ = state.boss.z;
         if (!damagePharaohShield(true)) {
-          state.boss.hp -= ENERGY_BALL_DAMAGE;
-          updateHud();
-          if (state.boss.hp <= 0) bossDie();
+          if (!blackBossInvulnerable()) {
+            state.boss.hp -= ENERGY_BALL_DAMAGE;
+            updateHud();
+            if (state.boss.hp <= 0) bossDie();
+          }
         }
       }
 
@@ -6882,7 +7632,8 @@
       if (!dead && state.phase === 'boss' && state.boss && state.boss.alive) {
         if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < state.boss.bulletHitRadius) {
           const shieldBlocked = damagePharaohShield(false);
-          if (!shieldBlocked) {
+          const mistBlocked = blackBossInvulnerable();
+          if (!shieldBlocked && !mistBlocked) {
             state.boss.hp -= b.bossDamage;
             state.score += 10;
             updateHud();
@@ -6892,7 +7643,7 @@
             spawnFireBurst(b.x, b.z);
             burstSpawned = true;
           }
-          if (!shieldBlocked && state.boss.hp <= 0) bossDie();
+          if (!shieldBlocked && !mistBlocked && state.boss.hp <= 0) bossDie();
         }
       }
 
@@ -7020,6 +7771,7 @@
     clearFrostDragonArena();
     clearWispCombatEffects();
     clearStormArena();
+    clearBlackGorgeEffects();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
     state.hitFlash = 0;
@@ -7112,6 +7864,7 @@
     if (doorPlug) doorPlug.visible = false;
     pharaohShieldRig.visible = false;
     rootSummonRig.visible = false;
+    clearBlackGorgeEffects();
     bossBreathRig.visible = false;
     playerFrostRig.visible = false;
     state.time = 0;
@@ -7157,7 +7910,7 @@
     state.over = true;
     saveBest();
     el.ovtitle.textContent = '通关';
-    el.ovsub.textContent = '你吞掉了枯树、黄金法老、熔岩巨像、凛冬冰龙、风暴巨鹰与深渊影主，六片疆域都成了你的巢。';
+    el.ovsub.textContent = '你穿过七片疆域，吞掉黑咒侍从、畸变血奴与黑雾魔侍，最终将黑巫师连同黑色峡谷一并吞噬。';
     const rating = evaluateLevelStars(state.cells.length, state.levelTime);
     showResultRating(rating.stars, state.levelTime);
     el.ovdetail.textContent = `体长 ${state.cells.length} · 受伤 ${state.damageTaken} 次 · 击杀 ${state.kills} · 吃豆 ${state.eaten}`;
@@ -7237,6 +7990,7 @@
       updateWispSpikes(dt);
       updateStormBolts(dt);
       updateStormArena(dt);
+      updateBlackGorgeEffects(dt);
       updateBullets(dt);
       updateFireTrails(dt);
       updateEnergyOrbs(dt);
@@ -7320,6 +8074,22 @@
       tornadoes: state.stormTornadoes.map(({ anchor, life }) => ({ ...anchor, life })),
       bolts: state.stormBolts.length,
       bossKind: state.boss?.kind || null,
+    }),
+    spawnBlackRune,
+    spawnBlackPool,
+    spawnBlackBeam,
+    spawnBlackClonePair,
+    getBlackGorgeArena: () => ({
+      theme: ROOMS[state.level]?.theme || null,
+      bossKind: state.boss?.kind || null,
+      bossState: state.boss?.blackState || null,
+      bossPhase: state.boss?.blackPhase || null,
+      invulnerable: blackBossInvulnerable(),
+      runes: state.blackRunes.map(({ i, j, age, delay }) => ({ i, j, age, delay })),
+      pools: state.blackPools.map(({ i, j, life }) => ({ i, j, life })),
+      beams: state.blackBeamEffects.map(({ x, z, angle, age }) => ({ x, z, angle, age })),
+      clones: state.blackClones.length,
+      obstacleCount: obstacles.size / 4,
     }),
     getIceObstacles: () => [...new Set(dynamicIce.values())].map(({ i, j, cells }) => ({
       i,

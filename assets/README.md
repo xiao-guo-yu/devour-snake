@@ -91,3 +91,12 @@ The Chapter 6 map, abyss rock obstacle, three regular enemies, Abyss Lord boss, 
 - `abyss-black-hole.png` is the Q-skill visual reference for the later mechanic phase.
 - `abyss-lord-enter-01.png` through `abyss-lord-enter-11.png` and `abyss-lord-exit-01.png` through `abyss-lord-exit-11.png` are extracted from the supplied enter/exit GIFs.
 - Production files are reproducible with `tools/import_abyss_assets.py`.
+
+## Black Gorge Assets
+
+The Chapter 7 map, 2×2 rune obstacle, three miniboss portraits, and Black Wizard portrait were supplied by the project owner on 2026-11-25.
+
+- `black-gorge-map.jpg` keeps the central rune arena from the supplied presentation image; the old HUD and touch controls are cropped out.
+- `black-rune-block.png` is the supplied transparent 2×2 arena obstacle, trimmed and normalized to a square canvas.
+- `black-curse-attendant.png`, `blood-slave.png`, `black-mist-servant.png`, and `black-wizard.png` preserve the supplied transparent artwork without distorting its aspect ratio.
+- Production files are reproducible with `tools/import_black_gorge_assets.py`.

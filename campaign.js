@@ -125,6 +125,22 @@
         { n: 8, room: 47, name: '深渊影主', boss: true, icon: 'assets/abyss-lord.png' },
       ],
     },
+    {
+      id: 'blackgorge',
+      name: '黑色峡谷',
+      en: 'BLACK GORGE',
+      subtitle: '血色符文吞没岩壁，黑巫师在峡谷终点等待',
+      art: 'assets/black-wizard.png',
+      accent: '#ff5c54',
+      accent2: '#76191d',
+      base: 48,
+      levels: [
+        { n: 1, room: 48, name: '黑咒侍从', boss: true, icon: 'assets/black-curse-attendant.png' },
+        { n: 2, room: 49, name: '畸变血奴', boss: true, icon: 'assets/blood-slave.png' },
+        { n: 3, room: 50, name: '黑雾魔侍', boss: true, icon: 'assets/black-mist-servant.png' },
+        { n: 4, room: 51, name: '黑巫师', boss: true, icon: 'assets/black-wizard.png' },
+      ],
+    },
   ];
 
   const NODE_POSITIONS = [
@@ -137,6 +153,16 @@
     { x: 91, y: 70 },
     { x: 50, y: 22 },
   ];
+  const BLACK_GORGE_POSITIONS = [
+    { x: 17, y: 76 },
+    { x: 38, y: 55 },
+    { x: 62, y: 72 },
+    { x: 81, y: 30 },
+  ];
+  const ROUTE_PATHS = {
+    desktop: 'M204 532 C285 470 346 421 456 385 C530 361 584 451 636 504 C717 576 790 505 851 424 C912 343 934 268 972 210',
+    mobile: 'M195 722 C145 690 112 620 133 546 C156 480 226 560 254 466 C282 382 165 322 195 250',
+  };
 
   const campaignScreen = document.getElementById('campaignScreen');
   const levelMapScreen = document.getElementById('levelMapScreen');
@@ -176,7 +202,9 @@
         for (const [level, stars] of Object.entries(source)) {
           const n = Number(level);
           const value = Number(stars);
-          if (n >= 1 && n <= 8 && value > 0) fresh.regions[region.id][n] = Math.min(3, value);
+          if (n >= 1 && n <= region.levels.length && value > 0) {
+            fresh.regions[region.id][n] = Math.min(3, value);
+          }
         }
       }
       return fresh;
@@ -212,7 +240,9 @@
   function regionUnlocked(regionIndex) {
     if (TEST_UNLOCK_ALL) return true;
     if (regionIndex <= 0) return true;
-    return starsFor(regionIndex - 1, 8) > 0;
+    const previousRegion = REGIONS[regionIndex - 1];
+    const finalLevel = previousRegion.levels[previousRegion.levels.length - 1];
+    return starsFor(regionIndex - 1, finalLevel.n) > 0;
   }
 
   function levelAvailable(regionIndex, level) {
@@ -232,6 +262,7 @@
     regionCards.innerHTML = REGIONS.map((region, index) => {
       const unlocked = regionUnlocked(index);
       const complete = completedCount(index);
+      const levelCount = region.levels.length;
       const lockedLabel = index > 0 && !unlocked ? `先完成${REGIONS[index - 1].name}` : '';
       const pips = region.levels.map((level) => {
         const done = !level.planned && starsFor(index, level.n) > 0;
@@ -240,7 +271,7 @@
       return `
         <button class="region-card${unlocked ? '' : ' is-locked'}" type="button"
           data-region="${index}" style="--accent:${region.accent};--accent-2:${region.accent2}"
-          aria-label="${region.name}，已通关 ${complete} / 8${unlocked ? '' : '，未解锁'}" ${unlocked ? '' : 'disabled'}>
+          aria-label="${region.name}，已通关 ${complete} / ${levelCount}${unlocked ? '' : '，未解锁'}" ${unlocked ? '' : 'disabled'}>
           <span class="region-aura" aria-hidden="true"></span>
           <span class="region-moon" aria-hidden="true"></span>
           <span class="region-spire region-spire-a" aria-hidden="true"></span>
@@ -256,14 +287,16 @@
             <small>${unlocked ? region.subtitle : lockedLabel}</small>
             <span class="region-progress">
               <span class="region-stars">★</span>
-              <b>${complete} / 8</b>
+              <b>${complete} / ${levelCount}</b>
               <span class="region-pips" aria-hidden="true">${pips}</span>
             </span>
           </span>
         </button>`;
     }).join('');
 
-    campaignTotal.textContent = `${totalCompleted()} / ${REGIONS.length * 8}`;
+    regionCards.classList.toggle('is-seven-up', REGIONS.length >= 7);
+    const campaignLevelCount = REGIONS.reduce((sum, region) => sum + region.levels.length, 0);
+    campaignTotal.textContent = `${totalCompleted()} / ${campaignLevelCount}`;
     regionCards.querySelectorAll('.region-card:not(:disabled)').forEach((card) => {
       card.addEventListener('click', () => showLevelMap(Number(card.dataset.region)));
     });
@@ -279,13 +312,26 @@
   function renderLevelMap() {
     const region = REGIONS[activeRegion];
     const complete = completedCount(activeRegion);
+    const bossRush = region.levels.every((level) => level.boss);
+    const routeGroups = [
+      ['.level-routes-desktop', ROUTE_PATHS.desktop],
+      ['.level-routes-mobile', ROUTE_PATHS.mobile],
+    ];
+    for (const [selector, bossPath] of routeGroups) {
+      document.querySelectorAll(`${selector} path`).forEach((path) => {
+        if (!path.dataset.defaultD) path.dataset.defaultD = path.getAttribute('d');
+        path.setAttribute('d', bossRush ? bossPath : path.dataset.defaultD);
+      });
+    }
     document.body.dataset.campaignTheme = region.id;
     regionMapTitle.textContent = region.name;
     regionMapSubtitle.textContent = region.subtitle;
-    regionMapProgress.textContent = `${complete} / 8`;
+    regionMapProgress.textContent = `${complete} / ${region.levels.length}`;
+    const mapKey = document.querySelector('.region-map-footer .map-key');
+    if (mapKey) mapKey.textContent = bossRush ? '四关皆为终局首领战' : '第 8 关为首领战';
 
     levelNodes.innerHTML = region.levels.map((level, index) => {
-      const position = NODE_POSITIONS[index];
+      const position = bossRush ? BLACK_GORGE_POSITIONS[index] : NODE_POSITIONS[index];
       const stars = starsFor(activeRegion, level.n);
       const available = levelAvailable(activeRegion, level);
       const classes = [
@@ -334,7 +380,14 @@
 
     const preferred = regionUnlocked(progress.lastRegion) ? progress.lastRegion : 0;
     const card = regionCards.querySelector(`[data-region="${preferred}"]:not(:disabled)`);
-    if (card) window.setTimeout(() => card.focus({ preventScroll: true }), 30);
+    if (card) {
+      window.setTimeout(() => {
+        card.focus({ preventScroll: true });
+        if (window.matchMedia('(max-width: 760px)').matches) {
+          card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }, 30);
+    }
   }
 
   function showLevelMap(regionIndex) {

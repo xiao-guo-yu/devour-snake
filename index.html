@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>吞噬之蛇 — 温室、神庙、火山、永冻冰原、风暴空域与深渊裂隙</title>
+  <title>吞噬之蛇 — 温室、神庙、火山、永冻冰原、风暴空域、深渊裂隙与黑色峡谷</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307110c'/%3E%3Cpath d='M13 37c8 0 8-13 17-13s8 13 17 13 7-8 7-8' fill='none' stroke='%2362e2b3' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='51' cy='29' r='7' fill='%2362e2b3'/%3E%3Ccircle cx='53' cy='27' r='1.6' fill='white'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -256,6 +256,21 @@
   }
   body[data-game-theme="green"] #bossbar .bbar {
     height: 7.5px;
+  }
+  body[data-game-theme="blackgorge"] #bossbar {
+    border-color: rgba(255,65,58,.35);
+    filter: drop-shadow(0 0 18px rgba(157,19,18,.22));
+  }
+  body[data-game-theme="blackgorge"] #bossbar .bname {
+    color: #ffb1a6;
+    text-shadow: 0 0 15px rgba(255,49,40,.42);
+  }
+  body[data-game-theme="blackgorge"] #bossbar .bshield {
+    color: #ff7368;
+  }
+  body[data-game-theme="blackgorge"] #bossbar .bbar {
+    border-color: rgba(255,66,57,.45);
+    background: rgba(50,4,4,.35);
   }
   #bfill {
     height: 100%;
@@ -1205,6 +1220,15 @@
       url("assets/abyss-rift-map.jpg") center / cover no-repeat,
       linear-gradient(180deg, #12061f, #040109);
   }
+  body[data-campaign-theme="blackgorge"] .campaign-screen {
+    --map-accent: #ff5c54;
+    --map-accent-deep: #76191d;
+    background:
+      linear-gradient(180deg, rgba(4,3,3,.7), rgba(19,7,8,.8) 52%, rgba(3,2,2,.96)),
+      radial-gradient(circle at 50% 8%, rgba(255,69,61,.23), transparent 31%),
+      url("assets/black-gorge-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #160607, #030202);
+  }
   .campaign-shell {
     position: relative;
     z-index: 2;
@@ -1305,6 +1329,34 @@
     perspective: 1200px;
   }
   .region-cards::-webkit-scrollbar { display: none; }
+  @media (min-width: 761px) {
+    .region-cards.is-seven-up {
+      gap: clamp(9px, 1vw, 14px);
+    }
+    .region-cards.is-seven-up .region-card {
+      min-width: 150px;
+    }
+    .region-cards.is-seven-up .region-progress {
+      grid-template-columns: auto auto;
+      gap: 6px;
+    }
+    .region-cards.is-seven-up .region-progress b {
+      white-space: nowrap;
+    }
+    .region-cards.is-seven-up .region-pips {
+      display: none;
+    }
+  }
+  @media (min-width: 761px) and (max-width: 1120px) {
+    .region-cards.is-seven-up {
+      justify-content: flex-start;
+      gap: 9px;
+      padding-inline: 4px;
+    }
+    .region-cards.is-seven-up .region-card {
+      min-width: 132px;
+    }
+  }
   .region-card {
     --accent: #68e7b8;
     --accent-2: #157257;
@@ -1618,6 +1670,37 @@
       radial-gradient(circle at 50% 10%, rgba(190,103,255,.25), transparent 30%),
       url("assets/abyss-rift-map.jpg") center / cover no-repeat,
       linear-gradient(180deg, #140720, #030108);
+  }
+  body[data-campaign-theme="blackgorge"] #levelMapScreen {
+    background:
+      linear-gradient(180deg, rgba(4,3,3,.68), rgba(20,7,8,.8) 55%, rgba(2,1,1,.97)),
+      radial-gradient(circle at 50% 10%, rgba(255,76,66,.24), transparent 30%),
+      url("assets/black-gorge-map.jpg") center / cover no-repeat,
+      linear-gradient(180deg, #160607, #020101);
+  }
+  body[data-campaign-theme="blackgorge"] .region-map-footer .map-key::before {
+    background: #ff5c54;
+    box-shadow: 0 0 9px rgba(255,92,84,.85);
+  }
+  body[data-campaign-theme="blackgorge"] .level-route-base {
+    stroke: rgba(255,83,74,.16);
+  }
+  body[data-campaign-theme="blackgorge"] .node-platform {
+    border-color: rgba(255,93,83,.62);
+    background:
+      radial-gradient(ellipse at 50% 27%, rgba(127,24,25,.52), #1b0709 72%);
+    box-shadow:
+      0 0 0 4px rgba(8,3,4,.94),
+      0 0 0 5px rgba(255,94,82,.2),
+      0 13px 0 rgba(6,1,2,.78),
+      0 19px 24px rgba(0,0,0,.52),
+      inset 0 3px 4px rgba(255,185,174,.1);
+  }
+  body[data-campaign-theme="blackgorge"] .node-platform::before {
+    background: #4d0b0e;
+  }
+  body[data-campaign-theme="blackgorge"] .node-ring {
+    border-color: rgba(255,97,86,.42);
   }
   #levelMapScreen .campaign-shell { grid-template-rows: auto minmax(0, 1fr) auto; }
   .region-map-head {
@@ -2204,6 +2287,10 @@
     .level-node:nth-child(6) { left: 35%; top: 45%; }
     .level-node:nth-child(7) { left: 69%; top: 36%; }
     .level-node:nth-child(8) { left: 50%; top: 22%; }
+    body[data-campaign-theme="blackgorge"] .level-node:nth-child(1) { left: 50%; top: 82%; }
+    body[data-campaign-theme="blackgorge"] .level-node:nth-child(2) { left: 34%; top: 62%; }
+    body[data-campaign-theme="blackgorge"] .level-node:nth-child(3) { left: 65%; top: 53%; }
+    body[data-campaign-theme="blackgorge"] .level-node:nth-child(4) { left: 50%; top: 28%; }
     .region-map-footer {
       display: flex;
       min-height: 20px;
@@ -2599,8 +2686,8 @@
 
 <script src="vendor/three.min.js?v=20261117"></script>
 <script src="skills.js?v=20261124-icepierce1"></script>
-<script src="game.js?v=20261124-laser8s-halfspin1"></script>
-<script src="campaign.js?v=20261123-unlockall1"></script>
+<script src="game.js?v=20261125-blackgorge1"></script>
+<script src="campaign.js?v=20261125-blackgorge1"></script>
 <script src="audio.js?v=20261121-settings2"></script>
 <script src="start.js?v=20261124-pausecontinue1"></script>
 </body>
