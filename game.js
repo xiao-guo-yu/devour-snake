@@ -116,6 +116,26 @@
   const ABYSS_OBSTACLE_COUNT = 8;
   const ABYSS_LORD_HP = 520;
   const ABYSS_LEVEL_BASE = 40;
+  const ABYSS_LORD_TRIGGER_RANGE = 8;
+  const ABYSS_LORD_THRUST_WINDUP = 0.35;
+  const ABYSS_LORD_THRUST_TIME = 0.34;
+  const ABYSS_LORD_THRUST_INTERVAL = 6;
+  const ABYSS_LORD_THRUST_DAMAGE = 3;
+  const ABYSS_LORD_THRUST_HIT_RADIUS = 2.2;
+  const ABYSS_LORD_SHOT_INTERVAL = 3;
+  const ABYSS_LORD_SHOT_COUNT = 3;
+  const ABYSS_LORD_SHOT_SPREAD = 0.14;
+  const ABYSS_LORD_BULLET_SPEED = 5.4;
+  const ABYSS_LORD_BULLET_SIZE = 3;
+  const ABYSS_LORD_BULLET_VISUAL_SIZE = 5.6;
+  const ABYSS_LORD_BULLET_HEAD_OFFSET = 1.45;
+  const ABYSS_LORD_BULLET_HIT_RADIUS = 1.5;
+  const ABYSS_LORD_BULLET_DAMAGE = 1;
+  const ABYSS_LORD_AFTERIMAGE_LIFE = 6;
+  const ABYSS_LORD_AFTERIMAGE_SIZE = 3;
+  const ABYSS_LORD_AFTERIMAGE_SLOW_TIME = 3;
+  const ABYSS_LORD_TELEPORT_FRAMES = 11;
+  const ABYSS_LORD_TELEPORT_DURATION = 0.99;
   const BLACK_GORGE_LEVEL_BASE = 48;
   const BLACK_GORGE_OBSTACLE_COUNT = 8;
   const BLACK_CURSE_ATTENDANT_HP = 290;
@@ -1498,6 +1518,21 @@
   );
   const STORM_EAGLE_DIVE_TEX = loadIceEffectTexture('storm-eagle-dive.png');
   const STORM_EAGLE_FLAP_TEX = loadIceEffectTexture('storm-eagle-flap.png');
+  const ABYSS_LORD_THRUST_TEX = loadIceEffectTexture('abyss-lord-thrust.png');
+  const ABYSS_BULLET_TEX = loadIceEffectTexture('abyss-bullet.png');
+  const ABYSS_BULLET_AFTERIMAGE_TEX = loadIceEffectTexture('abyss-bullet-afterimage.png');
+  const ABYSS_LORD_VANISH_TEX = loadIceEffectTexture('abyss-lord-vanish.png');
+  const ABYSS_LORD_EMERGE_TEX = loadIceEffectTexture('abyss-lord-emerge.png');
+  if (ABYSS_LORD_VANISH_TEX) {
+    ABYSS_LORD_VANISH_TEX.wrapS = THREE.ClampToEdgeWrapping;
+    ABYSS_LORD_VANISH_TEX.repeat.set(1 / ABYSS_LORD_TELEPORT_FRAMES, 1);
+    ABYSS_LORD_VANISH_TEX.offset.set(0, 0);
+  }
+  if (ABYSS_LORD_EMERGE_TEX) {
+    ABYSS_LORD_EMERGE_TEX.wrapS = THREE.ClampToEdgeWrapping;
+    ABYSS_LORD_EMERGE_TEX.repeat.set(1 / ABYSS_LORD_TELEPORT_FRAMES, 1);
+    ABYSS_LORD_EMERGE_TEX.offset.set(0, 0);
+  }
   const BOSS_TEX = {
     rootcoil: loadCharacterTexture('rootcoil.png', spriteTexture(512, drawBoss)),
     pharaoh: loadCharacterTexture('pharaoh.png', spriteTexture(512, drawPharaoh)),
@@ -1507,6 +1542,7 @@
     storm_eagle_dive: STORM_EAGLE_DIVE_TEX,
     storm_eagle_flap: STORM_EAGLE_FLAP_TEX,
     abyss_lord: loadCharacterTexture('abyss-lord.png', null),
+    abyss_lord_thrust: ABYSS_LORD_THRUST_TEX,
     black_curse_servant: loadCharacterTexture('black-curse-attendant.png', null),
     blood_slave: loadCharacterTexture('blood-slave.png', null),
     black_mist_servant: loadCharacterTexture('black-mist-servant.png', null),
@@ -2257,6 +2293,77 @@
   }
 
   // ---------- 子弹 ----------
+  const abyssTeleportMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.4, 5.4),
+    new THREE.MeshBasicMaterial({
+      map: null,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+      toneMapped: false,
+      blending: THREE.NormalBlending,
+    })
+  );
+  abyssTeleportMesh.rotation.x = -Math.PI / 2;
+  abyssTeleportMesh.position.y = 0.64;
+  abyssTeleportMesh.renderOrder = 6;
+  abyssTeleportMesh.visible = false;
+  scene.add(abyssTeleportMesh);
+
+  const abyssBulletPool = [];
+  for (let i = 0; i < 24; i++) {
+    const group = new THREE.Group();
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(
+        ABYSS_LORD_BULLET_VISUAL_SIZE,
+        ABYSS_LORD_BULLET_VISUAL_SIZE
+      ),
+      new THREE.MeshBasicMaterial({
+        map: ABYSS_BULLET_TEX || null,
+        color: ABYSS_BULLET_TEX ? 0xffffff : 0xa93cff,
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.x = -ABYSS_LORD_BULLET_HEAD_OFFSET;
+    group.add(plane);
+    group.visible = false;
+    scene.add(group);
+    abyssBulletPool.push(group);
+  }
+
+  const abyssAfterimagePool = [];
+  for (let i = 0; i < 32; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(ABYSS_LORD_AFTERIMAGE_SIZE, ABYSS_LORD_AFTERIMAGE_SIZE),
+      new THREE.MeshBasicMaterial({
+        map: ABYSS_BULLET_AFTERIMAGE_TEX || null,
+        color: ABYSS_BULLET_AFTERIMAGE_TEX ? 0xffffff : 0x9a35ff,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.13;
+    mesh.renderOrder = 3;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssAfterimagePool.push(mesh);
+  }
+
   const bulletPool = [];
   for (let i = 0; i < 40; i++) {
     const mesh = new THREE.Mesh(
@@ -2967,6 +3074,8 @@
     stormLightningTimer: STORM_LIGHTNING_INTERVAL,
     stormSummon: null,
     stormIntroShown: false,
+    abyssBullets: [],
+    abyssAfterimages: [],
     blackRunes: [],
     blackPools: [],
     blackBeamEffects: [],
@@ -4224,6 +4333,7 @@
     pharaohShieldRig.visible = false;
     rootSummonRig.visible = false;
     clearStormArena();
+    clearAbyssLordArena();
     if (room.theme === 'temple') layoutTemple(idx);
     else if (room.theme === 'volcano') layoutVolcano(idx);
     else if (room.theme === 'frozen') layoutFrozen(idx);
@@ -4508,6 +4618,16 @@
       stormFeatherTimer: isEagle ? 2.4 : 0,
       stormFeatherPoseTimer: 0,
       stormFeatherCycle: 0,
+      abyssState: isAbyssLord ? 'idle' : 'none',
+      abyssStateTimer: 0,
+      abyssThrustCooldown: isAbyssLord ? 1.5 : 0,
+      abyssShotTimer: isAbyssLord ? 2.2 : 0,
+      abyssThrustFrom: null,
+      abyssThrustTo: null,
+      abyssThrustHit: false,
+      abyssForceThrust: false,
+      abyssTeleportElapsed: 0,
+      abyssTeleportFrame: -1,
       summonFlash: 0,
       shieldActive: isPharaoh,
       shieldHp: isPharaoh ? PHARAOH_SHIELD_HP : 0,
@@ -4540,6 +4660,7 @@
     bossMesh.scale.setScalar(state.boss.renderScale);
     bossMesh.rotation.y = 0;
     bossMesh.rotation.z = 0;
+    abyssTeleportMesh.visible = false;
     bossBreathRig.visible = false;
     bossBreathMat.opacity = 0;
     if (isDragon) clearFrostDragonArena();
@@ -4646,6 +4767,7 @@
     bossBreathMat.opacity = 0;
     if (bossKind === 'frost_dragon') clearFrostDragonArena();
     if (bossKind === 'storm_eagle') clearStormArena();
+    if (bossKind === 'abyss_lord') clearAbyssLordArena();
     clearWispCombatEffects();
     clearBlackGorgeEffects();
     colossusShadow.visible = false;
@@ -6408,7 +6530,7 @@
       return;
     }
     if (b.kind === 'abyss_lord') {
-      updateAbyssLordScene(b, dt);
+      updateAbyssLordScene(b, dt, hp);
       return;
     }
     if (b.kind === 'storm_eagle') {
@@ -6486,18 +6608,313 @@
   }
 
   // 第六章场景阶段：影主固定在王座中心并保留接触伤害，钻洞与暗影弹稍后接入。
-  function updateAbyssLordScene(b, dt) {
-    b.x = cellX(BOSS_CELL.i);
-    b.z = cellZ(BOSS_CELL.j);
-    bossMesh.position.set(b.x, 0, b.z);
-    bossMesh.rotation.z = Math.sin(state.time * 1.45) * 0.018;
-    const scale = (b.renderScale || 2.2) * (1 + Math.sin(state.time * 2.2) * 0.022);
-    bossMesh.scale.setScalar(scale);
-    if (b.cool > 0) b.cool -= dt;
-    if (bodyDistanceSq(b.x, b.z) < b.contactRadius * b.contactRadius && b.cool <= 0) {
-      b.cool = 1.6;
-      damage(2, 'contact');
+  function abyssLordInvulnerable(b = state.boss) {
+    return Boolean(
+      b &&
+      b.alive &&
+      b.kind === 'abyss_lord' &&
+      (b.abyssState === 'vanish' || b.abyssState === 'emerge')
+    );
+  }
+
+  function beginAbyssTeleportAnimation(b, kind) {
+    const texture = kind === 'vanish' ? ABYSS_LORD_VANISH_TEX : ABYSS_LORD_EMERGE_TEX;
+    b.abyssState = kind;
+    b.abyssStateTimer = ABYSS_LORD_TELEPORT_DURATION;
+    b.abyssTeleportElapsed = 0;
+    b.abyssTeleportFrame = -1;
+    bossMesh.visible = false;
+    abyssTeleportMesh.visible = true;
+    abyssTeleportMesh.position.set(b.x, 0.64, b.z);
+    abyssTeleportMesh.scale.setScalar(b.renderScale || 2.2);
+    abyssTeleportMesh.material.map = texture || null;
+    abyssTeleportMesh.material.opacity = 1;
+    abyssTeleportMesh.material.needsUpdate = true;
+  }
+
+  function chooseAbyssTeleportTarget() {
+    const head = state.cells[0] || BOSS_CELL;
+    for (let tries = 0; tries < 100; tries++) {
+      const i = 3 + randInt(N - 6);
+      const j = 3 + randInt(N - 6);
+      if (isObstacle(i, j)) continue;
+      if (Math.hypot(i - head.i, j - head.j) < 5) continue;
+      if (state.cells.some((cell) => cell.i === i && cell.j === j)) continue;
+      return { i, j };
     }
+    return {
+      i: BOSS_CELL.i,
+      j: BOSS_CELL.j,
+    };
+  }
+
+  function startAbyssThrust(b, hp, forced = false) {
+    if (!b || b.abyssState !== 'idle' || b.abyssThrustCooldown > 0 || state.over) return false;
+    const distance = Math.hypot(hp.x - b.x, hp.z - b.z);
+    if (!forced && distance > ABYSS_LORD_TRIGGER_RANGE) return false;
+    b.abyssState = 'windup';
+    b.abyssStateTimer = ABYSS_LORD_THRUST_WINDUP;
+    b.abyssThrustCooldown = ABYSS_LORD_THRUST_INTERVAL;
+    b.abyssThrustFrom = { x: b.x, z: b.z };
+    b.abyssThrustTo = {
+      x: Math.max(-HALF + 1, Math.min(HALF - 1, hp.x)),
+      z: Math.max(-HALF + 1, Math.min(HALF - 1, hp.z)),
+    };
+    b.abyssThrustHit = false;
+    b.abyssForceThrust = false;
+    return true;
+  }
+
+  function fireAbyssLordVolley(b, hp) {
+    const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+    const offsets = [-ABYSS_LORD_SHOT_SPREAD, 0, ABYSS_LORD_SHOT_SPREAD];
+    for (const offset of offsets) {
+      spawnAbyssBullet(b.x, b.z, base + offset);
+    }
+    b.abyssShotTimer = ABYSS_LORD_SHOT_INTERVAL;
+  }
+
+  function spawnAbyssBullet(x, z, angle) {
+    const mesh = abyssBulletPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.visible = true;
+    mesh.rotation.y = -angle;
+    mesh.position.set(x, 0.58, z);
+    mesh.scale.setScalar(1);
+    state.abyssBullets.push({
+      mesh,
+      x,
+      z,
+      vx: Math.cos(angle) * ABYSS_LORD_BULLET_SPEED,
+      vz: Math.sin(angle) * ABYSS_LORD_BULLET_SPEED,
+      angle,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  function abyssProjectileTouchesObstacle(x, z, radius) {
+    const baseI = Math.round(x + HALF);
+    const baseJ = Math.round(z + HALF);
+    const padding = Math.ceil(radius + 0.5);
+    for (let di = -padding; di <= padding; di++) {
+      for (let dj = -padding; dj <= padding; dj++) {
+        const i = baseI + di;
+        const j = baseJ + dj;
+        if (!inBounds(i, j) || !isObstacle(i, j)) continue;
+        const cx = cellX(i);
+        const cz = cellZ(j);
+        const nearestX = Math.max(cx - 0.5, Math.min(x, cx + 0.5));
+        const nearestZ = Math.max(cz - 0.5, Math.min(z, cz + 0.5));
+        const dx = x - nearestX;
+        const dz = z - nearestZ;
+        if (dx * dx + dz * dz <= radius * radius) return true;
+      }
+    }
+    return false;
+  }
+
+  function spawnAbyssAfterimage(x, z) {
+    const mesh = abyssAfterimagePool.find((item) => !item.visible);
+    if (!mesh) return;
+    x = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, x));
+    z = Math.max(-HALF + 0.5, Math.min(HALF - 0.5, z));
+    mesh.visible = true;
+    mesh.position.set(x, 0.13, z);
+    mesh.scale.setScalar(1);
+    mesh.material.opacity = 0.82;
+    state.abyssAfterimages.push({
+      mesh,
+      x,
+      z,
+      life: ABYSS_LORD_AFTERIMAGE_LIFE,
+      age: 0,
+      hit: false,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  function abyssAfterimageTouchesBody(afterimage) {
+    const half = ABYSS_LORD_AFTERIMAGE_SIZE / 2;
+    return state.cells.some((cell) => (
+      Math.abs(cellX(cell.i) - afterimage.x) <= half &&
+      Math.abs(cellZ(cell.j) - afterimage.z) <= half
+    ));
+  }
+
+  function updateAbyssLordArena(dt) {
+    for (let k = state.abyssBullets.length - 1; k >= 0; k--) {
+      const bullet = state.abyssBullets[k];
+      bullet.x += bullet.vx * dt;
+      bullet.z += bullet.vz * dt;
+      bullet.mesh.position.set(
+        bullet.x,
+        0.58 + Math.sin(state.time * 14 + bullet.phase) * 0.04,
+        bullet.z
+      );
+      bullet.mesh.scale.setScalar(1 + Math.sin(state.time * 18 + bullet.phase) * 0.025);
+
+      let dead = !inBounds(Math.round(bullet.x + HALF), Math.round(bullet.z + HALF)) ||
+        abyssProjectileTouchesObstacle(
+          bullet.x,
+          bullet.z,
+          ABYSS_LORD_BULLET_HIT_RADIUS
+        );
+      if (!dead && bodyDistanceSq(bullet.x, bullet.z) <
+        ABYSS_LORD_BULLET_HIT_RADIUS * ABYSS_LORD_BULLET_HIT_RADIUS) {
+        damage(ABYSS_LORD_BULLET_DAMAGE, 'projectile');
+        dead = true;
+      }
+      if (dead) {
+        spawnAbyssAfterimage(bullet.x, bullet.z);
+        bullet.mesh.visible = false;
+        state.abyssBullets.splice(k, 1);
+      }
+    }
+
+    for (let k = state.abyssAfterimages.length - 1; k >= 0; k--) {
+      const afterimage = state.abyssAfterimages[k];
+      afterimage.life -= dt;
+      afterimage.age += dt;
+      afterimage.mesh.material.opacity =
+        Math.min(0.82, Math.max(0, afterimage.life) * 1.4) *
+        (0.82 + Math.sin(state.time * 5 + afterimage.phase) * 0.12);
+      afterimage.mesh.scale.setScalar(1 + Math.sin(state.time * 4 + afterimage.phase) * 0.04);
+      if (!afterimage.hit && afterimage.age >= 0.15 && abyssAfterimageTouchesBody(afterimage)) {
+        afterimage.hit = true;
+        afterimage.life = Math.min(afterimage.life, 0.7);
+        state.slowTimer = Math.max(state.slowTimer, ABYSS_LORD_AFTERIMAGE_SLOW_TIME);
+        if (state.boss && state.boss.kind === 'abyss_lord' && state.boss.alive) {
+          state.boss.abyssForceThrust = true;
+        }
+        toast('暗影残影', '移动速度降低 3 秒 · 影主锁定突刺');
+      }
+      if (afterimage.life <= 0) {
+        afterimage.mesh.visible = false;
+        state.abyssAfterimages.splice(k, 1);
+      }
+    }
+  }
+
+  function updateAbyssLordScene(b, dt, hp) {
+    b.abyssThrustCooldown = Math.max(0, b.abyssThrustCooldown - dt);
+    b.abyssShotTimer = Math.max(0, b.abyssShotTimer - dt);
+
+    if (b.abyssState === 'vanish' || b.abyssState === 'emerge') {
+      b.abyssStateTimer = Math.max(0, b.abyssStateTimer - dt);
+      b.abyssTeleportElapsed += dt;
+      const progress = Math.min(1, b.abyssTeleportElapsed / ABYSS_LORD_TELEPORT_DURATION);
+      const frame = Math.min(
+        ABYSS_LORD_TELEPORT_FRAMES - 1,
+        Math.floor(progress * ABYSS_LORD_TELEPORT_FRAMES)
+      );
+      const texture = b.abyssState === 'vanish'
+        ? ABYSS_LORD_VANISH_TEX
+        : ABYSS_LORD_EMERGE_TEX;
+      if (texture && b.abyssTeleportFrame !== frame) {
+        b.abyssTeleportFrame = frame;
+        texture.offset.x = frame / ABYSS_LORD_TELEPORT_FRAMES;
+      }
+      abyssTeleportMesh.position.set(b.x, 0.64, b.z);
+      if (b.abyssStateTimer > 0) return;
+
+      if (b.abyssState === 'vanish') {
+        const target = chooseAbyssTeleportTarget();
+        b.x = cellX(target.i);
+        b.z = cellZ(target.j);
+        beginAbyssTeleportAnimation(b, 'emerge');
+      } else {
+        abyssTeleportMesh.visible = false;
+        bossMesh.visible = true;
+        b.abyssState = 'idle';
+        b.abyssStateTimer = 0;
+        bossPlaneMat.map = BOSS_TEX.abyss_lord || null;
+        bossPlaneMat.needsUpdate = true;
+      }
+    }
+
+    const distance = Math.hypot(hp.x - b.x, hp.z - b.z);
+    if (b.abyssState === 'idle') {
+      if (b.abyssThrustCooldown <= 0 &&
+        (b.abyssForceThrust || distance <= ABYSS_LORD_TRIGGER_RANGE)) {
+        startAbyssThrust(b, hp, b.abyssForceThrust);
+      } else if (distance > ABYSS_LORD_TRIGGER_RANGE && b.abyssShotTimer <= 0) {
+        fireAbyssLordVolley(b, hp);
+      }
+    } else if (b.abyssState === 'windup') {
+      b.abyssStateTimer = Math.max(0, b.abyssStateTimer - dt);
+      if (b.abyssStateTimer <= 0) {
+        b.abyssState = 'thrust';
+        b.abyssStateTimer = ABYSS_LORD_THRUST_TIME;
+        b.abyssThrustHit = false;
+        b.abyssThrustFrom = { x: b.x, z: b.z };
+      }
+    } else if (b.abyssState === 'thrust') {
+      const previousX = b.x;
+      const previousZ = b.z;
+      b.abyssStateTimer = Math.max(0, b.abyssStateTimer - dt);
+      const progress = 1 - b.abyssStateTimer / ABYSS_LORD_THRUST_TIME;
+      const eased = progress * progress * (3 - 2 * progress);
+      const from = b.abyssThrustFrom || { x: b.x, z: b.z };
+      const to = b.abyssThrustTo || from;
+      b.x = from.x + (to.x - from.x) * eased;
+      b.z = from.z + (to.z - from.z) * eased;
+      if (!b.abyssThrustHit && stormEagleDashTouchesBody(
+        previousX,
+        previousZ,
+        b.x,
+        b.z,
+        ABYSS_LORD_THRUST_HIT_RADIUS
+      )) {
+        b.abyssThrustHit = true;
+        damage(ABYSS_LORD_THRUST_DAMAGE, 'contact');
+        if (state.over) return;
+        toast('影主突刺命中', '体长 -3');
+      }
+      if (b.abyssStateTimer <= 0) {
+        if (b.abyssThrustHit) {
+          beginAbyssTeleportAnimation(b, 'vanish');
+        } else {
+          b.abyssState = 'idle';
+          bossPlaneMat.map = BOSS_TEX.abyss_lord || null;
+          bossPlaneMat.needsUpdate = true;
+        }
+      }
+    }
+
+    if (b.abyssState !== 'vanish' && b.abyssState !== 'emerge') {
+      const thrustPose = b.abyssState === 'windup' || b.abyssState === 'thrust';
+      const poseTexture = thrustPose
+        ? BOSS_TEX.abyss_lord_thrust
+        : BOSS_TEX.abyss_lord;
+      if (poseTexture && bossPlaneMat.map !== poseTexture) {
+        bossPlaneMat.map = poseTexture;
+        bossPlaneMat.needsUpdate = true;
+      }
+      bossMesh.visible = true;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.y = 0;
+      bossMesh.rotation.z = thrustPose ? 0 : Math.sin(state.time * 1.45) * 0.018;
+      bossMesh.scale.setScalar(b.renderScale || 2.2);
+      bossPlaneMat.opacity = 1;
+    }
+  }
+
+  function clearAbyssLordArena() {
+    state.abyssBullets.forEach((bullet) => {
+      bullet.mesh.visible = false;
+    });
+    state.abyssBullets.length = 0;
+    state.abyssAfterimages.forEach((afterimage) => {
+      afterimage.mesh.visible = false;
+    });
+    state.abyssAfterimages.length = 0;
+    abyssBulletPool.forEach((mesh) => {
+      mesh.visible = false;
+    });
+    abyssAfterimagePool.forEach((mesh) => {
+      mesh.visible = false;
+    });
+    abyssTeleportMesh.visible = false;
   }
 
   function isBlackGorgeBoss(kind = state.boss?.kind) {
@@ -7673,7 +8090,7 @@
         }
       }
 
-      if (!boom && state.boss && state.boss.alive &&
+      if (!boom && state.boss && state.boss.alive && !abyssLordInvulnerable() &&
         Math.hypot(state.boss.x - orb.x, state.boss.z - orb.z) < state.boss.orbHitRadius) {
         boom = true;
         orb.boomX = state.boss.x;
@@ -7881,7 +8298,8 @@
       }
 
       // 命中 Boss
-      if (!dead && state.phase === 'boss' && state.boss && state.boss.alive) {
+      if (!dead && state.phase === 'boss' && state.boss && state.boss.alive &&
+        !abyssLordInvulnerable()) {
         if (Math.hypot(state.boss.x - b.x, state.boss.z - b.z) < state.boss.bulletHitRadius) {
           const shieldBlocked = damagePharaohShield(false);
           const mistBlocked = blackBossInvulnerable();
@@ -8023,6 +8441,7 @@
     clearFrostDragonArena();
     clearWispCombatEffects();
     clearStormArena();
+    clearAbyssLordArena();
     clearBlackGorgeEffects();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
@@ -8243,6 +8662,7 @@
       updateStormBolts(dt);
       updateStormFeathers(dt);
       updateStormArena(dt);
+      updateAbyssLordArena(dt);
       updateBlackGorgeEffects(dt);
       updateBullets(dt);
       updateFireTrails(dt);
@@ -8353,6 +8773,38 @@
         ? { ...state.boss.stormDashTo }
         : null,
     }),
+    getAbyssLordArena: () => {
+      const boss = state.boss?.kind === 'abyss_lord' ? state.boss : null;
+      const head = state.cells[0];
+      return {
+        theme: ROOMS[state.level]?.theme || null,
+        bossKind: state.boss?.kind || null,
+        bossState: boss?.abyssState || null,
+        bossX: boss?.x ?? null,
+        bossZ: boss?.z ?? null,
+        distance: boss && head ? Math.hypot(
+          boss.x - cellX(head.i),
+          boss.z - cellZ(head.j)
+        ) : null,
+        thrustCooldown: boss?.abyssThrustCooldown ?? null,
+        shotTimer: boss?.abyssShotTimer ?? null,
+        forceThrust: Boolean(boss?.abyssForceThrust),
+        hidden: Boolean(boss && (boss.abyssState === 'vanish' || boss.abyssState === 'emerge')),
+        teleportVisible: abyssTeleportMesh.visible,
+        teleportFrame: boss?.abyssTeleportFrame ?? -1,
+        bullets: state.abyssBullets.map(({ x, z, vx, vz }) => ({ x, z, vx, vz })),
+        afterimages: state.abyssAfterimages.map(({ x, z, life, age, hit }) => ({
+          x,
+          z,
+          life,
+          age,
+          hit,
+        })),
+        slowTimer: state.slowTimer,
+      };
+    },
+    spawnAbyssBullet,
+    spawnAbyssAfterimage,
     spawnBlackRune,
     spawnBlackPool,
     spawnBlackBeam,
