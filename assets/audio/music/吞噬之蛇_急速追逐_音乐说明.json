@@ -1,0 +1,75 @@
+{
+  "title": "吞噬之蛇 · 急速回环",
+  "bpm": 120,
+  "beats_per_bar": 4,
+  "bars": 30,
+  "key": "A minor",
+  "sections": [
+    {
+      "name": "intro",
+      "bars": "1-2",
+      "seconds": "0-4"
+    },
+    {
+      "name": "A1",
+      "bars": "3-10",
+      "seconds": "4-20"
+    },
+    {
+      "name": "B tension",
+      "bars": "11-18",
+      "seconds": "20-36"
+    },
+    {
+      "name": "A2 full",
+      "bars": "19-26",
+      "seconds": "36-52"
+    },
+    {
+      "name": "outro fade",
+      "bars": "27-30",
+      "seconds": "52-60"
+    }
+  ],
+  "progression_A": [
+    "Am",
+    "F",
+    "C",
+    "G"
+  ],
+  "progression_B": [
+    "Dm",
+    "Bb",
+    "F",
+    "E"
+  ],
+  "instrumentation": [
+    "bright plucked lead",
+    "octave double",
+    "staccato bass",
+    "soft chord bed",
+    "tense chord stabs",
+    "kick",
+    "snare",
+    "16th-note hi-hats",
+    "tom fills",
+    "short tension risers"
+  ],
+  "sample_rate": 44100,
+  "channels": 2,
+  "seed": 20261120,
+  "loop_notes": {
+    "fade_version": {
+      "file": "吞噬之蛇_急速追逐_60s_淡出循环.wav",
+      "duration_seconds": 60.0,
+      "fade_start_seconds": 57.0,
+      "use": "Play the whole file in a loop; the 3-second fade resets cleanly to the quiet opening."
+    },
+    "seamless_version": {
+      "file": "吞噬之蛇_急速追逐_59.2s_无缝循环.wav",
+      "duration_seconds": 59.2,
+      "crossfade_seconds": 0.8,
+      "use": "Loop the whole file directly; the final 0.8 seconds are crossfaded into the opening."
+    }
+  }
+}

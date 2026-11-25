@@ -1,0 +1,41 @@
+{
+  "title": "吞噬之蛇 · 主菜单「静候」",
+  "purpose": "main menu background music",
+  "bpm": 80,
+  "time_signature": "4/4",
+  "bars": 20,
+  "duration_seconds": 60.0,
+  "key": "F major with gentle major-seventh color",
+  "progression": [
+    "Fmaj7",
+    "Dm7",
+    "Bbmaj7",
+    "Cadd9"
+  ],
+  "mood": "calm, warm, spacious, low-distraction",
+  "instrumentation": [
+    "soft felt-piano lead",
+    "quiet felt-piano arpeggio",
+    "warm analog-style pad",
+    "soft sub bass",
+    "glass bell accents",
+    "air texture",
+    "long room reverb"
+  ],
+  "sample_rate": 44100,
+  "channels": 2,
+  "seed": 20261121,
+  "loop_notes": {
+    "soft_loop": {
+      "file": "吞噬之蛇_主菜单_静候_60s_柔和循环.wav",
+      "duration_seconds": 60.0,
+      "use": "Play the whole file in a loop; the short soft fade at each end gives a gentle breath."
+    },
+    "seamless_loop": {
+      "file": "吞噬之蛇_主菜单_静候_59.2s_无缝循环.wav",
+      "duration_seconds": 59.2,
+      "crossfade_seconds": 0.8,
+      "use": "Recommended for the main menu; loop the whole file directly with no audible seam."
+    }
+  }
+}
