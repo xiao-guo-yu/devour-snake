@@ -136,6 +136,7 @@
   const ABYSS_LORD_AFTERIMAGE_SLOW_TIME = 3;
   const ABYSS_LORD_TELEPORT_FRAMES = 11;
   const ABYSS_LORD_TELEPORT_DURATION = 0.99;
+  const ABYSS_LORD_TELEPORT_INTERVAL = 8;
   const BLACK_GORGE_LEVEL_BASE = 48;
   const BLACK_GORGE_OBSTACLE_COUNT = 8;
   const BLACK_CURSE_ATTENDANT_HP = 290;
@@ -4626,6 +4627,7 @@
       abyssThrustTo: null,
       abyssThrustHit: false,
       abyssForceThrust: false,
+      abyssTeleportTimer: isAbyssLord ? ABYSS_LORD_TELEPORT_INTERVAL : 0,
       abyssTeleportElapsed: 0,
       abyssTeleportFrame: -1,
       summonFlash: 0,
@@ -6633,12 +6635,10 @@
   }
 
   function chooseAbyssTeleportTarget() {
-    const head = state.cells[0] || BOSS_CELL;
     for (let tries = 0; tries < 100; tries++) {
-      const i = 3 + randInt(N - 6);
-      const j = 3 + randInt(N - 6);
+      const i = 2 + randInt(N - 4);
+      const j = 2 + randInt(N - 4);
       if (isObstacle(i, j)) continue;
-      if (Math.hypot(i - head.i, j - head.j) < 5) continue;
       if (state.cells.some((cell) => cell.i === i && cell.j === j)) continue;
       return { i, j };
     }
@@ -6827,14 +6827,21 @@
         bossMesh.visible = true;
         b.abyssState = 'idle';
         b.abyssStateTimer = 0;
+        b.abyssTeleportTimer = ABYSS_LORD_TELEPORT_INTERVAL;
         bossPlaneMat.map = BOSS_TEX.abyss_lord || null;
         bossPlaneMat.needsUpdate = true;
       }
     }
 
+    if (b.abyssState !== 'vanish' && b.abyssState !== 'emerge') {
+      b.abyssTeleportTimer = Math.max(0, b.abyssTeleportTimer - dt);
+    }
     const distance = Math.hypot(hp.x - b.x, hp.z - b.z);
     if (b.abyssState === 'idle') {
-      if (b.abyssThrustCooldown <= 0 &&
+      if (b.abyssTeleportTimer <= 0) {
+        b.abyssTeleportTimer = ABYSS_LORD_TELEPORT_INTERVAL;
+        beginAbyssTeleportAnimation(b, 'vanish');
+      } else if (b.abyssThrustCooldown <= 0 &&
         (b.abyssForceThrust || distance <= ABYSS_LORD_TRIGGER_RANGE)) {
         startAbyssThrust(b, hp, b.abyssForceThrust);
       } else if (distance > ABYSS_LORD_TRIGGER_RANGE && b.abyssShotTimer <= 0) {
@@ -6871,13 +6878,8 @@
         toast('影主突刺命中', '体长 -3');
       }
       if (b.abyssStateTimer <= 0) {
-        if (b.abyssThrustHit) {
-          beginAbyssTeleportAnimation(b, 'vanish');
-        } else {
-          b.abyssState = 'idle';
-          bossPlaneMat.map = BOSS_TEX.abyss_lord || null;
-          bossPlaneMat.needsUpdate = true;
-        }
+        b.abyssTeleportTimer = ABYSS_LORD_TELEPORT_INTERVAL;
+        beginAbyssTeleportAnimation(b, 'vanish');
       }
     }
 
@@ -8788,6 +8790,7 @@
         ) : null,
         thrustCooldown: boss?.abyssThrustCooldown ?? null,
         shotTimer: boss?.abyssShotTimer ?? null,
+        teleportTimer: boss?.abyssTeleportTimer ?? null,
         forceThrust: Boolean(boss?.abyssForceThrust),
         hidden: Boolean(boss && (boss.abyssState === 'vanish' || boss.abyssState === 'emerge')),
         teleportVisible: abyssTeleportMesh.visible,
