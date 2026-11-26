@@ -56,15 +56,18 @@
   const DRAGON_BREATH_COOLDOWN = 6.2;
   const DRAGON_BREATH_RANGE = 23.2;
   const DRAGON_BREATH_HALF_ANGLE = Math.PI * 0.12;
-  const DRAGON_ATTACK_INTERVAL = 7;
+  const DRAGON_ATTACK_INTERVAL = 2;
   const DRAGON_MIRROR_HP_RATIO = 0.75;
   const DRAGON_LASER_TELEGRAPH = 0.9;
   const DRAGON_LASER_ACTIVE = 8;
   const DRAGON_LASER_SPIN_SPEED = Math.PI * 0.26;
   const DRAGON_LASER_RANGE = 23.2;
   const DRAGON_LASER_HIT_WIDTH = 1.52;
+  const DRAGON_LASER_HIT_COOLDOWN = 0.9;
   const DRAGON_SLAM_TELEGRAPH = 1.15;
   const DRAGON_SLAM_ACTIVE = 0.65;
+  const DRAGON_SLAM_BULLET_COUNT = 72;
+  const DRAGON_SLAM_BULLET_POOL_SIZE = 160;
   const DRAGON_FROST_SCAR_LIFE = 5;
   const WISP_FOG_TIME = 7;
   const WISP_SOLID_TIME = 3;
@@ -2440,7 +2443,7 @@
   }
 
   const frostSlamBulletPool = [];
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < DRAGON_SLAM_BULLET_POOL_SIZE; i++) {
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.46, 12, 9),
       new THREE.MeshStandardMaterial({
@@ -4594,7 +4597,7 @@
       jumpHidden: false,
       fireballTimer: isColossus ? 3 : 0,
       cool: 0,
-      breathTimer: isDragon ? 2.6 : 0,
+      breathTimer: isDragon ? DRAGON_ATTACK_INTERVAL : 0,
       breathState: isDragon ? 'idle' : 'none',
       breathElapsed: 0,
       breathAngle: 0,
@@ -4603,7 +4606,7 @@
       dragonAttack: null,
       dragonAttackElapsed: 0,
       mirrorsSpawned: false,
-      laserHit: false,
+      laserHitCooldown: 0,
       laserAngleOffset: 0,
       slamElapsed: 0,
       summonTimer: isRootcoil ? ROOT_SUMMON_INTERVAL : 0,
@@ -6201,7 +6204,7 @@
   }
 
   function spawnFrostSlamRing(b) {
-    const count = 36;
+    const count = DRAGON_SLAM_BULLET_COUNT;
     const startRadius = 5.15;
     const speed = 5.1;
     for (let k = 0; k < count; k++) {
@@ -6257,7 +6260,7 @@
   function startFrostDragonAttack(b, attack, targetAngle) {
     b.dragonAttack = attack;
     b.dragonAttackElapsed = 0;
-    b.laserHit = false;
+    b.laserHitCooldown = 0;
     b.breathHit = false;
     if (attack === 'breath') {
       b.dragonState = 'breathTelegraph';
@@ -6366,11 +6369,14 @@
 
     if (b.dragonState === 'laserTelegraph' || b.dragonState === 'laserActive') {
       const active = b.dragonState === 'laserActive';
-      if (active) b.laserAngleOffset += DRAGON_LASER_SPIN_SPEED * dt;
+      if (active) {
+        b.laserAngleOffset += DRAGON_LASER_SPIN_SPEED * dt;
+        b.laserHitCooldown = Math.max(0, b.laserHitCooldown - dt);
+      }
       updateDragonLaserVisuals(b, active ? 0.92 : 0.22);
       setFrostDragonPose(true);
-      if (active && !b.laserHit && bodyTouchesDragonLaser(b)) {
-        b.laserHit = true;
+      if (active && b.laserHitCooldown <= 0 && bodyTouchesDragonLaser(b)) {
+        b.laserHitCooldown = DRAGON_LASER_HIT_COOLDOWN;
         damage(1, 'projectile');
         if (state.over) return;
       }
