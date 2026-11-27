@@ -84,7 +84,7 @@
   const FROST_SKILL_COST = 1;
   const FROST_SKILL_COOLDOWN = 5;
   const FROST_SKILL_SLOW_DURATION = 3;
-  const FROST_SKILL_RANGE = 5;
+  const FROST_SKILL_RANGE = 8;
   const FROST_SKILL_HALF_ANGLE = Math.atan(0.28);
   const FROST_SKILL_SLOW_MULT = 0.5;
   const FROST_SKILL_DAMAGE = 1;
@@ -4322,7 +4322,7 @@
       const frost = qSkill === 'ice';
       el.qSkillName.textContent = frost ? 'Q · 冰核吐息' : 'Q · 金核壁垒';
       el.qSkillDesc.textContent = frost
-        ? '5 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
+        ? '8 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
         : '护盾 2 秒 · 冷却 5 秒';
       el.qSkillState.textContent = frost
         ? (state.frostCooldown > 0
@@ -5116,7 +5116,7 @@
       '冰核吐息',
       hitCount > 0
         ? `命中 ${hitCount} 个目标 · 减速 ${slowed} 个目标 ${FROST_SKILL_SLOW_DURATION} 秒`
-        : '寒霜席卷前方 5 格'
+        : '寒霜席卷前方 8 格'
     );
   }
 

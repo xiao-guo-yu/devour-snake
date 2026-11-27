@@ -77,7 +77,7 @@ The Frost Dragon arena and attack assets were supplied by the project owner on 2
 - Original file: `C:\Users\17928\DSH生成文件夹\龙息_锥形喷射_透明底.png`.
 - The supplied 2004×1117 RGBA image is shipped without pixel modification.
 - Technical QA confirms real alpha transparency and reports no cropping or format problems.
-- Runtime uses linear filtering with mipmaps disabled and maps the image to the five-cell Q-skill cone.
+- Runtime uses linear filtering with mipmaps disabled and maps the image to the eight-cell Q-skill cone.
 
 ## Storm Airspace Assets
 
