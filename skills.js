@@ -33,11 +33,19 @@
     },
     ice: {
       id: 'ice',
-      slot: 'q',
+      slot: 'e',
       color: '#8de9ff',
       name: '冰核吐息',
-      subtitle: 'BLUE CORE · Q',
-      desc: '按 Q 消耗 1 格身体，向面前 8 格扇形范围喷吐冰霜；造成 1 点伤害并减速敌人 3 秒，冷却 5 秒。',
+      subtitle: 'BLUE CORE · E',
+      desc: '按 E 消耗 1 格身体，向面前 8 格扇形范围喷吐冰霜；造成 1 点伤害并减速敌人 3 秒，冷却 5 秒。',
+    },
+    purple: {
+      id: 'purple',
+      slot: 'q',
+      color: '#b783ff',
+      name: '紫核传送',
+      subtitle: 'PURPLE CORE · Q',
+      desc: '按 Q 消耗 2 格身体，在身前 2 格生成入口，并在地图随机位置生成出口；蛇从出口逐节钻出，冷却 8 秒。',
     },
     speed: {
       id: 'speed',
@@ -58,8 +66,8 @@
 
   function freshData() {
     return {
-      version: 4,
-      unlocked: { green: false, yellow: false, red: false, ice: false, speed: false },
+      version: 5,
+      unlocked: { green: false, yellow: false, red: false, ice: false, purple: false, speed: false },
       equipped: { e: null, q: null, shift: null },
     };
   }
@@ -144,7 +152,7 @@
     // on the shared E slot; replaying green must not overwrite a chosen red loadout.
     if (skill.slot !== 'e') {
       data.equipped[skill.slot] = id;
-    } else if (id === 'red' || !data.equipped.e) {
+    } else if (id === 'red' || id === 'ice' || !data.equipped.e) {
       data.equipped.e = id;
     }
 
@@ -280,7 +288,7 @@
   if (TEST_ALL_SKILLS || ENABLE_ALL_SKILLS_FOR_TESTING) {
     for (const id of Object.keys(SKILLS)) data.unlocked[id] = true;
     data.equipped.e = 'red';
-    data.equipped.q = 'ice';
+    data.equipped.q = 'purple';
     data.equipped.shift = 'speed';
     save();
   }

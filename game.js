@@ -21,6 +21,10 @@
   const ENEMY_HIT_RADIUS = 1.5;
   const SHIELD_DURATION = 2;
   const SHIELD_COOLDOWN = 5;
+  const TELEPORT_SKILL_COST = 2;
+  const TELEPORT_SKILL_COOLDOWN = 8;
+  const TELEPORT_MIN_HOLE_DISTANCE = 9;
+  const TELEPORT_HOLE_EFFECT_TIME = 1.6;
   const SPEED_BOOST_MULT = 1.5;
   const SPEED_BOOST_DURATION = 2;
   const SPEED_BOOST_COOLDOWN = 3;
@@ -1485,6 +1489,12 @@
     FROST_BREATH_CONE_TEX.minFilter = THREE.LinearFilter;
     FROST_BREATH_CONE_TEX.magFilter = THREE.LinearFilter;
   }
+  const PURPLE_BLACK_HOLE_TEX = loadIceEffectTexture('purple-black-hole.png');
+  if (PURPLE_BLACK_HOLE_TEX) {
+    PURPLE_BLACK_HOLE_TEX.generateMipmaps = false;
+    PURPLE_BLACK_HOLE_TEX.minFilter = THREE.LinearFilter;
+    PURPLE_BLACK_HOLE_TEX.magFilter = THREE.LinearFilter;
+  }
   if (FIRE_BULLET_TEX) {
     FIRE_BULLET_TEX.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
@@ -2934,6 +2944,27 @@
   playerFrostRig.visible = false;
   scene.add(playerFrostRig);
 
+  const purpleHoleMeshes = Array.from({ length: 2 }, () => {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.35, 2.35),
+      new THREE.MeshBasicMaterial({
+        map: PURPLE_BLACK_HOLE_TEX || null,
+        color: PURPLE_BLACK_HOLE_TEX ? 0xffffff : 0xb783ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.18;
+    mesh.renderOrder = 3;
+    mesh.visible = false;
+    scene.add(mesh);
+    return mesh;
+  });
+
   const colossusShadow = new THREE.Mesh(
     new THREE.CircleGeometry(6.45, 48),
     new THREE.MeshBasicMaterial({
@@ -3050,6 +3081,7 @@
     magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     frost_dragon: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
     storm_eagle: { id: 'speed', color: 0x9fe6ff, core: 0xf1fdff, emissive: 0x3b9cc5 },
+    abyss_lord: { id: 'purple', color: 0xb783ff, core: 0xf0ddff, emissive: 0x7438d8 },
     black_curse_servant: { id: 'green', color: 0x68e7b8, core: 0xcaffea, emissive: 0x28b685 },
     blood_slave: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     black_mist_servant: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
@@ -3110,6 +3142,10 @@
     shieldTimer: 0,
     shieldCooldown: 0,
     shieldFlash: 0,
+    teleportCooldown: 0,
+    teleportHoleTimer: 0,
+    teleportHoles: [],
+    teleportEmerging: false,
     speedBoostTimer: 0,
     speedCooldown: 0,
     frostCooldown: 0,
@@ -4292,7 +4328,7 @@
     const shieldText = state.shieldTimer > 0
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
-    const signature = `${eSkill}|${qSkill}|${shiftSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.speedBoostTimer.toFixed(1)}|${state.speedCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}|${state.cells.length}`;
+    const signature = `${eSkill}|${qSkill}|${shiftSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.teleportCooldown.toFixed(1)}|${state.speedBoostTimer.toFixed(1)}|${state.speedCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}|${state.cells.length}`;
     const showSkillHud = Boolean(eSkill || qSkill || shiftSkill) && skillHudRevealTimer > 0;
     el.skillHud.hidden = !showSkillHud;
     el.skillHud.classList.toggle('is-fading', showSkillHud && skillHudRevealTimer <= 0.45);
@@ -4306,35 +4342,38 @@
     if (eSkill) {
       const red = eSkill === 'red';
       const green = eSkill === 'green';
-      el.eSkillName.textContent = red ? 'E · 赤核烈焰弹' : 'E · 翠核能量波';
-      el.eSkillDesc.textContent = red
-        ? '消耗 2 格 · 伤害 2 · 2×2 火焰'
-        : '消耗 3 格 · 3×3 能量爆发';
-      el.eSkillState.textContent = green && state.energyCd > 0
-        ? `${state.energyCd.toFixed(1)}s`
-        : (state.cells.length > (green ? 4 : 3) ? '就绪' : '身体不足');
+      const ice = eSkill === 'ice';
+      el.eSkillName.textContent = ice ? 'E · 冰核吐息' : (red ? 'E · 赤核烈焰弹' : 'E · 翠核能量波');
+      el.eSkillDesc.textContent = ice
+        ? '8 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
+        : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 3 格 · 3×3 能量爆发');
+      el.eSkillState.textContent = ice && state.frostCooldown > 0
+        ? `${state.frostCooldown.toFixed(1)}s`
+        : (green && state.energyCd > 0
+          ? `${state.energyCd.toFixed(1)}s`
+          : (state.cells.length > (green ? 4 : (red || ice ? 3 : 2)) ? '就绪' : '身体不足'));
       if (el.eSkillHud.style?.setProperty) {
-        el.eSkillHud.style.setProperty('--skill-color', red ? '#ff6542' : '#68e7b8');
+        el.eSkillHud.style.setProperty('--skill-color', ice ? '#8de9ff' : (red ? '#ff6542' : '#68e7b8'));
       }
     }
 
     if (qSkill) {
-      const frost = qSkill === 'ice';
-      el.qSkillName.textContent = frost ? 'Q · 冰核吐息' : 'Q · 金核壁垒';
-      el.qSkillDesc.textContent = frost
-        ? '8 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
+      const portal = qSkill === 'purple';
+      el.qSkillName.textContent = portal ? 'Q · 紫核传送' : 'Q · 金核壁垒';
+      el.qSkillDesc.textContent = portal
+        ? '入口前方 2 格 · 随机出口 · 消耗 2'
         : '护盾 2 秒 · 冷却 5 秒';
-      el.qSkillState.textContent = frost
-        ? (state.frostCooldown > 0
-          ? `${state.frostCooldown.toFixed(1)}s`
-          : (state.cells.length > 2 ? '就绪' : '身体不足'))
+      el.qSkillState.textContent = portal
+        ? (state.teleportCooldown > 0
+          ? `${state.teleportCooldown.toFixed(1)}s`
+          : (state.cells.length > 3 ? '就绪' : '身体不足'))
         : shieldText;
       el.qSkillHud.classList.toggle(
         'is-cooling',
-        frost ? state.frostCooldown > 0 : (state.shieldCooldown > 0 || state.shieldTimer > 0)
+        portal ? state.teleportCooldown > 0 : (state.shieldCooldown > 0 || state.shieldTimer > 0)
       );
       if (el.qSkillHud.style?.setProperty) {
-        el.qSkillHud.style.setProperty('--skill-color', frost ? '#8de9ff' : '#f0c66c');
+        el.qSkillHud.style.setProperty('--skill-color', portal ? '#b783ff' : '#f0c66c');
       }
     }
 
@@ -4426,6 +4465,9 @@
     state.shieldTimer = 0;
     state.shieldCooldown = 0;
     state.shieldFlash = 0;
+    clearPurpleTeleport();
+    state.teleportCooldown = 0;
+    state.teleportEmerging = false;
     state.speedBoostTimer = 0;
     state.speedCooldown = 0;
     state.frostCooldown = 0;
@@ -4828,7 +4870,7 @@
     clearBlackGorgeEffects();
     colossusShadow.visible = false;
     colossusImpactRing.visible = false;
-    const finalBoss = bossKind === 'abyss_lord' || bossKind === 'black_wizard';
+    const finalBoss = bossKind === 'black_wizard';
     state.phase = finalBoss ? 'exit' : 'pick';
     state.doorOpen = finalBoss;
     // Boss 战结束也停止刷豆，场上豆子清空
@@ -4846,8 +4888,9 @@
     state.enemies.forEach((enemy) => { enemy.alive = false; });
     enemyPool.forEach((mesh) => { mesh.visible = false; });
     if (bossKind === 'abyss_lord') {
+      spawnSkillOrb(bossKind);
       updateHud();
-      toast('深渊影主倒下', '裂隙尽头传来血色咒印的低鸣 · 前往黑色峡谷');
+      toast('深渊影主倒下', '吞噬紫色核心，获得紫核传送');
       return;
     }
     if (bossKind === 'black_wizard') {
@@ -5016,6 +5059,10 @@
     } else if (state.spawnEmerging && state.spawnPending > 0) {
       // 蛇身逐节从底部传送门钻出，暂不收尾
       state.spawnPending -= 1;
+      if (state.teleportEmerging && state.spawnPending === 0) {
+        state.teleportEmerging = false;
+        state.spawnEmerging = false;
+      }
       state.prevTail = null;
       updateHud();
     } else {
@@ -5045,7 +5092,7 @@
   function applyDir(d) {
     if (!d || state.over || state.paused) return;
     // 出洞时默认向上；禁止反向钻回传送门，但保留横向转向以支持超长蛇
-    if (state.spawnEmerging && d.j > 0) return;
+    if (state.spawnEmerging && !state.teleportEmerging && d.j > 0) return;
     const reverse = d.i === -state.dir.i && d.j === -state.dir.j;
     if (reverse && state.cells.length > 2) return;
     state.dir = d;
@@ -5053,6 +5100,117 @@
 
   function angleDistance(a, b) {
     return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  }
+
+  function clearPurpleTeleport() {
+    for (const mesh of purpleHoleMeshes) {
+      mesh.visible = false;
+      mesh.material.opacity = 0;
+    }
+    state.teleportHoles.length = 0;
+    state.teleportHoleTimer = 0;
+  }
+
+  function showPurpleTeleportHoles(entry, exit) {
+    for (const mesh of purpleHoleMeshes) {
+      mesh.visible = false;
+      mesh.material.opacity = 0;
+    }
+    state.teleportHoles = [
+      { mesh: purpleHoleMeshes[0], i: entry.i, j: entry.j },
+      { mesh: purpleHoleMeshes[1], i: exit.i, j: exit.j },
+    ];
+    for (const hole of state.teleportHoles) {
+      hole.mesh.visible = true;
+      hole.mesh.material.opacity = 0.95;
+      hole.mesh.position.set(cellX(hole.i), 0.18, cellZ(hole.j));
+    }
+    state.teleportHoleTimer = TELEPORT_HOLE_EFFECT_TIME;
+  }
+
+  function updatePurpleTeleportHoles(dt) {
+    if (state.teleportHoleTimer <= 0) return;
+    state.teleportHoleTimer = Math.max(0, state.teleportHoleTimer - dt);
+    const fade = Math.min(1, state.teleportHoleTimer / 0.45);
+    for (const hole of state.teleportHoles) {
+      hole.mesh.material.opacity = fade * 0.95;
+      hole.mesh.rotation.z += dt * 0.7;
+    }
+    if (state.teleportHoleTimer <= 0) clearPurpleTeleport();
+  }
+
+  function teleportExitHasRoom(i, j, dir, length) {
+    const room = Math.min(3, Math.max(1, length - 1));
+    for (let k = 1; k <= room; k++) {
+      const ni = i + dir.i * k;
+      const nj = j + dir.j * k;
+      if (!inBounds(ni, nj) || isObstacle(ni, nj)) return false;
+    }
+    return true;
+  }
+
+  function choosePurpleTeleportExit(entry, dir, length) {
+    let fallback = null;
+    for (let tries = 0; tries < 240; tries++) {
+      const i = 2 + randInt(N - 4);
+      const j = 2 + randInt(N - 4);
+      if (i === entry.i && j === entry.j) continue;
+      if (isObstacle(i, j)) continue;
+      if (state.cells.some((cell) => cell.i === i && cell.j === j)) continue;
+      if (!teleportExitHasRoom(i, j, dir, length)) continue;
+      fallback = fallback || { i, j };
+      if (Math.hypot(i - entry.i, j - entry.j) >= TELEPORT_MIN_HOLE_DISTANCE) {
+        return { i, j };
+      }
+    }
+    return fallback;
+  }
+
+  function activatePurpleTeleport() {
+    if (state.over || state.paused || state.teleportCooldown > 0) return false;
+    if (activeSkillId('q') !== 'purple') return false;
+    if (state.spawnEmerging && !state.teleportEmerging) return false;
+    if (state.cells.length <= TELEPORT_SKILL_COST + 1) {
+      toast('紫核传送无法启动', `至少需要 ${TELEPORT_SKILL_COST + 2} 格身体`);
+      return false;
+    }
+
+    const head = state.cells[0];
+    const dir = { ...state.dir };
+    const entry = {
+      i: head.i + dir.i * 2,
+      j: head.j + dir.j * 2,
+    };
+    if (!inBounds(entry.i, entry.j) || isObstacle(entry.i, entry.j) ||
+      state.cells.some((cell) => cell.i === entry.i && cell.j === entry.j)) {
+      toast('紫核传送失败', '身前 2 格没有可用黑洞位置');
+      return false;
+    }
+
+    const remainingLength = state.cells.length - TELEPORT_SKILL_COST;
+    const exit = choosePurpleTeleportExit(entry, dir, remainingLength);
+    if (!exit) {
+      toast('紫核传送失败', '地图上没有合适的出口位置');
+      return false;
+    }
+
+    for (let k = 0; k < TELEPORT_SKILL_COST; k++) state.cells.pop();
+    state.prevTail = null;
+    state.cells = [{ i: exit.i, j: exit.j }];
+    state.progress = 0;
+    state.spawnEmerging = true;
+    state.teleportEmerging = true;
+    state.spawnPending = remainingLength - 1;
+    state.spawnGrace = Math.max(state.spawnGrace, Math.min(2.2, remainingLength * STEP + 0.2));
+    state.invuln = Math.max(state.invuln, remainingLength * STEP + 0.25);
+    state.teleportCooldown = TELEPORT_SKILL_COOLDOWN;
+    showPurpleTeleportHoles(entry, exit);
+    updateHud();
+    toast(
+      '紫核传送',
+      `入口 ${entry.i},${entry.j} · 出口 ${exit.i},${exit.j} · 正在钻出`
+    );
+    return true;
   }
 
   function pointInFrostCone(x, z, head, angle) {
@@ -5066,7 +5224,7 @@
 
   function activateFrostBreath() {
     if (state.over || state.paused || state.frostCooldown > 0) return;
-    if (activeSkillId('q') !== 'ice') return;
+    if (activeSkillId('e') !== 'ice') return;
     if (state.cells.length <= FROST_SKILL_COST + 1) {
       toast('冰核吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
       return;
@@ -5122,6 +5280,10 @@
 
   function shoot(source = 'space') {
     if (state.over || state.paused) return;
+    if (source === 'e' && activeSkillId('e') === 'ice') {
+      activateFrostBreath();
+      return;
+    }
     if (source === 'e' && activeSkillId('e') === 'green') {
       fireEnergy();
       return;
@@ -5189,8 +5351,8 @@
 
   function activateQSkill() {
     const skillId = activeSkillId('q');
-    if (skillId === 'ice') {
-      activateFrostBreath();
+    if (skillId === 'purple') {
+      activatePurpleTeleport();
     } else if (skillId === 'yellow') {
       activateShield();
     } else {
@@ -8544,7 +8706,7 @@
     doorPad.visible = doorPad.material.opacity > 0.02;
     doorGroup.rotation.y += dt * 0.4;
 
-    if (state.spawnEmerging) {
+    if (state.spawnEmerging && !state.teleportEmerging) {
       const tail = state.cells[state.cells.length - 1];
       if (tail && tail.j < SPAWN_DOOR_CELL.j) {
         state.spawnEmerging = false;
@@ -8637,6 +8799,7 @@
     clearStormArena();
     clearAbyssLordArena();
     clearBlackGorgeEffects();
+    clearPurpleTeleport();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
     state.slowTimer = 0;
     state.hitFlash = 0;
@@ -8707,6 +8870,9 @@
     state.shieldTimer = 0;
     state.shieldCooldown = 0;
     state.shieldFlash = 0;
+    clearPurpleTeleport();
+    state.teleportCooldown = 0;
+    state.teleportEmerging = false;
     state.speedBoostTimer = 0;
     state.speedCooldown = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
@@ -8813,9 +8979,11 @@
       state.shieldTimer = Math.max(0, state.shieldTimer - dt);
       state.shieldCooldown = Math.max(0, state.shieldCooldown - dt);
       state.shieldFlash = Math.max(0, state.shieldFlash - dt);
+      state.teleportCooldown = Math.max(0, state.teleportCooldown - dt);
       state.frostCooldown = Math.max(0, state.frostCooldown - dt);
       state.frostEffectTimer = Math.max(0, state.frostEffectTimer - dt);
       updateSpeedBoost(dt);
+      updatePurpleTeleportHoles(dt);
       skillHudRevealTimer = Math.max(0, skillHudRevealTimer - dt);
       playerFrostRig.visible = state.frostEffectTimer > 0;
       if (playerFrostRig.visible) {
@@ -8900,6 +9068,7 @@
     activateShield,
     activateFrostBreath,
     activateQSkill,
+    activatePurpleTeleport,
     damage,
     checkClear,
     clearCombatResidue,
