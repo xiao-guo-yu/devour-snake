@@ -3,6 +3,7 @@
   'use strict';
 
   const STORAGE_KEY = 'devour-skills-v2';
+  const ENABLE_ALL_SKILLS_FOR_TESTING = true;
   const TEST_SHIELD_FIRE = new URLSearchParams(window.location.search).get('skills') === 'shield-fire';
   const TEST_ALL_SKILLS = new URLSearchParams(window.location.search).get('skills') === 'all';
   const SKILLS = {
@@ -276,7 +277,7 @@
     data.equipped.e = 'red';
     save();
   }
-  if (TEST_ALL_SKILLS) {
+  if (TEST_ALL_SKILLS || ENABLE_ALL_SKILLS_FOR_TESTING) {
     for (const id of Object.keys(SKILLS)) data.unlocked[id] = true;
     data.equipped.e = 'red';
     data.equipped.q = 'ice';
