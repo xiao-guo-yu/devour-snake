@@ -4306,7 +4306,7 @@
     if (eSkill) {
       const red = eSkill === 'red';
       const green = eSkill === 'green';
-      el.eSkillName.textContent = red ? 'E · 赤核烈焰' : 'E · 翠核能量波';
+      el.eSkillName.textContent = red ? 'E · 赤核烈焰弹' : 'E · 翠核能量波';
       el.eSkillDesc.textContent = red
         ? '消耗 2 格 · 伤害 2 · 2×2 火焰'
         : '消耗 3 格 · 3×3 能量爆发';
@@ -4320,7 +4320,7 @@
 
     if (qSkill) {
       const frost = qSkill === 'ice';
-      el.qSkillName.textContent = frost ? 'Q · 冰霜吐息' : 'Q · 金核壁垒';
+      el.qSkillName.textContent = frost ? 'Q · 冰核吐息' : 'Q · 金核壁垒';
       el.qSkillDesc.textContent = frost
         ? '5 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
         : '护盾 2 秒 · 冷却 5 秒';
@@ -4339,7 +4339,7 @@
     }
 
     if (shiftSkill) {
-      el.shiftSkillName.textContent = 'Shift · 加速冲刺';
+      el.shiftSkillName.textContent = 'Shift · 风核极速';
       el.shiftSkillDesc.textContent = '按住加速 2 秒 · 冷却 3 秒';
       el.shiftSkillState.textContent = state.speedBoostTimer > 0
         ? `${state.speedBoostTimer.toFixed(1)}s`
@@ -5068,7 +5068,7 @@
     if (state.over || state.paused || state.frostCooldown > 0) return;
     if (activeSkillId('q') !== 'ice') return;
     if (state.cells.length <= FROST_SKILL_COST + 1) {
-      toast('冰霜吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
+      toast('冰核吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
       return;
     }
 
@@ -5113,7 +5113,7 @@
 
     updateHud();
     toast(
-      '冰霜吐息',
+      '冰核吐息',
       hitCount > 0
         ? `命中 ${hitCount} 个目标 · 减速 ${slowed} 个目标 ${FROST_SKILL_SLOW_DURATION} 秒`
         : '寒霜席卷前方 5 格'
@@ -5203,7 +5203,7 @@
     if (activeSkillId('shift') !== 'speed') return false;
     if (state.speedBoostTimer > 0 || state.speedCooldown > 0) return false;
     state.speedBoostTimer = SPEED_BOOST_DURATION;
-    if (announce) toast('加速冲刺', '按住 Shift · 移动速度 ×1.5');
+    if (announce) toast('风核极速', '按住 Shift · 移动速度 ×1.5');
     updateHud();
     return true;
   }
