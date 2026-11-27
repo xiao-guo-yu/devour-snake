@@ -156,7 +156,7 @@
   const BLACK_MIST_SERVANT_HP = 430;
   const BLACK_WIZARD_HP = 760;
   const BLACK_CURSE_BOSS_CELL = { i: 22, j: 4 };
-  const BLACK_CURSE_BULLET_INTERVAL = 6;
+  const BLACK_CURSE_BULLET_INTERVAL = 8;
   const BLACK_CURSE_BULLET_COUNT = 27;
   const BLACK_CURSE_BULLET_SPEED = 2.35;
   const BLACK_CURSE_BULLET_HIT_RADIUS = 0.9;
@@ -167,10 +167,37 @@
   const BLACK_CURSE_RUNE_SIZE = 8;
   const BLACK_CURSE_RUNE_DAMAGE = 3;
   const BLACK_CURSE_LOCK_TIME = 8;
+  const BLOOD_SLAVE_FILM_DURATION = 5;
+  const BLOOD_SLAVE_FILM_COOLDOWN = 10;
+  const BLOOD_SLAVE_FILM_HEAL = 1;
+  const BLOOD_SLAVE_CLAW_RANGE = 8;
+  const BLOOD_SLAVE_CLAW_WINDUP = 0.38;
+  const BLOOD_SLAVE_CLAW_DASH_TIME = 0.2;
+  const BLOOD_SLAVE_CLAW_RECOVER = 0.55;
+  const BLOOD_SLAVE_CLAW_COOLDOWN = 6;
+  const BLOOD_SLAVE_CLAW_DAMAGE = 3;
+  const BLOOD_SLAVE_CLAW_HIT_RADIUS = 4.2;
+  const BLOOD_SLAVE_POOL_COOLDOWN = 9;
+  const BLOOD_SLAVE_POOL_COUNT = 4;
+  const BLOOD_SLAVE_POOL_LIFE = 6;
+  const BLOOD_SLAVE_POOL_RADIUS = 2.7;
+  const BLOOD_SLAVE_POOL_DISTANCE = 5.2;
+  const BLOOD_SLAVE_POOL_DAMAGE = 1;
+  const BLOOD_SLAVE_RAGE_TIME = 5;
+  const BLOOD_SLAVE_RAGE_MULT = 2;
   const BLACK_RUNE_WARNING = 0.9;
   const BLACK_RUNE_ACTIVE = 0.48;
-  const BLACK_MIST_TIME = 2.1;
-  const BLACK_MIST_SOLID_TIME = 4.4;
+  const BLACK_MIST_TIME = 1.2;
+  const BLACK_MIST_SOLID_TIME = 3.8;
+  const BLACK_MIST_TELEPORT_INTERVAL = 5;
+  const BLACK_MIST_CLONE_SPLIT_INTERVAL = 10;
+  const BLACK_MIST_CLONE_COUNT = 2;
+  const BLACK_MIST_CLONE_BREAK_HITS = 3;
+  const BLACK_MIST_CLONE_HIT_RADIUS = 3.0;
+  const BLACK_MIST_BULLET_HIT_RADIUS = 0.78;
+  const BLACK_MIST_BULLET_SPEED = 4.2;
+  const BLACK_MIST_BULLET_BURST_SPEED = 4.7;
+  const BLACK_MIST_BULLET_POOL_SIZE = 160;
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   let DEBUG_START_LEVEL = 0;
@@ -1609,6 +1636,9 @@
   const BLACK_RUNE_BLOCK_TEX = loadCharacterTexture('black-rune-block.png', null);
   const BLACK_CURSE_RUNE_TEX = loadIceEffectTexture('black-curse-rune-field.png');
   const BLACK_CURSE_BULLET_TEX = loadIceEffectTexture('black-curse-bullet.png');
+  const BLOOD_SLAVE_CLAW_TEX = loadIceEffectTexture('blood-slave-claw.png');
+  const BLOOD_SLAVE_POOL_TEX = loadIceEffectTexture('blood-slave-pool.png');
+  const BLACK_MIST_BULLET_TEX = loadIceEffectTexture('black-mist-bullet.png');
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -2721,6 +2751,51 @@
     blackCurseBulletPool.push(mesh);
   }
 
+  const blackMistBulletPool = [];
+  const blackMistBulletGeo = new THREE.PlaneGeometry(2.65, 2.7);
+  blackMistBulletGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < BLACK_MIST_BULLET_POOL_SIZE; i++) {
+    const mesh = new THREE.Mesh(
+      blackMistBulletGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_MIST_BULLET_TEX || null,
+        color: BLACK_MIST_BULLET_TEX ? 0xffffff : 0xff2727,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.55;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackMistBulletPool.push(mesh);
+  }
+
+  const blackMistCloneMeshes = [];
+  for (let i = 0; i < BLACK_MIST_CLONE_COUNT; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.4, 5.4),
+      new THREE.MeshBasicMaterial({
+        map: BOSS_TEX.black_mist_servant || null,
+        color: 0xffb0aa,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.62;
+    mesh.scale.setScalar(2.05);
+    mesh.visible = false;
+    scene.add(mesh);
+    blackMistCloneMeshes.push(mesh);
+  }
+
   const blackPoolPool = [];
   for (let i = 0; i < 20; i++) {
     const mesh = new THREE.Mesh(
@@ -2739,6 +2814,107 @@
     scene.add(mesh);
     blackPoolPool.push(mesh);
   }
+
+  const bloodSlavePoolPool = [];
+  const bloodSlavePoolGeo = new THREE.PlaneGeometry(
+    BLOOD_SLAVE_POOL_RADIUS * 2,
+    BLOOD_SLAVE_POOL_RADIUS * 2
+  );
+  bloodSlavePoolGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 16; i++) {
+    const mesh = new THREE.Mesh(
+      bloodSlavePoolGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLOOD_SLAVE_POOL_TEX || null,
+        color: BLOOD_SLAVE_POOL_TEX ? 0xffffff : 0x8f0508,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.12;
+    mesh.visible = false;
+    scene.add(mesh);
+    bloodSlavePoolPool.push(mesh);
+  }
+
+  const bloodSlaveClawPool = [];
+  const bloodSlaveClawGeo = new THREE.PlaneGeometry(10.5, 10.5);
+  bloodSlaveClawGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 12; i++) {
+    const mesh = new THREE.Mesh(
+      bloodSlaveClawGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLOOD_SLAVE_CLAW_TEX || null,
+        color: BLOOD_SLAVE_CLAW_TEX ? 0xffffff : 0xff1d1d,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.22;
+    mesh.visible = false;
+    scene.add(mesh);
+    bloodSlaveClawPool.push(mesh);
+  }
+
+  const bloodFilmRig = new THREE.Group();
+  const bloodFilmDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(4.15, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x990006,
+      transparent: true,
+      opacity: 0.18,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  bloodFilmDisc.rotation.x = -Math.PI / 2;
+  bloodFilmDisc.position.y = 0.16;
+  bloodFilmRig.add(bloodFilmDisc);
+  const bloodFilmRings = [];
+  for (let i = 0; i < 2; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(3.25 + i * 0.58, 0.08 - i * 0.018, 8, 64),
+      new THREE.MeshBasicMaterial({
+        color: i ? 0xff2b2b : 0xc00810,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        fog: false,
+      })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.3 + i * 0.04;
+    bloodFilmRig.add(ring);
+    bloodFilmRings.push(ring);
+  }
+  bloodFilmRig.visible = false;
+  scene.add(bloodFilmRig);
+
+  const bloodRageEyeRig = new THREE.Group();
+  const bloodRageEyeMat = new THREE.MeshBasicMaterial({
+    color: 0xff1f20,
+    transparent: true,
+    opacity: 0.96,
+    depthWrite: false,
+    fog: false,
+  });
+  for (const x of [-0.34, 0.34]) {
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.17, 20), bloodRageEyeMat);
+    eye.rotation.x = -Math.PI / 2;
+    eye.position.set(x, 0.74, -0.18);
+    bloodRageEyeRig.add(eye);
+  }
+  bloodRageEyeRig.visible = false;
+  scene.add(bloodRageEyeRig);
 
   const blackBeamPool = [];
   for (let i = 0; i < 16; i++) {
@@ -3196,6 +3372,9 @@
     blackPools: [],
     blackBeamEffects: [],
     blackClones: [],
+    blackMistClones: [],
+    bloodSlavePools: [],
+    bloodSlaveClaws: [],
     lavaBalls: [],
     lavaPools: [],
     skillOrb: null,
@@ -4352,13 +4531,27 @@
             el.bshield.textContent = lock > 0
               ? `血咒锁定 · ${Math.ceil(lock)}s · 弹幕追踪`
               : `弹幕 ${Math.max(0, Math.ceil(state.boss.blackCurseBulletTimer))}s · 法阵 ${Math.max(0, Math.ceil(state.boss.blackCurseRuneTimer))}s`;
+          } else if (state.boss.kind === 'blood_slave') {
+            const rage = state.boss.bloodRageTimer || 0;
+            const film = state.boss.bloodFilmTimer || 0;
+            const filmText = film > 0
+              ? `血膜 ${Math.ceil(film)}s`
+              : `血膜冷却 ${Math.ceil(state.boss.bloodFilmCooldown || 0)}s`;
+            el.bshield.textContent = rage > 0
+              ? `狂暴 ×${BLOOD_SLAVE_RAGE_MULT} · ${Math.ceil(rage)}s · ${filmText}`
+              : filmText;
+          } else if (state.boss.kind === 'black_mist_servant') {
+            const clones = state.blackMistClones.length;
+            const hits = state.boss.blackMistCloneHits || 0;
+            el.bshield.textContent = state.boss.blackInvulnerable
+              ? `雾化瞬移 · ${Math.ceil(state.boss.blackStateTimer)}s`
+              : clones > 0
+                ? `分身 ${clones} · 本体受击 ${hits}/${BLACK_MIST_CLONE_BREAK_HITS} · 分裂 ${Math.ceil(state.boss.blackMistSplitTimer)}s`
+                : `分身冷却 ${Math.ceil(state.boss.blackMistSplitTimer)}s · 瞬移 ${BLACK_MIST_TELEPORT_INTERVAL}s`;
           } else {
-            el.bshield.textContent = state.boss.kind === 'black_mist_servant' &&
-              state.boss.blackInvulnerable
-              ? '雾化 · 免疫伤害'
-              : (state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
+            el.bshield.textContent = state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
                 ? `狂暴阶段 · ${hpPercent}%`
-                : `首领阶段 1 · ${hpPercent}%`);
+                : `首领阶段 1 · ${hpPercent}%`;
           }
         } else {
           el.bshield.textContent = state.boss.shieldActive
@@ -4817,10 +5010,25 @@
       blackClonesSpawned: false,
       blackPhase: 1,
       blackVolleyTimer: isBlackMist ? 0.8 : 1.5,
+      blackMistSplitTimer: isBlackMist ? BLACK_MIST_CLONE_SPLIT_INTERVAL : 0,
+      blackMistCloneHits: 0,
+      blackMistHudSignature: '',
       blackCurseBulletTimer: isBlackCurse ? BLACK_CURSE_BULLET_INTERVAL : 0,
       blackCurseRuneTimer: isBlackCurse ? BLACK_CURSE_RUNE_INTERVAL : 0,
       blackCurseLockTimer: 0,
       blackCurseSkillCycle: 0,
+      bloodState: isBloodSlave ? 'stalk' : 'none',
+      bloodStateTimer: 0,
+      bloodFilmTimer: isBloodSlave ? BLOOD_SLAVE_FILM_DURATION : 0,
+      bloodFilmCooldown: 0,
+      bloodClawCooldown: isBloodSlave ? 1.2 : 0,
+      bloodClawTarget: null,
+      bloodClawFrom: null,
+      bloodClawTo: null,
+      bloodPoolCooldown: isBloodSlave ? 4.5 : 0,
+      bloodRageTimer: 0,
+      bloodRageStacks: 0,
+      bloodHudSignature: '',
     };
     bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -5337,6 +5545,7 @@
       const shieldBlocked = damagePharaohShield(false);
       if (!shieldBlocked) {
         boss.hp -= FROST_SKILL_DAMAGE;
+        registerBlackMistBossHit();
         boss.slowTimer = Math.max(boss.slowTimer || 0, FROST_SKILL_SLOW_DURATION);
         hitCount += 1;
         slowed += 1;
@@ -7615,16 +7824,29 @@
     state.blackBeamEffects.length = 0;
     state.blackClones.forEach((clone) => { clone.mesh.visible = false; });
     state.blackClones.length = 0;
+    state.blackMistClones.forEach((clone) => { clone.mesh.visible = false; });
+    state.blackMistClones.length = 0;
+    state.bloodSlavePools.forEach((pool) => { pool.mesh.visible = false; });
+    state.bloodSlavePools.length = 0;
+    state.bloodSlaveClaws.forEach((claw) => { claw.mesh.visible = false; });
+    state.bloodSlaveClaws.length = 0;
     blackRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseBulletPool.forEach((mesh) => { mesh.visible = false; });
+    blackMistCloneMeshes.forEach((mesh) => { mesh.visible = false; });
+    blackMistBulletPool.forEach((mesh) => { mesh.visible = false; });
     blackPoolPool.forEach((mesh) => { mesh.visible = false; });
+    bloodSlavePoolPool.forEach((mesh) => { mesh.visible = false; });
+    bloodSlaveClawPool.forEach((mesh) => { mesh.visible = false; });
     blackBeamPool.forEach((mesh) => { mesh.visible = false; });
     blackClones.forEach((mesh) => {
       mesh.visible = false;
       mesh.material.opacity = 0;
     });
+    bloodFilmRig.visible = false;
+    bloodRageEyeRig.visible = false;
     bossPlaneMat.opacity = 1;
+    bossPlaneMat.color.setHex(0xffffff);
   }
 
   function updateBlackGorgeEffects(dt) {
@@ -7706,88 +7928,461 @@
     }
   }
 
-  function startBloodSlaveCharge(b, hp) {
+  function bloodSlaveDamage(b, baseDamage) {
+    return baseDamage * (b.bloodRageTimer > 0 ? BLOOD_SLAVE_RAGE_MULT : 1);
+  }
+
+  function healBloodSlave(b, amount) {
+    if (!b || !b.alive || amount <= 0 || b.hp >= b.max) return;
+    b.hp = Math.min(b.max, b.hp + amount);
+    updateHud();
+  }
+
+  function bloodSlaveBasicContact(b, dt) {
+    if (b.cool > 0) b.cool = Math.max(0, b.cool - dt);
+    if (bodyDistanceSq(b.x, b.z) >= 2.8 * 2.8 || b.cool > 0) return;
+    b.cool = 1.35;
+    const damageBefore = state.damageTaken;
+    damage(bloodSlaveDamage(b, 1), 'contact');
+    if (!state.over && state.damageTaken > damageBefore && b.bloodFilmTimer > 0) {
+      healBloodSlave(b, BLOOD_SLAVE_FILM_HEAL);
+    }
+  }
+
+  function startBloodSlaveClaw(b, hp) {
+    if (b.bloodState !== 'stalk') return false;
     const dx = hp.x - b.x;
     const dz = hp.z - b.z;
-    const len = Math.hypot(dx, dz) || 1;
-    const dirX = dx / len;
-    const dirZ = dz / len;
-    b.blackState = 'windup';
-    b.blackStateTimer = 0.94;
-    b.blackChargeHit = false;
-    b.blackChargeFrom = { x: b.x, z: b.z };
-    b.blackChargeTo = {
-      x: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.x + dirX * 13)),
-      z: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.z + dirZ * 13)),
+    const distance = Math.hypot(dx, dz) || 1;
+    const dirX = dx / distance;
+    const dirZ = dz / distance;
+    const dashDistance = Math.max(0, distance - 2.1);
+    b.bloodState = 'clawWindup';
+    b.bloodStateTimer = BLOOD_SLAVE_CLAW_WINDUP;
+    b.bloodClawCooldown = BLOOD_SLAVE_CLAW_COOLDOWN;
+    b.bloodClawTarget = { x: hp.x, z: hp.z };
+    b.bloodClawAngle = Math.atan2(dz, dx);
+    b.bloodClawFrom = { x: b.x, z: b.z };
+    b.bloodClawTo = {
+      x: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.x + dirX * dashDistance)),
+      z: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.z + dirZ * dashDistance)),
     };
-    const angle = Math.atan2(dirZ, dirX);
-    b.blackBeam = spawnBlackBeam({
-      x: b.x, z: b.z, angle, length: 13.5, width: 0.9,
-      warning: 0.94, active: 0.38, color: 0xff1f24,
+    toast('畸变血奴 · 裂肉三爪', '八格内锁定蛇头 · 短距扑击后三连裂爪');
+    return true;
+  }
+
+  function spawnBloodSlaveClawEffect(x, z, angle, index) {
+    const mesh = bloodSlaveClawPool.find((item) => !item.visible);
+    if (!mesh) return;
+    const offset = (index - 1) * 0.34;
+    const baseScale = 0.92 + index * 0.04;
+    mesh.position.set(x + Math.cos(angle + Math.PI / 2) * offset, 0.22,
+      z + Math.sin(angle + Math.PI / 2) * offset);
+    mesh.rotation.y = -angle + (index - 1) * 0.1;
+    mesh.scale.setScalar(baseScale);
+    mesh.material.opacity = 0.94;
+    mesh.visible = true;
+    state.bloodSlaveClaws.push({
+      mesh,
+      life: 0.48,
+      maxLife: 0.48,
+      baseScale,
     });
-    toast('畸变血奴 · 锁链冲锋', '红色直线预警后高速扑击');
+  }
+
+  function resolveBloodSlaveClaw(b) {
+    const target = b.bloodClawTarget;
+    if (!target) return;
+    for (let index = 0; index < 3; index++) {
+      spawnBloodSlaveClawEffect(target.x, target.z, b.bloodClawAngle || 0, index);
+    }
+    const damageBefore = state.damageTaken;
+    if (bodyDistanceSq(target.x, target.z) <=
+      BLOOD_SLAVE_CLAW_HIT_RADIUS * BLOOD_SLAVE_CLAW_HIT_RADIUS) {
+      damage(bloodSlaveDamage(b, BLOOD_SLAVE_CLAW_DAMAGE), 'contact');
+    }
+    if (!state.over && state.damageTaken > damageBefore) {
+      toast('畸变血奴 · 三爪命中', b.bloodRageTimer > 0 ? '狂暴伤害 ×2' : '蛇身连续撕裂');
+    }
+  }
+
+  function spawnBloodSlavePool(x, z) {
+    const mesh = bloodSlavePoolPool.find((item) => !item.visible);
+    if (!mesh) return;
+    x = Math.max(-HALF + BLOOD_SLAVE_POOL_RADIUS, Math.min(HALF - BLOOD_SLAVE_POOL_RADIUS, x));
+    z = Math.max(-HALF + BLOOD_SLAVE_POOL_RADIUS, Math.min(HALF - BLOOD_SLAVE_POOL_RADIUS, z));
+    mesh.position.set(x, 0.12, z);
+    mesh.rotation.y = Math.random() * Math.PI * 2;
+    mesh.scale.setScalar(0.75);
+    mesh.material.opacity = 0;
+    mesh.visible = true;
+    state.bloodSlavePools.push({
+      mesh,
+      x,
+      z,
+      life: BLOOD_SLAVE_POOL_LIFE,
+      maxLife: BLOOD_SLAVE_POOL_LIFE,
+      rageTriggered: false,
+    });
+  }
+
+  function startBloodSlavePound(b) {
+    if (b.bloodState !== 'stalk') return false;
+    b.bloodState = 'poundWindup';
+    b.bloodStateTimer = 0.55;
+    b.bloodPoolCooldown = BLOOD_SLAVE_POOL_COOLDOWN;
+    toast('畸变血奴 · 裂胸血雨', '捶打胸膛后将向四周泼洒四片血滩');
+    return true;
+  }
+
+  function resolveBloodSlavePound(b) {
+    for (let index = 0; index < BLOOD_SLAVE_POOL_COUNT; index++) {
+      const angle = Math.PI / 4 + (index / BLOOD_SLAVE_POOL_COUNT) * Math.PI * 2;
+      spawnBloodSlavePool(
+        b.x + Math.cos(angle) * BLOOD_SLAVE_POOL_DISTANCE,
+        b.z + Math.sin(angle) * BLOOD_SLAVE_POOL_DISTANCE
+      );
+    }
+    toast('畸变血奴 · 血滩喷涌', '四片血滩持续 6 秒 · 踩中减速并触发红眼狂暴');
+  }
+
+  function updateBloodSlavePools(b, dt) {
+    for (let k = state.bloodSlavePools.length - 1; k >= 0; k--) {
+      const pool = state.bloodSlavePools[k];
+      pool.life -= dt;
+      const age = pool.maxLife - pool.life;
+      const fade = Math.min(1, age * 5, Math.max(0, pool.life) * 2);
+      pool.mesh.material.opacity = fade * 0.92;
+      pool.mesh.scale.setScalar(
+        0.75 + Math.min(1, age * 3.5) * 0.25 +
+        Math.sin(state.time * 3.4 + pool.x) * 0.015
+      );
+      if (state.cells.some((cell) => (
+        Math.hypot(cellX(cell.i) - pool.x, cellZ(cell.j) - pool.z) <=
+        BLOOD_SLAVE_POOL_RADIUS
+      ))) {
+        state.slowTimer = Math.max(state.slowTimer, 0.5);
+        if (!pool.rageTriggered) {
+          pool.rageTriggered = true;
+          b.bloodRageTimer = BLOOD_SLAVE_RAGE_TIME;
+          b.bloodRageStacks = Math.min(BLOOD_SLAVE_POOL_COUNT, (b.bloodRageStacks || 0) + 1);
+          updateHud();
+          toast('畸变血奴 · 红眼狂暴', '血滩触发狂暴增伤 · 5 秒内伤害 ×2');
+        }
+        damage(bloodSlaveDamage(b, BLOOD_SLAVE_POOL_DAMAGE), 'hazard');
+        if (state.over) return;
+      }
+      if (pool.life <= 0) {
+        pool.mesh.visible = false;
+        state.bloodSlavePools.splice(k, 1);
+      }
+    }
+  }
+
+  function updateBloodSlaveClawEffects(dt) {
+    for (let k = state.bloodSlaveClaws.length - 1; k >= 0; k--) {
+      const claw = state.bloodSlaveClaws[k];
+      claw.life -= dt;
+      const progress = 1 - Math.max(0, claw.life / claw.maxLife);
+      claw.mesh.material.opacity = Math.max(0, 0.94 * (1 - progress));
+      claw.mesh.scale.setScalar(claw.baseScale + progress * 0.16);
+      if (claw.life <= 0) {
+        claw.mesh.visible = false;
+        state.bloodSlaveClaws.splice(k, 1);
+      }
+    }
+  }
+
+  function updateBloodSlavePassive(b, dt) {
+    if (b.bloodFilmTimer > 0) {
+      b.bloodFilmTimer = Math.max(0, b.bloodFilmTimer - dt);
+      if (b.bloodFilmTimer === 0) {
+        b.bloodFilmCooldown = BLOOD_SLAVE_FILM_COOLDOWN;
+        updateHud();
+      }
+    } else {
+      b.bloodFilmCooldown = Math.max(0, b.bloodFilmCooldown - dt);
+      if (b.bloodFilmCooldown === 0) {
+        b.bloodFilmTimer = BLOOD_SLAVE_FILM_DURATION;
+        toast('畸变血奴 · 血膜再生', '血膜持续 5 秒 · 普通攻击命中蛇身可为自身回复 1 格');
+      }
+    }
+
+    b.bloodRageTimer = Math.max(0, b.bloodRageTimer - dt);
+    if (b.bloodRageTimer === 0) b.bloodRageStacks = 0;
+    const filmActive = b.bloodFilmTimer > 0;
+    bloodFilmRig.visible = filmActive;
+    bloodFilmRig.position.set(b.x, 0, b.z);
+    if (filmActive) {
+      const pulse = 1 + Math.sin(state.time * 5.2) * 0.045;
+      bloodFilmRig.scale.setScalar(pulse);
+      bloodFilmDisc.material.opacity = 0.16 + Math.sin(state.time * 4.1) * 0.05;
+      bloodFilmRings[0].scale.setScalar(1 + Math.sin(state.time * 5.4) * 0.045);
+      bloodFilmRings[1].scale.setScalar(1 + Math.sin(state.time * 4.6 + 1.2) * 0.06);
+    }
+    bloodRageEyeRig.visible = b.bloodRageTimer > 0;
+    if (bloodRageEyeRig.visible) {
+      bloodRageEyeRig.position.set(b.x, 0, b.z);
+      bloodRageEyeRig.scale.setScalar(1 + Math.sin(state.time * 16) * 0.08);
+    }
+    bossPlaneMat.color.setHex(b.bloodRageTimer > 0 ? 0xff8b82 : 0xffffff);
+    const hudSignature = [
+      Math.ceil(b.bloodFilmTimer),
+      Math.ceil(b.bloodFilmCooldown),
+      Math.ceil(b.bloodRageTimer),
+      b.bloodRageStacks || 0,
+    ].join(':');
+    if (b.bloodHudSignature !== hudSignature) {
+      b.bloodHudSignature = hudSignature;
+      updateHud();
+    }
   }
 
   function updateBloodSlave(b, dt, hp) {
     bossPlaneMat.opacity = 1;
-    if (b.blackState === 'windup') {
-      b.blackStateTimer -= dt;
+    b.bloodClawCooldown = Math.max(0, b.bloodClawCooldown - dt);
+    b.bloodPoolCooldown = Math.max(0, b.bloodPoolCooldown - dt);
+    updateBloodSlavePassive(b, dt);
+    updateBloodSlavePools(b, dt);
+    updateBloodSlaveClawEffects(dt);
+    if (state.over) return;
+
+    if (b.bloodState === 'clawWindup') {
+      b.bloodStateTimer = Math.max(0, b.bloodStateTimer - dt);
       bossMesh.position.set(b.x, 0, b.z);
-      bossMesh.rotation.z = Math.sin(state.time * 28) * 0.045;
-      bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + (0.94 - b.blackStateTimer) * 0.07));
-      if (b.blackStateTimer <= 0) {
-        b.blackState = 'charge';
-        b.blackStateTimer = 0.36;
+      bossMesh.rotation.z = Math.sin(state.time * 24) * 0.035;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) *
+        (1 + (1 - b.bloodStateTimer / BLOOD_SLAVE_CLAW_WINDUP) * 0.08));
+      if (b.bloodStateTimer === 0) {
+        b.bloodState = 'clawDash';
+        b.bloodStateTimer = BLOOD_SLAVE_CLAW_DASH_TIME;
       }
       return;
     }
 
-    if (b.blackState === 'charge') {
-      const progress = 1 - Math.max(0, b.blackStateTimer / 0.36);
-      b.x = b.blackChargeFrom.x + (b.blackChargeTo.x - b.blackChargeFrom.x) * progress;
-      b.z = b.blackChargeFrom.z + (b.blackChargeTo.z - b.blackChargeFrom.z) * progress;
+    if (b.bloodState === 'clawDash') {
+      b.bloodStateTimer = Math.max(0, b.bloodStateTimer - dt);
+      const progress = 1 - b.bloodStateTimer / BLOOD_SLAVE_CLAW_DASH_TIME;
+      const eased = progress * progress * (3 - 2 * progress);
+      b.x = b.bloodClawFrom.x + (b.bloodClawTo.x - b.bloodClawFrom.x) * eased;
+      b.z = b.bloodClawFrom.z + (b.bloodClawTo.z - b.bloodClawFrom.z) * eased;
       bossMesh.position.set(b.x, 0, b.z);
-      bossMesh.rotation.z = Math.sin(progress * Math.PI) * 0.16;
-      if (!b.blackChargeHit && bodyDistanceSq(b.x, b.z) < 1.25 * 1.25) {
-        b.blackChargeHit = true;
-        damage(2, 'contact');
+      bossMesh.rotation.z = Math.sin(progress * Math.PI) * 0.14;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * 0.96);
+      if (b.bloodStateTimer === 0) {
+        resolveBloodSlaveClaw(b);
         if (state.over) return;
-      }
-      b.blackStateTimer -= dt;
-      if (b.blackStateTimer <= 0) {
-        b.blackState = 'stun';
-        b.blackStateTimer = 1.05;
-        b.blackBeam = null;
-        spawnBlackPool(b.x + HALF - 0.5, b.z + HALF - 0.5, 4.5);
+        b.bloodState = 'clawRecover';
+        b.bloodStateTimer = BLOOD_SLAVE_CLAW_RECOVER;
       }
       return;
     }
 
-    if (b.blackState === 'stun') {
-      b.blackStateTimer -= dt;
+    if (b.bloodState === 'clawRecover') {
+      b.bloodStateTimer = Math.max(0, b.bloodStateTimer - dt);
       bossMesh.position.set(b.x, 0, b.z);
-      bossMesh.rotation.z = -0.16 + Math.sin(state.time * 8) * 0.02;
-      bossMesh.scale.setScalar((b.renderScale || 2.05) * 0.94);
-      if (b.blackStateTimer <= 0) {
-        b.blackState = 'stalk';
-        b.blackAttackTimer = 3.2;
+      bossMesh.rotation.z = -0.1 + Math.sin(state.time * 10) * 0.025;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * 0.93);
+      if (b.bloodStateTimer === 0) b.bloodState = 'stalk';
+      return;
+    }
+
+    if (b.bloodState === 'poundWindup') {
+      b.bloodStateTimer = Math.max(0, b.bloodStateTimer - dt);
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = Math.sin(state.time * 20) * 0.06;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) *
+        (1 + Math.sin((0.55 - b.bloodStateTimer) * 18) * 0.055));
+      if (b.bloodStateTimer === 0) {
+        resolveBloodSlavePound(b);
+        b.bloodState = 'poundRecover';
+        b.bloodStateTimer = 0.42;
       }
+      return;
+    }
+
+    if (b.bloodState === 'poundRecover') {
+      b.bloodStateTimer = Math.max(0, b.bloodStateTimer - dt);
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = -0.06;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * 0.95);
+      if (b.bloodStateTimer === 0) b.bloodState = 'stalk';
       return;
     }
 
     moveBlackBossToward(b, hp, 1.18, dt);
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 2.1) * 0.04;
-    bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 3) * 0.025));
-    blackBossContact(b, dt, 2.8, 1);
+    bossMesh.scale.setScalar((b.renderScale || 2.05) *
+      (1 + Math.sin(state.time * 3) * 0.025));
+    bloodSlaveBasicContact(b, dt);
     if (state.over) return;
-    b.blackAttackTimer -= dt;
-    if (b.blackAttackTimer <= 0) startBloodSlaveCharge(b, hp);
+    const distance = Math.hypot(hp.x - b.x, hp.z - b.z);
+    if (distance <= BLOOD_SLAVE_CLAW_RANGE && b.bloodClawCooldown <= 0) {
+      startBloodSlaveClaw(b, hp);
+    } else if (b.bloodPoolCooldown <= 0) {
+      startBloodSlavePound(b);
+    }
+  }
+
+  function spawnBlackMistBullet(x, z, angle, speed = BLACK_MIST_BULLET_SPEED) {
+    const mesh = blackMistBulletPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.position.set(x, 0.55, z);
+    mesh.rotation.y = Math.random() * Math.PI * 2;
+    mesh.scale.setScalar(1);
+    mesh.visible = true;
+    state.enemyBullets.push({
+      mesh,
+      x,
+      z,
+      vx: Math.cos(angle) * speed,
+      vz: Math.sin(angle) * speed,
+      life: 4.8,
+      blackMist: true,
+    });
+  }
+
+  function fireBlackMistRing(source, count = 8, speed = BLACK_MIST_BULLET_SPEED, offset = 0) {
+    for (let shot = 0; shot < count; shot++) {
+      const angle = offset + (shot / count) * Math.PI * 2 + state.time * 0.4;
+      spawnBlackMistBullet(source.x, source.z, angle, speed);
+    }
+  }
+
+  function chooseBlackMistCloneCell(used = []) {
+    const head = state.cells[0] || BOSS_CELL;
+    for (let tries = 0; tries < 100; tries++) {
+      const cell = randomFreeCell();
+      if (Math.abs(cell.i - head.i) + Math.abs(cell.j - head.j) < 8) continue;
+      if (used.some((other) => Math.abs(other.i - cell.i) + Math.abs(other.j - cell.j) < 8)) {
+        continue;
+      }
+      return cell;
+    }
+    return randomFreeCell();
+  }
+
+  function clearBlackMistClones(b = state.boss, announce = false) {
+    state.blackMistClones.forEach((clone) => { clone.mesh.visible = false; });
+    state.blackMistClones.length = 0;
+    if (b && b.kind === 'black_mist_servant') {
+      b.blackMistCloneHits = 0;
+      b.blackMistSplitTimer = BLACK_MIST_CLONE_SPLIT_INTERVAL;
+      updateHud();
+    }
+    if (announce) toast('黑雾魔侍 · 分身崩解', '本体连续承受 3 次弹丸攻击 · 10 秒后再次分裂');
+  }
+
+  function spawnBlackMistClones(b) {
+    if (state.blackMistClones.length > 0) return false;
+    const used = [];
+    for (let index = 0; index < BLACK_MIST_CLONE_COUNT; index++) {
+      const cell = chooseBlackMistCloneCell(used);
+      used.push(cell);
+      const mesh = blackMistCloneMeshes[index];
+      mesh.position.set(cellX(cell.i), 0.62, cellZ(cell.j));
+      mesh.visible = true;
+      state.blackMistClones.push({
+        mesh,
+        x: cellX(cell.i),
+        z: cellZ(cell.j),
+        mistState: 'solid',
+        stateTimer: BLACK_MIST_SOLID_TIME,
+        volleyTimer: 0.7 + index * 0.22,
+        teleported: false,
+        target: null,
+        hitFlash: 0,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    b.blackMistCloneHits = 0;
+    b.blackMistSplitTimer = BLACK_MIST_CLONE_SPLIT_INTERVAL;
+    updateHud();
+    toast('黑雾魔侍 · 雾影分裂', '两个同体积分身出现 · 攻击本体 3 次可令分身崩解');
+    return true;
+  }
+
+  function blackMistBlockingClone(x, z, radius = BLACK_MIST_CLONE_HIT_RADIUS) {
+    return state.blackMistClones.find((clone) => (
+      clone.mistState === 'solid' &&
+      Math.hypot(clone.x - x, clone.z - z) <= radius
+    )) || null;
+  }
+
+  function registerBlackMistBossHit() {
+    const b = state.boss;
+    if (!b || b.kind !== 'black_mist_servant' || state.blackMistClones.length === 0) return;
+    b.blackMistCloneHits = Math.min(
+      BLACK_MIST_CLONE_BREAK_HITS,
+      (b.blackMistCloneHits || 0) + 1
+    );
+    updateHud();
+    if (b.blackMistCloneHits >= BLACK_MIST_CLONE_BREAK_HITS) {
+      clearBlackMistClones(b, true);
+    }
+  }
+
+  function updateBlackMistClone(clone, dt) {
+    clone.hitFlash = Math.max(0, clone.hitFlash - dt);
+    if (clone.mistState === 'mist') {
+      clone.stateTimer = Math.max(0, clone.stateTimer - dt);
+      const half = BLACK_MIST_TIME * 0.5;
+      if (clone.stateTimer <= half && !clone.teleported) {
+        clone.teleported = true;
+        const target = chooseBlackMistCloneCell(
+          state.blackMistClones.filter((other) => other !== clone)
+            .map((other) => ({ i: Math.round(other.x + HALF), j: Math.round(other.z + HALF) }))
+        );
+        clone.x = cellX(target.i);
+        clone.z = cellZ(target.j);
+      }
+      clone.mesh.material.opacity = Math.max(0.12, clone.stateTimer / BLACK_MIST_TIME * 0.42);
+      clone.mesh.position.set(clone.x, 0.62, clone.z);
+      clone.mesh.scale.setScalar(2.05 * (1.03 - clone.stateTimer * 0.04));
+      if (clone.stateTimer === 0) {
+        clone.mistState = 'solid';
+        clone.stateTimer = BLACK_MIST_SOLID_TIME;
+        clone.volleyTimer = 0.55;
+        clone.teleported = false;
+        clone.mesh.material.opacity = 0.88;
+        clone.mesh.scale.setScalar(2.05);
+        fireBlackMistRing(clone, 14, BLACK_MIST_BULLET_BURST_SPEED, state.time * 0.3);
+      }
+      return;
+    }
+
+    clone.stateTimer = Math.max(0, clone.stateTimer - dt);
+    clone.volleyTimer -= dt;
+    clone.mesh.material.opacity = 0.84 + Math.sin(state.time * 4 + clone.phase) * 0.06;
+    clone.mesh.material.color.setHex(clone.hitFlash > 0 ? 0xffffff : 0xffb0aa);
+    clone.mesh.position.set(
+      clone.x,
+      0.62 + Math.sin(state.time * 4.2 + clone.phase) * 0.035,
+      clone.z
+    );
+    clone.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 3.2 + clone.phase) * 0.018));
+    if (clone.volleyTimer <= 0) {
+      clone.volleyTimer = 1.7;
+      fireBlackMistRing(clone, 8, BLACK_MIST_BULLET_SPEED, clone.phase);
+    }
+    if (clone.stateTimer === 0) {
+      clone.mistState = 'mist';
+      clone.stateTimer = BLACK_MIST_TIME;
+      clone.teleported = false;
+    }
   }
 
   function updateBlackMistServant(b, dt, hp) {
+    b.blackMistSplitTimer = Math.max(0, b.blackMistSplitTimer - dt);
+    if (b.blackMistSplitTimer === 0) {
+      if (state.blackMistClones.length === 0) spawnBlackMistClones(b);
+      else b.blackMistSplitTimer = BLACK_MIST_CLONE_SPLIT_INTERVAL;
+    }
+    state.blackMistClones.forEach((clone) => updateBlackMistClone(clone, dt));
+
     if (b.blackState === 'mist') {
-      b.blackStateTimer -= dt;
+      b.blackStateTimer = Math.max(0, b.blackStateTimer - dt);
       const half = BLACK_MIST_TIME * 0.5;
       if (b.blackStateTimer <= half && !b.blackMistTeleported) {
         b.blackMistTeleported = true;
@@ -7796,63 +8391,56 @@
       }
       bossPlaneMat.opacity = Math.max(0.14, b.blackStateTimer / BLACK_MIST_TIME * 0.46);
       bossMesh.position.set(b.x, 0, b.z);
-      bossMesh.rotation.z += dt * 0.8;
       bossMesh.scale.setScalar((b.renderScale || 2.05) * (1.04 - b.blackStateTimer * 0.05));
-      if (b.blackStateTimer <= 0) {
+      if (b.blackStateTimer === 0) {
         b.blackState = 'solid';
         b.blackStateTimer = BLACK_MIST_SOLID_TIME;
         b.blackInvulnerable = false;
         b.blackVolleyTimer = 0.55;
         b.blackMistTeleported = false;
         bossPlaneMat.opacity = 1;
+        fireBlackMistRing(b, 14, BLACK_MIST_BULLET_BURST_SPEED, state.time * 0.3);
         updateHud();
-        for (let shot = 0; shot < 14; shot++) {
-          const angle = (shot / 14) * Math.PI * 2 + state.time * 0.3;
-          spawnBossBullet(
-            b.x, b.z,
-            Math.cos(angle) * 4.7,
-            Math.sin(angle) * 4.7,
-            4.8
-          );
-        }
       }
-      return;
-    }
+    } else {
+      b.blackStateTimer = Math.max(0, b.blackStateTimer - dt);
+      moveBlackBossToward(b, hp, 1.12, dt);
+      bossPlaneMat.opacity = 1;
+      bossMesh.position.set(b.x, 0, b.z);
+      bossMesh.rotation.z = Math.sin(state.time * 2.8) * 0.03;
+      bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 4.1) * 0.02));
+      blackBossContact(b, dt, 2.9, 1);
+      if (state.over) return;
 
-    b.blackStateTimer -= dt;
-    moveBlackBossToward(b, hp, 1.12, dt);
-    bossPlaneMat.opacity = 1;
-    bossMesh.position.set(b.x, 0, b.z);
-    bossMesh.rotation.z = Math.sin(state.time * 2.8) * 0.03;
-    bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 4.1) * 0.02));
-    blackBossContact(b, dt, 2.9, 1);
-    if (state.over) return;
+      b.blackVolleyTimer -= dt;
+      if (b.blackVolleyTimer <= 0) {
+        b.blackVolleyTimer = 1.7;
+        fireBlackMistRing(b, 8, BLACK_MIST_BULLET_SPEED);
+      }
 
-    b.blackVolleyTimer -= dt;
-    if (b.blackVolleyTimer <= 0) {
-      b.blackVolleyTimer = 1.7;
-      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
-      for (let shot = 0; shot < 8; shot++) {
-        const angle = base + (shot / 8) * Math.PI * 2 + state.time * 0.4;
-        spawnBossBullet(
-          b.x, b.z,
-          Math.cos(angle) * 4.2,
-          Math.sin(angle) * 4.2,
-          4.5
-        );
+      if (b.blackStateTimer === 0) {
+        b.blackState = 'mist';
+        b.blackStateTimer = BLACK_MIST_TIME;
+        b.blackInvulnerable = true;
+        b.blackMistTeleported = false;
+        const target = randomFreeCell();
+        b.blackMistTarget = { x: cellX(target.i), z: cellZ(target.j) };
+        spawnBlackRune(target.i - 0.5, target.j - 0.5, BLACK_MIST_TIME * 0.5, 0xa133ff);
+        updateHud();
+        toast('黑雾魔侍 · 雾化瞬移', '雾化期间免疫伤害 · 5 秒后完成下一次位移');
       }
     }
 
-    if (b.blackStateTimer <= 0) {
-      b.blackState = 'mist';
-      b.blackStateTimer = BLACK_MIST_TIME;
-      b.blackInvulnerable = true;
-      b.blackMistTeleported = false;
-      const target = randomFreeCell();
-      b.blackMistTarget = { x: cellX(target.i), z: cellZ(target.j) };
-      spawnBlackRune(target.i - 0.5, target.j - 0.5, BLACK_MIST_TIME * 0.5, 0xa133ff);
+    const hudSignature = [
+      Math.ceil(b.blackStateTimer),
+      Math.ceil(b.blackMistSplitTimer),
+      b.blackMistCloneHits || 0,
+      state.blackMistClones.length,
+      b.blackInvulnerable ? 1 : 0,
+    ].join(':');
+    if (b.blackMistHudSignature !== hudSignature) {
+      b.blackMistHudSignature = hudSignature;
       updateHud();
-      toast('黑雾魔侍 · 雾化', '雾化期间免疫伤害 · 紫色落点即将显形');
     }
   }
 
@@ -8165,6 +8753,9 @@
       if (b.blackCurse) {
         b.mesh.position.y = 0.42;
         b.mesh.rotation.y = -Math.atan2(b.vz, b.vx);
+      } else if (b.blackMist) {
+        b.mesh.position.y = 0.55;
+        b.mesh.rotation.y += dt * 2.8;
       }
 
       let dead;
@@ -8176,7 +8767,9 @@
         dead = b.life <= 0 || Math.abs(b.x) > HALF + 1 || Math.abs(b.z) > HALF + 1 ||
           isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF)); // 木桩挡弹
       }
-      const hitRadius = b.blackCurse ? BLACK_CURSE_BULLET_HIT_RADIUS : 0.7;
+      const hitRadius = b.blackCurse
+        ? BLACK_CURSE_BULLET_HIT_RADIUS
+        : (b.blackMist ? BLACK_MIST_BULLET_HIT_RADIUS : 0.7);
       if (!dead && bodyDistanceSq(b.x, b.z) < hitRadius * hitRadius) {
         dead = true;
         damage(1, 'projectile');
@@ -8621,6 +9214,16 @@
         }
       }
 
+      if (!boom) {
+        const clone = blackMistBlockingClone(orb.x, orb.z);
+        if (clone) {
+          boom = true;
+          clone.hitFlash = 0.18;
+          orb.boomX = clone.x;
+          orb.boomZ = clone.z;
+        }
+      }
+
       if (!boom && state.boss && state.boss.alive && !abyssLordInvulnerable() &&
         Math.hypot(state.boss.x - orb.x, state.boss.z - orb.z) < state.boss.orbHitRadius) {
         boom = true;
@@ -8629,6 +9232,7 @@
         if (!damagePharaohShield(true)) {
           if (!blackBossInvulnerable()) {
             state.boss.hp -= ENERGY_BALL_DAMAGE;
+            registerBlackMistBossHit();
             updateHud();
             if (state.boss.hp <= 0) bossDie();
           }
@@ -8828,6 +9432,18 @@
         }
       }
 
+      if (!dead) {
+        const clone = blackMistBlockingClone(b.x, b.z);
+        if (clone) {
+          clone.hitFlash = 0.18;
+          dead = true;
+          if (b.fire && !burstSpawned) {
+            spawnFireBurst(b.x, b.z);
+            burstSpawned = true;
+          }
+        }
+      }
+
       // 命中 Boss
       if (!dead && state.phase === 'boss' && state.boss && state.boss.alive &&
         !abyssLordInvulnerable()) {
@@ -8836,6 +9452,7 @@
           const mistBlocked = blackBossInvulnerable();
           if (!shieldBlocked && !mistBlocked) {
             state.boss.hp -= b.bossDamage;
+            registerBlackMistBossHit();
             state.score += 10;
             updateHud();
           }
@@ -9357,6 +9974,35 @@
     spawnBlackPool,
     spawnBlackBeam,
     spawnBlackClonePair,
+    spawnBloodSlavePool,
+    startBloodSlaveClaw,
+    startBloodSlavePound,
+    stepBloodSlave: (dt = 1 / 60, count = 1) => {
+      if (!state.boss || state.boss.kind !== 'blood_slave') return false;
+      const hp = headPosition(new THREE.Vector3());
+      for (let index = 0; index < count && !state.over; index++) {
+        updateBloodSlave(state.boss, dt, hp);
+      }
+      return true;
+    },
+    spawnBlackMistClones: () => (
+      state.boss?.kind === 'black_mist_servant' ? spawnBlackMistClones(state.boss) : false
+    ),
+    clearBlackMistClones: (announce = false) => {
+      if (state.boss?.kind === 'black_mist_servant') clearBlackMistClones(state.boss, announce);
+    },
+    registerBlackMistBossHit,
+    stepBlackMist: (dt = 1 / 60, count = 1) => {
+      if (!state.boss || state.boss.kind !== 'black_mist_servant') return false;
+      const hp = headPosition(new THREE.Vector3());
+      for (let index = 0; index < count && !state.over; index++) {
+        updateBlackMistServant(state.boss, dt, hp);
+      }
+      return true;
+    },
+    stepBullets: (dt = 1 / 60, count = 1) => {
+      for (let index = 0; index < count && !state.over; index++) updateBullets(dt);
+    },
     getBlackGorgeArena: () => ({
       theme: ROOMS[state.level]?.theme || null,
       bossKind: state.boss?.kind || null,
@@ -9375,6 +10021,31 @@
       bulletTimer: state.boss?.blackCurseBulletTimer ?? null,
       runeTimer: state.boss?.blackCurseRuneTimer ?? null,
       lockTimer: state.boss?.blackCurseLockTimer ?? null,
+      bloodState: state.boss?.bloodState ?? null,
+      bloodFilmTimer: state.boss?.bloodFilmTimer ?? null,
+      bloodFilmCooldown: state.boss?.bloodFilmCooldown ?? null,
+      bloodClawCooldown: state.boss?.bloodClawCooldown ?? null,
+      bloodPoolCooldown: state.boss?.bloodPoolCooldown ?? null,
+      bloodRageTimer: state.boss?.bloodRageTimer ?? null,
+      bloodRageStacks: state.boss?.bloodRageStacks ?? null,
+      bloodPools: state.bloodSlavePools.map(({ x, z, life, rageTriggered }) => ({
+        x,
+        z,
+        life,
+        rageTriggered,
+      })),
+      bloodClaws: state.bloodSlaveClaws.length,
+      mistState: state.boss?.blackState ?? null,
+      mistTeleportInterval: BLACK_MIST_TELEPORT_INTERVAL,
+      mistSplitTimer: state.boss?.blackMistSplitTimer ?? null,
+      mistCloneHits: state.boss?.blackMistCloneHits ?? null,
+      mistClones: state.blackMistClones.map(({ x, z, mistState, stateTimer, teleported }) => ({
+        x,
+        z,
+        mistState,
+        stateTimer,
+        teleported,
+      })),
       pools: state.blackPools.map(({ i, j, life }) => ({ i, j, life })),
       beams: state.blackBeamEffects.map(({ x, z, angle, age }) => ({ x, z, angle, age })),
       clones: state.blackClones.length,
