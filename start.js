@@ -305,7 +305,7 @@
 
   document.getElementById('btnCredits').addEventListener('click', () => {
     panel.innerHTML = [
-      '吞噬之蛇 DEVOUR · v0.1 prototype',
+      '吞噬之蛇 · v0.1 prototype',
       '设计与实现：郭宇',
       '引擎：Three.js　美术：Canvas 程序化生成',
     ].join('<br>');
