@@ -31,11 +31,11 @@
     },
     ice: {
       id: 'ice',
-      slot: 'e',
+      slot: 'q',
       color: '#8de9ff',
-      name: '寒冰吐息',
-      subtitle: 'BLUE CORE · E',
-      desc: '按 E 消耗 2 格身体，喷吐寒流冻结前方大片扇形范围内的敌人。',
+      name: '冰霜吐息',
+      subtitle: 'BLUE CORE · Q',
+      desc: '按 Q 消耗 1 格身体，向面前 5 格扇形范围喷吐冰霜；造成 1 点伤害并减速敌人 3 秒，冷却 5 秒。',
     },
   };
 
@@ -48,8 +48,8 @@
 
   function freshData() {
     return {
-      version: 2,
-      unlocked: { green: false, yellow: false, red: false },
+      version: 3,
+      unlocked: { green: false, yellow: false, red: false, ice: false },
       equipped: { e: null, q: null },
     };
   }
@@ -67,6 +67,9 @@
         if (id && SKILLS[id] && fresh.unlocked[id] && SKILLS[id].slot === slot) {
           fresh.equipped[slot] = id;
         }
+      }
+      if ((saved.version || 0) < 3 && fresh.unlocked.ice) {
+        fresh.equipped.q = 'ice';
       }
       return fresh;
     } catch (err) {
@@ -131,7 +134,7 @@
     // on the shared E slot; replaying green must not overwrite a chosen red loadout.
     if (skill.slot === 'q') {
       data.equipped.q = id;
-    } else if (id === 'red' || id === 'ice' || !data.equipped.e) {
+    } else if (id === 'red' || !data.equipped.e) {
       data.equipped.e = id;
     }
 

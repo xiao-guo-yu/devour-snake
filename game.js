@@ -78,11 +78,13 @@
   const WISP_ORB_TURN_RATE = 1.35;
   const WISP_ORB_LIFE = 9;
   const WISP_DISSOLVE_TIME = 0.62;
-  const FROST_SKILL_COST = 2;
-  const FROST_SKILL_COOLDOWN = 6;
-  const FROST_SKILL_DURATION = 3;
-  const FROST_SKILL_RANGE = 13;
-  const FROST_SKILL_HALF_ANGLE = Math.PI * 0.34;
+  const FROST_SKILL_COST = 1;
+  const FROST_SKILL_COOLDOWN = 5;
+  const FROST_SKILL_SLOW_DURATION = 3;
+  const FROST_SKILL_RANGE = 5;
+  const FROST_SKILL_HALF_ANGLE = Math.atan(0.28);
+  const FROST_SKILL_SLOW_MULT = 0.5;
+  const FROST_SKILL_DAMAGE = 1;
   const STORM_LIGHTNING_INTERVAL = 5;
   const STORM_LIGHTNING_WARNING = 1;
   const STORM_LIGHTNING_IMPACT_TIME = 0.42;
@@ -1474,6 +1476,12 @@
   const WOLF_CLAW_TEX = loadIceEffectTexture('wolf-claw-vfx.png');
   const FROST_MIST_TEX = loadIceEffectTexture('frost-mist-vfx.png');
   const WOLF_FROST_TILE_TEX = loadIceEffectTexture('wolf-frost-tile.png');
+  const FROST_BREATH_CONE_TEX = loadIceEffectTexture('frost-breath-cone.png');
+  if (FROST_BREATH_CONE_TEX) {
+    FROST_BREATH_CONE_TEX.generateMipmaps = false;
+    FROST_BREATH_CONE_TEX.minFilter = THREE.LinearFilter;
+    FROST_BREATH_CONE_TEX.magFilter = THREE.LinearFilter;
+  }
   if (FIRE_BULLET_TEX) {
     FIRE_BULLET_TEX.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
@@ -2898,13 +2906,17 @@
   }
 
   const playerFrostRig = new THREE.Group();
-  const playerFrostGeo = new THREE.PlaneGeometry(11.5, 5.2);
-  playerFrostGeo.translate(5.75, 0, 0);
+  const frostBreathVisualWidth = FROST_SKILL_RANGE + 0.45;
+  const playerFrostGeo = new THREE.PlaneGeometry(
+    frostBreathVisualWidth,
+    frostBreathVisualWidth * 2 * Math.tan(FROST_SKILL_HALF_ANGLE)
+  );
+  playerFrostGeo.translate(frostBreathVisualWidth / 2, 0, 0);
   const playerFrostMesh = new THREE.Mesh(
     playerFrostGeo,
     new THREE.MeshBasicMaterial({
-      map: DRAGON_BREATH_TEX || null,
-      color: DRAGON_BREATH_TEX ? 0x9beaff : 0x8de9ff,
+      map: FROST_BREATH_CONE_TEX || null,
+      color: FROST_BREATH_CONE_TEX ? 0xffffff : 0x8de9ff,
       transparent: true,
       opacity: 0.72,
       depthWrite: false,
@@ -3381,6 +3393,7 @@
       invulnTimer: 0,
       staffPulse: 0,
       frozenTimer: 0,
+      slowTimer: 0,
       splitTimer: spawnStats.splitInterval || 0,
       wolfState: 'stalk',
       wolfStateTimer: 0,
@@ -3714,7 +3727,8 @@
 
   function moveFrostWolfWander(e, mesh, dt) {
     const stats = enemyStats(e.type);
-    const speed = stats.speed * WOLF_WANDER_SPEED_MUL * (e.speedMul === undefined ? 1 : e.speedMul);
+    const speed = stats.speed * WOLF_WANDER_SPEED_MUL *
+      (e.speedMul === undefined ? 1 : e.speedMul) * enemySpeedFactor(e);
     const directions = [
       [1, 0], [1, 1], [0, 1], [-1, 1],
       [-1, 0], [-1, -1], [0, -1], [1, -1],
@@ -3783,7 +3797,7 @@
 
   function moveFrostWolfTowardSnake(e, mesh, target, dt) {
     const stats = enemyStats(e.type);
-    const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul);
+    const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul) * enemySpeedFactor(e);
     const targetX = cellX(target.i);
     const targetZ = cellZ(target.j);
     const directions = [
@@ -4268,7 +4282,7 @@
     const shieldText = state.shieldTimer > 0
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
-    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}`;
+    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}|${state.cells.length}`;
     const showSkillHud = Boolean(eSkill || qSkill) && skillHudRevealTimer > 0;
     el.skillHud.hidden = !showSkillHud;
     el.skillHud.classList.toggle('is-fading', showSkillHud && skillHudRevealTimer <= 0.45);
@@ -4280,27 +4294,37 @@
 
     if (eSkill) {
       const red = eSkill === 'red';
-      const ice = eSkill === 'ice';
       const green = eSkill === 'green';
-      el.eSkillName.textContent = ice ? 'E · 寒冰吐息' : (red ? 'E · 赤核烈焰' : 'E · 翠核能量波');
-      el.eSkillDesc.textContent = ice
-        ? '消耗 2 格 · 冻结前方大片敌人'
-        : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 3 格 · 3×3 能量爆发');
-      el.eSkillState.textContent = ice && state.frostCooldown > 0
-        ? `${state.frostCooldown.toFixed(1)}s`
-        : (green && state.energyCd > 0
-          ? `${state.energyCd.toFixed(1)}s`
-          : (state.cells.length > (green ? 4 : (red || ice ? 3 : 2)) ? '就绪' : '身体不足'));
+      el.eSkillName.textContent = red ? 'E · 赤核烈焰' : 'E · 翠核能量波';
+      el.eSkillDesc.textContent = red
+        ? '消耗 2 格 · 伤害 2 · 2×2 火焰'
+        : '消耗 3 格 · 3×3 能量爆发';
+      el.eSkillState.textContent = green && state.energyCd > 0
+        ? `${state.energyCd.toFixed(1)}s`
+        : (state.cells.length > (green ? 4 : 3) ? '就绪' : '身体不足');
       if (el.eSkillHud.style?.setProperty) {
-        el.eSkillHud.style.setProperty('--skill-color', ice ? '#8de9ff' : (red ? '#ff6542' : '#68e7b8'));
+        el.eSkillHud.style.setProperty('--skill-color', red ? '#ff6542' : '#68e7b8');
       }
     }
 
     if (qSkill) {
-      el.qSkillName.textContent = 'Q · 金核壁垒';
-      el.qSkillDesc.textContent = '护盾 2 秒 · 冷却 5 秒';
-      el.qSkillState.textContent = shieldText;
-      el.qSkillHud.classList.toggle('is-cooling', state.shieldCooldown > 0 || state.shieldTimer > 0);
+      const frost = qSkill === 'ice';
+      el.qSkillName.textContent = frost ? 'Q · 冰霜吐息' : 'Q · 金核壁垒';
+      el.qSkillDesc.textContent = frost
+        ? '5 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
+        : '护盾 2 秒 · 冷却 5 秒';
+      el.qSkillState.textContent = frost
+        ? (state.frostCooldown > 0
+          ? `${state.frostCooldown.toFixed(1)}s`
+          : (state.cells.length > 2 ? '就绪' : '身体不足'))
+        : shieldText;
+      el.qSkillHud.classList.toggle(
+        'is-cooling',
+        frost ? state.frostCooldown > 0 : (state.shieldCooldown > 0 || state.shieldTimer > 0)
+      );
+      if (el.qSkillHud.style?.setProperty) {
+        el.qSkillHud.style.setProperty('--skill-color', frost ? '#8de9ff' : '#f0c66c');
+      }
     }
   }
 
@@ -4482,6 +4506,7 @@
       state.enemies[k].invulnTimer = 0;
       state.enemies[k].staffPulse = 0;
       state.enemies[k].frozenTimer = 0;
+      state.enemies[k].slowTimer = 0;
     }
 
     if (room.kind === 'clear') {
@@ -4597,6 +4622,7 @@
       jumpHidden: false,
       fireballTimer: isColossus ? 3 : 0,
       cool: 0,
+      slowTimer: 0,
       breathTimer: isDragon ? DRAGON_ATTACK_INTERVAL : 0,
       breathState: isDragon ? 'idle' : 'none',
       breathElapsed: 0,
@@ -5004,18 +5030,27 @@
     return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
   }
 
+  function pointInFrostCone(x, z, head, angle) {
+    const dx = x - head.x;
+    const dz = z - head.z;
+    const distance = Math.hypot(dx, dz);
+    return distance > 0.001 &&
+      distance <= FROST_SKILL_RANGE &&
+      angleDistance(Math.atan2(dz, dx), angle) <= FROST_SKILL_HALF_ANGLE;
+  }
+
   function activateFrostBreath() {
     if (state.over || state.paused || state.frostCooldown > 0) return;
-    if (activeSkillId('e') !== 'ice') return;
+    if (activeSkillId('q') !== 'ice') return;
     if (state.cells.length <= FROST_SKILL_COST + 1) {
-      toast('寒冰吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
+      toast('冰霜吐息无法启动', `至少需要 ${FROST_SKILL_COST + 2} 格身体`);
       return;
     }
 
     for (let k = 0; k < FROST_SKILL_COST; k++) state.cells.pop();
     state.prevTail = null;
     state.frostCooldown = FROST_SKILL_COOLDOWN;
-    state.frostEffectTimer = 0.92;
+    state.frostEffectTimer = 0.62;
 
     const head = headPosition(_tmpA).clone();
     const angle = Math.atan2(state.dir.j, state.dir.i);
@@ -5024,27 +5059,44 @@
     playerFrostRig.visible = true;
     playerFrostMesh.material.opacity = 0.82;
 
-    let frozen = 0;
+    let hitCount = 0;
+    let slowed = 0;
     for (const enemy of state.enemies) {
-      if (!enemy.alive) continue;
-      const dx = enemy.x - head.x;
-      const dz = enemy.z - head.z;
-      const distance = Math.hypot(dx, dz);
-      if (distance > FROST_SKILL_RANGE || distance < 0.001) continue;
-      if (angleDistance(Math.atan2(dz, dx), angle) > FROST_SKILL_HALF_ANGLE) continue;
-      enemy.frozenTimer = Math.max(enemy.frozenTimer || 0, FROST_SKILL_DURATION);
-      frozen += 1;
+      if (!enemy.alive || !pointInFrostCone(enemy.x, enemy.z, head, angle)) continue;
+      if (isEnemyInvulnerable(enemy)) continue;
+      if (damageEnemy(enemy, FROST_SKILL_DAMAGE)) {
+        hitCount += 1;
+        enemy.slowTimer = Math.max(enemy.slowTimer || 0, FROST_SKILL_SLOW_DURATION);
+        slowed += 1;
+      }
     }
+
+    const boss = state.boss;
+    if (boss && boss.alive && pointInFrostCone(boss.x, boss.z, head, angle) &&
+      !abyssLordInvulnerable(boss) && !blackBossInvulnerable(boss)) {
+      const shieldBlocked = damagePharaohShield(false);
+      if (!shieldBlocked) {
+        boss.hp -= FROST_SKILL_DAMAGE;
+        boss.slowTimer = Math.max(boss.slowTimer || 0, FROST_SKILL_SLOW_DURATION);
+        hitCount += 1;
+        slowed += 1;
+        state.score += 10;
+        updateHud();
+        if (boss.hp <= 0) bossDie();
+      }
+    }
+
     updateHud();
-    toast('寒冰吐息', frozen > 0 ? `冻结 ${frozen} 只敌人 · ${FROST_SKILL_DURATION} 秒` : '寒流席卷前方');
+    toast(
+      '冰霜吐息',
+      hitCount > 0
+        ? `命中 ${hitCount} 个目标 · 减速 ${slowed} 个目标 ${FROST_SKILL_SLOW_DURATION} 秒`
+        : '寒霜席卷前方 5 格'
+    );
   }
 
   function shoot(source = 'space') {
     if (state.over || state.paused) return;
-    if (source === 'e' && activeSkillId('e') === 'ice') {
-      activateFrostBreath();
-      return;
-    }
     if (source === 'e' && activeSkillId('e') === 'green') {
       fireEnergy();
       return;
@@ -5110,6 +5162,17 @@
     toast('金核壁垒', '消耗 1 格身体 · 持续 2 秒');
   }
 
+  function activateQSkill() {
+    const skillId = activeSkillId('q');
+    if (skillId === 'ice') {
+      activateFrostBreath();
+    } else if (skillId === 'yellow') {
+      activateShield();
+    } else {
+      toast('未安装 Q 技能', '击败 Boss 后吞噬核心，并在设置中安装');
+    }
+  }
+
   window.addEventListener('keydown', (e) => {
     if (document.body.classList.contains('settings-open')) return;
     const k = e.key.toLowerCase();
@@ -5134,7 +5197,7 @@
       return;
     }
     if (k === 'e') { e.preventDefault(); shoot('e'); return; }
-    if (k === 'q') { e.preventDefault(); activateShield(); return; }
+    if (k === 'q') { e.preventDefault(); activateQSkill(); return; }
     if (DIRS[k]) { e.preventDefault(); held.add(k); applyDir(directionFromHeld()); }
   });
 
@@ -5357,7 +5420,7 @@
     const stats = enemyStats(e.type);
     if (e.jumpTimer === undefined) e.jumpTimer = stats.jumpInterval;
     if (e.jumpElapsed > 0) {
-      e.jumpElapsed += dt;
+      e.jumpElapsed += dt * enemySpeedFactor(e);
       const t = Math.min(1, e.jumpElapsed / stats.jumpDuration);
       const ease = t * t * (3 - 2 * t);
       e.x = e.jumpFrom.x + (e.jumpTo.x - e.jumpFrom.x) * ease;
@@ -5420,7 +5483,7 @@
     }
 
     const len = Math.hypot(dx, dz) || 1;
-    const speed = stats.speed;
+    const speed = stats.speed * enemySpeedFactor(e);
     let nx = e.x + (dx / len) * speed * dt;
     let nz = e.z + (dz / len) * speed * dt;
     const ci = Math.round(nx + HALF);
@@ -5464,13 +5527,14 @@
       mx = -nzDir * orbit;
       mz = nxDir * orbit;
     }
-    let nx = e.x + mx * stats.speed * dt;
-    let nz = e.z + mz * stats.speed * dt;
+    const speed = stats.speed * enemySpeedFactor(e);
+    let nx = e.x + mx * speed * dt;
+    let nz = e.z + mz * speed * dt;
     const ci = Math.round(nx + HALF);
     const cj = Math.round(nz + HALF);
     if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
-      nx = e.x - mx * stats.speed * dt;
-      nz = e.z - mz * stats.speed * dt;
+      nx = e.x - mx * speed * dt;
+      nz = e.z - mz * speed * dt;
     }
     e.x = Math.max(-HALF + 0.4, Math.min(HALF - 0.4, nx));
     e.z = Math.max(-HALF + 0.4, Math.min(HALF - 0.4, nz));
@@ -5508,13 +5572,14 @@
       const mx = (dx / len) * toward + (-dz / len) * orbit * 0.82;
       const mz = (dz / len) * toward + (dx / len) * orbit * 0.82;
       const ml = Math.hypot(mx, mz) || 1;
-      let nx = e.x + (mx / ml) * stats.speed * dt;
-      let nz = e.z + (mz / ml) * stats.speed * dt;
+      const speed = stats.speed * enemySpeedFactor(e);
+      let nx = e.x + (mx / ml) * speed * dt;
+      let nz = e.z + (mz / ml) * speed * dt;
       const ci = Math.round(nx + HALF);
       const cj = Math.round(nz + HALF);
       if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
-        nx = e.x - (mz / ml) * stats.speed * dt;
-        nz = e.z + (mx / ml) * stats.speed * dt;
+        nx = e.x - (mz / ml) * speed * dt;
+        nz = e.z + (mx / ml) * speed * dt;
       }
       e.x = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nx));
       e.z = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nz));
@@ -5679,6 +5744,27 @@
       (e.type === 'frostWisp' && e.wispState !== 'solid');
   }
 
+  function enemySpeedFactor(e) {
+    return e.slowTimer > 0 ? FROST_SKILL_SLOW_MULT : 1;
+  }
+
+  function damageEnemy(enemy, amount) {
+    if (!enemy || !enemy.alive || isEnemyInvulnerable(enemy)) return false;
+    enemy.hp -= amount;
+    const index = state.enemies.indexOf(enemy);
+    if (enemy.hp <= 0) {
+      if (enemy.type === 'frostWisp') spawnWispDissolve(enemy.x, enemy.z);
+      enemy.alive = false;
+      state.kills += 1;
+      state.score += 25;
+      growBy(2);
+    } else if (enemy.type === 'scarab' && enemyPool[index]) {
+      enemyPool[index].material.map = TEX.scarabBroken || enemyPool[index].material.map;
+      enemyPool[index].material.needsUpdate = true;
+    }
+    return true;
+  }
+
   function updateEnemies(dt) {
     const hp = headPosition(_tmpA).clone();
     const spawnLocked = state.spawnGrace > 0;
@@ -5697,6 +5783,7 @@
         continue;
       }
       mesh.visible = true;
+      if (e.slowTimer > 0) e.slowTimer = Math.max(0, e.slowTimer - dt);
       if (!spawnLocked && e.type === 'iceSlug') {
         const splitInterval = enemyStats(e.type).splitInterval;
         if (!(e.splitTimer > 0)) e.splitTimer = splitInterval;
@@ -5781,7 +5868,7 @@
         }
         e.speedMul = e.stormDashActive > 0 ? stats.dashSpeedMul : 1;
       }
-      const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul) *
+      const speed = stats.speed * (e.speedMul === undefined ? 1 : e.speedMul) * enemySpeedFactor(e) *
         (e.cool > 0 ? stats.retreatSpeedMul : 1);
       let nx = e.x + (dx / len) * speed * dt;
       let nz = e.z + (dz / len) * speed * dt;
@@ -6520,6 +6607,10 @@
   function updateBoss(dt) {
     const b = state.boss;
     if (!b || !b.alive) return;
+    if (b.slowTimer > 0) {
+      b.slowTimer = Math.max(0, b.slowTimer - dt);
+      dt *= FROST_SKILL_SLOW_MULT;
+    }
     const hp = headPosition(_tmpA).clone();
     if (b.kind === 'black_curse_servant') {
       updateBlackCurseServant(b, dt, hp);
@@ -8749,6 +8840,7 @@
     shoot,
     activateShield,
     activateFrostBreath,
+    activateQSkill,
     damage,
     checkClear,
     clearCombatResidue,
