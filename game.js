@@ -155,6 +155,18 @@
   const BLOOD_SLAVE_HP = 360;
   const BLACK_MIST_SERVANT_HP = 430;
   const BLACK_WIZARD_HP = 760;
+  const BLACK_CURSE_BOSS_CELL = { i: 22, j: 4 };
+  const BLACK_CURSE_BULLET_INTERVAL = 6;
+  const BLACK_CURSE_BULLET_COUNT = 27;
+  const BLACK_CURSE_BULLET_SPEED = 2.35;
+  const BLACK_CURSE_BULLET_HIT_RADIUS = 0.9;
+  const BLACK_CURSE_BULLET_TURN_RATE = 1.15;
+  const BLACK_CURSE_RUNE_INTERVAL = 7;
+  const BLACK_CURSE_RUNE_WARNING = 2;
+  const BLACK_CURSE_RUNE_ACTIVE = 0.55;
+  const BLACK_CURSE_RUNE_SIZE = 8;
+  const BLACK_CURSE_RUNE_DAMAGE = 3;
+  const BLACK_CURSE_LOCK_TIME = 8;
   const BLACK_RUNE_WARNING = 0.9;
   const BLACK_RUNE_ACTIVE = 0.48;
   const BLACK_MIST_TIME = 2.1;
@@ -1595,6 +1607,8 @@
   const STORM_ROCK_TEX = loadCharacterTexture('storm-rock.png', null);
   const ABYSS_ROCK_TEX = loadCharacterTexture('abyss-rock.png', null);
   const BLACK_RUNE_BLOCK_TEX = loadCharacterTexture('black-rune-block.png', null);
+  const BLACK_CURSE_RUNE_TEX = loadIceEffectTexture('black-curse-rune-field.png');
+  const BLACK_CURSE_BULLET_TEX = loadIceEffectTexture('black-curse-bullet.png');
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -2657,6 +2671,56 @@
     blackRunePool.push(mesh);
   }
 
+  const blackCurseRunePool = [];
+  const blackCurseRuneGeo = new THREE.PlaneGeometry(
+    BLACK_CURSE_RUNE_SIZE,
+    BLACK_CURSE_RUNE_SIZE
+  );
+  blackCurseRuneGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 12; i++) {
+    const mesh = new THREE.Mesh(
+      blackCurseRuneGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_CURSE_RUNE_TEX || null,
+        color: BLACK_CURSE_RUNE_TEX ? 0xffffff : 0xff2925,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.13;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackCurseRunePool.push(mesh);
+  }
+
+  const blackCurseBulletPool = [];
+  const blackCurseBulletGeo = new THREE.PlaneGeometry(6.2, 2.24);
+  blackCurseBulletGeo.rotateX(-Math.PI / 2);
+  blackCurseBulletGeo.translate(-2.8, 0, 0);
+  for (let i = 0; i < 96; i++) {
+    const mesh = new THREE.Mesh(
+      blackCurseBulletGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_CURSE_BULLET_TEX || null,
+        color: BLACK_CURSE_BULLET_TEX ? 0xffffff : 0xff2a24,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.42;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackCurseBulletPool.push(mesh);
+  }
+
   const blackPoolPool = [];
   for (let i = 0; i < 20; i++) {
     const mesh = new THREE.Mesh(
@@ -3128,6 +3192,7 @@
     abyssBullets: [],
     abyssAfterimages: [],
     blackRunes: [],
+    blackCurseRunes: [],
     blackPools: [],
     blackBeamEffects: [],
     blackClones: [],
@@ -4282,12 +4347,19 @@
       if (showShield) {
         if (isBlackBoss) {
           const hpPercent = Math.ceil((state.boss.hp / state.boss.max) * 100);
-          el.bshield.textContent = state.boss.kind === 'black_mist_servant' &&
-            state.boss.blackInvulnerable
-            ? '雾化 · 免疫伤害'
-            : (state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
-              ? `狂暴阶段 · ${hpPercent}%`
-              : `首领阶段 1 · ${hpPercent}%`);
+          if (state.boss.kind === 'black_curse_servant') {
+            const lock = state.boss.blackCurseLockTimer || 0;
+            el.bshield.textContent = lock > 0
+              ? `血咒锁定 · ${Math.ceil(lock)}s · 弹幕追踪`
+              : `弹幕 ${Math.max(0, Math.ceil(state.boss.blackCurseBulletTimer))}s · 法阵 ${Math.max(0, Math.ceil(state.boss.blackCurseRuneTimer))}s`;
+          } else {
+            el.bshield.textContent = state.boss.kind === 'black_mist_servant' &&
+              state.boss.blackInvulnerable
+              ? '雾化 · 免疫伤害'
+              : (state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
+                ? `狂暴阶段 · ${hpPercent}%`
+                : `首领阶段 1 · ${hpPercent}%`);
+          }
         } else {
           el.bshield.textContent = state.boss.shieldActive
             ? `金盾 ${state.boss.shieldHp} / ${PHARAOH_SHIELD_HP}`
@@ -4662,7 +4734,8 @@
           : (isAbyssLord
             ? 3.35
             : (isBlackBoss ? (isBlackWizard ? 3.5 : 3.0) : (isPharaoh ? 3.75 : 2.5)))));
-    const start = { x: cellX(BOSS_CELL.i), z: cellZ(BOSS_CELL.j) };
+    const startCell = isBlackCurse ? BLACK_CURSE_BOSS_CELL : BOSS_CELL;
+    const start = { x: cellX(startCell.i), z: cellZ(startCell.j) };
     state.boss = {
       alive: true,
       kind,
@@ -4744,6 +4817,10 @@
       blackClonesSpawned: false,
       blackPhase: 1,
       blackVolleyTimer: isBlackMist ? 0.8 : 1.5,
+      blackCurseBulletTimer: isBlackCurse ? BLACK_CURSE_BULLET_INTERVAL : 0,
+      blackCurseRuneTimer: isBlackCurse ? BLACK_CURSE_RUNE_INTERVAL : 0,
+      blackCurseLockTimer: 0,
+      blackCurseSkillCycle: 0,
     };
     bossPoseTexture = (kind === 'frost_dragon' ? BOSS_TEX.frost_dragon : null) || BOSS_TEX[kind] || null;
     bossPlaneMat.map = (BOSS_TEX[kind] || BOSS_TEX.rootcoil) || null;
@@ -7268,6 +7345,134 @@
     }
   }
 
+  function bodyInBlackCurseRune(rune) {
+    const half = BLACK_CURSE_RUNE_SIZE / 2;
+    return state.cells.some((cell) => (
+      Math.abs(cellX(cell.i) - rune.x) <= half &&
+      Math.abs(cellZ(cell.j) - rune.z) <= half
+    ));
+  }
+
+  function chooseBlackCurseRuneCenters() {
+    const minCenter = BLACK_CURSE_RUNE_SIZE / 2;
+    const maxCenter = N - 1 - minCenter;
+    const head = state.cells[0] || BOSS_CELL;
+    const firstI = Math.max(minCenter, Math.min(maxCenter, head.i));
+    const firstJ = Math.max(minCenter, Math.min(maxCenter, head.j));
+    const centers = [{ x: cellX(firstI), z: cellZ(firstJ) }];
+
+    while (centers.length < 3) {
+      let chosen = null;
+      for (let tries = 0; tries < 80; tries++) {
+        const i = minCenter + randInt(N - BLACK_CURSE_RUNE_SIZE);
+        const j = minCenter + randInt(N - BLACK_CURSE_RUNE_SIZE);
+        const candidate = { x: cellX(i), z: cellZ(j) };
+        if (centers.every((center) => (
+          Math.hypot(center.x - candidate.x, center.z - candidate.z) >=
+          BLACK_CURSE_RUNE_SIZE + 1
+        ))) {
+          chosen = candidate;
+          break;
+        }
+      }
+      centers.push(chosen || {
+        x: cellX(minCenter + randInt(N - BLACK_CURSE_RUNE_SIZE)),
+        z: cellZ(minCenter + randInt(N - BLACK_CURSE_RUNE_SIZE)),
+      });
+    }
+    return centers;
+  }
+
+  function spawnBlackCurseRune(centerX, centerZ) {
+    const mesh = blackCurseRunePool.find((item) => !item.visible);
+    if (!mesh) return null;
+    mesh.position.set(centerX, 0.13, centerZ);
+    mesh.rotation.y = Math.random() * Math.PI * 2;
+    mesh.scale.setScalar(1);
+    mesh.material.opacity = 0.12;
+    mesh.visible = true;
+    const rune = {
+      mesh,
+      x: centerX,
+      z: centerZ,
+      age: 0,
+      warning: BLACK_CURSE_RUNE_WARNING,
+      active: BLACK_CURSE_RUNE_ACTIVE,
+      hit: false,
+    };
+    state.blackCurseRunes.push(rune);
+    return rune;
+  }
+
+  function spawnBlackCurseRuneWave() {
+    const centers = chooseBlackCurseRuneCenters();
+    centers.forEach((center) => spawnBlackCurseRune(center.x, center.z));
+  }
+
+  function fireBlackCurseBulletCurtain(b, homing = false) {
+    const head = headPosition(_tmpA).clone();
+    for (let k = 0; k < BLACK_CURSE_BULLET_COUNT; k++) {
+      const mesh = blackCurseBulletPool.find((item) => !item.visible);
+      if (!mesh) break;
+      const x = -HALF + 1 + (k / (BLACK_CURSE_BULLET_COUNT - 1)) * (N - 2) +
+        (Math.random() - 0.5) * 0.45;
+      const z = b.z + 1.9 + Math.random() * 0.55;
+      const jitter = (Math.random() - 0.5) * 0.14;
+      const angle = homing
+        ? Math.atan2(head.z - z, head.x - x) + jitter
+        : Math.PI / 2 + jitter * 0.45;
+      const speed = BLACK_CURSE_BULLET_SPEED * (0.94 + Math.random() * 0.12);
+      mesh.position.set(x, 0.42, z);
+      mesh.rotation.y = -angle;
+      mesh.visible = true;
+      state.enemyBullets.push({
+        mesh,
+        x,
+        z,
+        vx: Math.cos(angle) * speed,
+        vz: Math.sin(angle) * speed,
+        life: Infinity,
+        speed,
+        homing,
+        blackCurse: true,
+      });
+    }
+  }
+
+  function updateBlackCurseRunes(dt) {
+    for (let k = state.blackCurseRunes.length - 1; k >= 0; k--) {
+      const rune = state.blackCurseRunes[k];
+      rune.age += dt;
+      if (rune.age < rune.warning) {
+        const progress = rune.age / rune.warning;
+        rune.mesh.material.opacity = 0.2 + progress * 0.42 +
+          Math.sin(state.time * 14 + rune.x) * 0.04;
+        rune.mesh.rotation.y += dt * (0.18 + progress * 0.42);
+      } else {
+        const progress = Math.min(1, (rune.age - rune.warning) / rune.active);
+        rune.mesh.material.opacity = Math.max(0, 0.92 * (1 - progress));
+        rune.mesh.scale.setScalar(1 + progress * 0.06);
+        rune.mesh.rotation.y += dt * 0.9;
+        if (!rune.hit) {
+          rune.hit = true;
+          const damageBefore = state.damageTaken;
+          if (bodyInBlackCurseRune(rune)) damage(BLACK_CURSE_RUNE_DAMAGE, 'hazard');
+          if (state.over) return;
+          if (state.damageTaken > damageBefore &&
+            state.boss && state.boss.kind === 'black_curse_servant' && state.boss.alive) {
+            state.boss.blackCurseLockTimer = BLACK_CURSE_LOCK_TIME;
+            updateHud();
+            toast('黑咒侍从 · 血咒锁定', '蛇身被法阵灼伤 3 格 · 后续弹幕追踪 8 秒');
+          }
+        }
+      }
+      if (rune.age >= rune.warning + rune.active) {
+        rune.mesh.visible = false;
+        state.blackCurseRunes.splice(k, 1);
+      }
+    }
+  }
+
   function spawnBlackPool(i, j, life = 4.2) {
     const mesh = blackPoolPool.find((item) => !item.visible);
     if (!mesh) return;
@@ -7402,6 +7607,8 @@
   function clearBlackGorgeEffects() {
     state.blackRunes.forEach((rune) => { rune.mesh.visible = false; });
     state.blackRunes.length = 0;
+    state.blackCurseRunes.forEach((rune) => { rune.mesh.visible = false; });
+    state.blackCurseRunes.length = 0;
     state.blackPools.forEach((pool) => { pool.mesh.visible = false; });
     state.blackPools.length = 0;
     state.blackBeamEffects.forEach((effect) => { effect.mesh.visible = false; });
@@ -7409,6 +7616,8 @@
     state.blackClones.forEach((clone) => { clone.mesh.visible = false; });
     state.blackClones.length = 0;
     blackRunePool.forEach((mesh) => { mesh.visible = false; });
+    blackCurseRunePool.forEach((mesh) => { mesh.visible = false; });
+    blackCurseBulletPool.forEach((mesh) => { mesh.visible = false; });
     blackPoolPool.forEach((mesh) => { mesh.visible = false; });
     blackBeamPool.forEach((mesh) => { mesh.visible = false; });
     blackClones.forEach((mesh) => {
@@ -7420,6 +7629,7 @@
 
   function updateBlackGorgeEffects(dt) {
     updateBlackRunes(dt);
+    updateBlackCurseRunes(dt);
     updateBlackPools(dt);
     updateBlackBeams(dt);
     updateBlackClones(dt);
@@ -7450,40 +7660,49 @@
 
   function updateBlackCurseServant(b, dt, hp) {
     bossPlaneMat.opacity = 1;
-    moveBlackBossToward(b, hp, 1.05, dt);
+    b.x = cellX(BLACK_CURSE_BOSS_CELL.i);
+    b.z = cellZ(BLACK_CURSE_BOSS_CELL.j);
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.8) * 0.028;
     bossMesh.scale.setScalar((b.renderScale || 2.05) * (1 + Math.sin(state.time * 2.3) * 0.022));
     blackBossContact(b, dt, 3, 1);
     if (state.over) return;
 
-    b.blackAttackTimer -= dt;
-    if (b.blackAttackTimer > 0) return;
-    b.blackAttackTimer = 5.1;
-    b.blackAttackCycle += 1;
-    if (b.blackAttackCycle % 2 === 1) {
-      const head = state.cells[0] || BOSS_CELL;
-      const anchors = [
-        [head.i - 1, head.j - 1],
-        [head.i + 2, head.j - 1],
-        [head.i - 3, head.j + 2],
-      ];
-      anchors.forEach(([i, j]) => spawnBlackRune(i, j));
-      toast('黑咒侍从 · 禁书封印', '三处 2×2 咒印即将爆裂');
-    } else {
-      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
-      for (const offset of [-0.42, 0, 0.42]) {
-        for (let shot = -1; shot <= 1; shot++) {
-          const angle = base + offset + shot * 0.08;
-          spawnBossBullet(
-            b.x, b.z,
-            Math.cos(angle) * 4.4,
-            Math.sin(angle) * 4.4,
-            5
-          );
-        }
+    b.blackCurseLockTimer = Math.max(0, b.blackCurseLockTimer - dt);
+    b.blackCurseBulletTimer -= dt;
+    b.blackCurseRuneTimer -= dt;
+
+    const readySkills = [];
+    if (b.blackCurseBulletTimer <= 0) readySkills.push('bullets');
+    if (b.blackCurseRuneTimer <= 0) readySkills.push('runes');
+    if (readySkills.length > 0) {
+      const skill = readySkills[randInt(readySkills.length)];
+      b.blackCurseSkillCycle += 1;
+      if (skill === 'bullets') {
+        b.blackCurseBulletTimer = BLACK_CURSE_BULLET_INTERVAL;
+        const homing = b.blackCurseLockTimer > 0;
+        fireBlackCurseBulletCurtain(b, homing);
+        toast(
+          '黑咒侍从 · 深渊弹幕',
+          homing
+            ? '27 发黑咒弹幕贯穿全场 · 血咒锁定追踪中'
+            : '27 发黑咒弹幕贯穿全场 · 触碰障碍前持续飞行'
+        );
+      } else {
+        b.blackCurseRuneTimer = BLACK_CURSE_RUNE_INTERVAL;
+        spawnBlackCurseRuneWave();
+        toast('黑咒侍从 · 三重禁阵', '三处 8×8 法阵生成 · 2 秒后灼伤并锁定本体');
       }
-      toast('黑咒侍从 · 书页齐射', '三道诅咒弹幕封锁直线');
+    }
+
+    const hudSignature = [
+      Math.ceil(b.blackCurseLockTimer),
+      Math.ceil(b.blackCurseBulletTimer),
+      Math.ceil(b.blackCurseRuneTimer),
+    ].join(':');
+    if (b.blackCurseHudSignature !== hudSignature) {
+      b.blackCurseHudSignature = hudSignature;
+      updateHud();
     }
   }
 
@@ -7928,14 +8147,37 @@
     const hp = headPosition(_tmpA).clone();
     for (let k = state.enemyBullets.length - 1; k >= 0; k--) {
       const b = state.enemyBullets[k];
+      if (b.blackCurse && b.homing && b.speed) {
+        const desired = Math.atan2(hp.z - b.z, hp.x - b.x);
+        const current = Math.atan2(b.vz, b.vx);
+        const turn = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
+        const angle = current + Math.max(
+          -BLACK_CURSE_BULLET_TURN_RATE * dt,
+          Math.min(BLACK_CURSE_BULLET_TURN_RATE * dt, turn)
+        );
+        b.vx = Math.cos(angle) * b.speed;
+        b.vz = Math.sin(angle) * b.speed;
+      }
       b.life -= dt;
       b.x += b.vx * dt;
       b.z += b.vz * dt;
       b.mesh.position.set(b.x, 0.5, b.z);
+      if (b.blackCurse) {
+        b.mesh.position.y = 0.42;
+        b.mesh.rotation.y = -Math.atan2(b.vz, b.vx);
+      }
 
-      let dead = b.life <= 0 || Math.abs(b.x) > HALF + 1 || Math.abs(b.z) > HALF + 1 ||
-        isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF)); // 木桩挡弹
-      if (!dead && bodyDistanceSq(b.x, b.z) < 0.7 * 0.7) {
+      let dead;
+      if (b.blackCurse) {
+        dead = b.x < -HALF - 10 || b.x > HALF + 10 ||
+          b.z < -HALF - 10 || b.z > HALF + 10 ||
+          isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF));
+      } else {
+        dead = b.life <= 0 || Math.abs(b.x) > HALF + 1 || Math.abs(b.z) > HALF + 1 ||
+          isObstacle(Math.round(b.x + HALF), Math.round(b.z + HALF)); // 木桩挡弹
+      }
+      const hitRadius = b.blackCurse ? BLACK_CURSE_BULLET_HIT_RADIUS : 0.7;
+      if (!dead && bodyDistanceSq(b.x, b.z) < hitRadius * hitRadius) {
         dead = true;
         damage(1, 'projectile');
       }
@@ -9109,6 +9351,9 @@
     spawnAbyssBullet,
     spawnAbyssAfterimage,
     spawnBlackRune,
+    spawnBlackCurseRune,
+    spawnBlackCurseRuneWave,
+    fireBlackCurseBulletCurtain,
     spawnBlackPool,
     spawnBlackBeam,
     spawnBlackClonePair,
@@ -9119,6 +9364,17 @@
       bossPhase: state.boss?.blackPhase || null,
       invulnerable: blackBossInvulnerable(),
       runes: state.blackRunes.map(({ i, j, age, delay }) => ({ i, j, age, delay })),
+      curseRunes: state.blackCurseRunes.map(({ x, z, age, warning, hit }) => ({
+        x,
+        z,
+        age,
+        warning,
+        hit,
+        size: BLACK_CURSE_RUNE_SIZE,
+      })),
+      bulletTimer: state.boss?.blackCurseBulletTimer ?? null,
+      runeTimer: state.boss?.blackCurseRuneTimer ?? null,
+      lockTimer: state.boss?.blackCurseLockTimer ?? null,
       pools: state.blackPools.map(({ i, j, life }) => ({ i, j, life })),
       beams: state.blackBeamEffects.map(({ x, z, angle, age }) => ({ x, z, angle, age })),
       clones: state.blackClones.length,
