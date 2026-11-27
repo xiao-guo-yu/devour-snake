@@ -91,7 +91,7 @@
   const FROST_SKILL_RANGE = 8;
   const FROST_SKILL_HALF_ANGLE = Math.atan(0.28);
   const FROST_SKILL_SLOW_MULT = 0.5;
-  const FROST_SKILL_DAMAGE = 1;
+  const FROST_SKILL_DAMAGE = 2;
   const STORM_LIGHTNING_INTERVAL = 5;
   const STORM_LIGHTNING_WARNING = 1;
   const STORM_LIGHTNING_IMPACT_TIME = 0.42;
@@ -4345,7 +4345,7 @@
       const ice = eSkill === 'ice';
       el.eSkillName.textContent = ice ? 'E · 冰核吐息' : (red ? 'E · 赤核烈焰弹' : 'E · 翠核能量波');
       el.eSkillDesc.textContent = ice
-        ? '8 格扇形 · 伤害 1 · 减速 3 秒 · 消耗 1'
+        ? '8 格扇形 · 伤害 2 · 减速 3 秒 · 消耗 1'
         : (red ? '消耗 2 格 · 伤害 2 · 2×2 火焰' : '消耗 3 格 · 3×3 能量爆发');
       el.eSkillState.textContent = ice && state.frostCooldown > 0
         ? `${state.frostCooldown.toFixed(1)}s`
@@ -7005,58 +7005,6 @@
     });
   }
 
-  function abyssProjectileObstacleHit(x0, z0, x1, z1, radius) {
-    const padding = Math.ceil(radius + 0.5);
-    const minI = Math.floor(Math.min(x0, x1) + HALF) - padding;
-    const maxI = Math.floor(Math.max(x0, x1) + HALF) + padding;
-    const minJ = Math.floor(Math.min(z0, z1) + HALF) - padding;
-    const maxJ = Math.floor(Math.max(z0, z1) + HALF) + padding;
-    const dx = x1 - x0;
-    const dz = z1 - z0;
-    let nearestHit = Infinity;
-
-    for (let i = minI; i <= maxI; i++) {
-      for (let j = minJ; j <= maxJ; j++) {
-        if (!inBounds(i, j) || !isObstacle(i, j)) continue;
-        const cx = cellX(i);
-        const cz = cellZ(j);
-        const minX = cx - 0.5 - radius;
-        const maxX = cx + 0.5 + radius;
-        const minZ = cz - 0.5 - radius;
-        const maxZ = cz + 0.5 + radius;
-        let enter = 0;
-        let exit = 1;
-
-        if (Math.abs(dx) < 0.0001) {
-          if (x0 < minX || x0 > maxX) continue;
-        } else {
-          const tx1 = (minX - x0) / dx;
-          const tx2 = (maxX - x0) / dx;
-          enter = Math.max(enter, Math.min(tx1, tx2));
-          exit = Math.min(exit, Math.max(tx1, tx2));
-        }
-
-        if (Math.abs(dz) < 0.0001) {
-          if (z0 < minZ || z0 > maxZ) continue;
-        } else {
-          const tz1 = (minZ - z0) / dz;
-          const tz2 = (maxZ - z0) / dz;
-          enter = Math.max(enter, Math.min(tz1, tz2));
-          exit = Math.min(exit, Math.max(tz1, tz2));
-        }
-
-        if (enter <= exit && exit >= 0 && enter <= 1) {
-          nearestHit = Math.min(nearestHit, Math.max(0, enter));
-        }
-      }
-    }
-    if (!Number.isFinite(nearestHit)) return null;
-    return {
-      x: x0 + dx * nearestHit,
-      z: z0 + dz * nearestHit,
-    };
-  }
-
   function spawnAbyssAfterimage(x, z) {
     const mesh = abyssAfterimagePool.find((item) => !item.visible);
     if (!mesh) return;
@@ -7088,22 +7036,8 @@
   function updateAbyssLordArena(dt) {
     for (let k = state.abyssBullets.length - 1; k >= 0; k--) {
       const bullet = state.abyssBullets[k];
-      const previousX = bullet.x;
-      const previousZ = bullet.z;
       bullet.x += bullet.vx * dt;
       bullet.z += bullet.vz * dt;
-
-      const obstacleHit = abyssProjectileObstacleHit(
-        previousX,
-        previousZ,
-        bullet.x,
-        bullet.z,
-        ABYSS_LORD_BULLET_HIT_RADIUS
-      );
-      if (obstacleHit) {
-        bullet.x = obstacleHit.x;
-        bullet.z = obstacleHit.z;
-      }
       bullet.mesh.position.set(
         bullet.x,
         0.58 + Math.sin(state.time * 14 + bullet.phase) * 0.04,
@@ -7111,8 +7045,7 @@
       );
       bullet.mesh.scale.setScalar(1 + Math.sin(state.time * 18 + bullet.phase) * 0.025);
 
-      let dead = Boolean(obstacleHit) ||
-        !inBounds(Math.round(bullet.x + HALF), Math.round(bullet.z + HALF));
+      let dead = !inBounds(Math.round(bullet.x + HALF), Math.round(bullet.z + HALF));
       if (!dead && bodyDistanceSq(bullet.x, bullet.z) <
         ABYSS_LORD_BULLET_HIT_RADIUS * ABYSS_LORD_BULLET_HIT_RADIUS) {
         damage(ABYSS_LORD_BULLET_DAMAGE, 'projectile');
