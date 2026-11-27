@@ -2115,7 +2115,8 @@
   .touch-key,
   .touch-action,
   .touch-fire,
-  .touch-shield {
+  .touch-shield,
+  .touch-speed {
     pointer-events: auto;
     touch-action: none;
     -webkit-user-select: none;
@@ -2134,7 +2135,8 @@
   .touch-key:active,
   .touch-action:active,
   .touch-fire:active,
-  .touch-shield:active {
+  .touch-shield:active,
+  .touch-speed:active {
     color: var(--jade-pale, #c6ffeb);
     border-color: var(--jade);
     background: rgba(23,91,70,.88);
@@ -2163,11 +2165,15 @@
   .touch-actions {
     display: flex;
     align-items: end;
-    gap: 11px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 170px;
   }
   .touch-action,
   .touch-fire,
-  .touch-shield {
+  .touch-shield,
+  .touch-speed {
     border-radius: 50%;
     display: flex;
     flex-direction: column;
@@ -2179,7 +2185,8 @@
   }
   .touch-action small,
   .touch-fire small,
-  .touch-shield small {
+  .touch-shield small,
+  .touch-speed small {
     margin-bottom: 4px;
     color: rgba(193,189,168,.6);
     font-size: 8px;
@@ -2195,6 +2202,17 @@
     height: 58px;
     border-color: rgba(154,211,255,.42);
     color: #dff4ff;
+  }
+  .touch-speed {
+    width: 52px;
+    height: 52px;
+    border-color: rgba(159,230,255,.58);
+    color: #e3faff;
+  }
+  .touch-action[hidden],
+  .touch-shield[hidden],
+  .touch-speed[hidden] {
+    display: none;
   }
   .touch-fire {
     width: 82px;
@@ -2575,11 +2593,16 @@
     <span class="skill-hud-copy"><b id="qSkillName">Q · 金核壁垒</b><small id="qSkillDesc">护盾 2 秒 · 冷却 5 秒</small></span>
     <span class="skill-hud-state" id="qSkillState">就绪</span>
   </div>
+  <div class="skill-hud-item" id="shiftSkillHud" style="--skill-color:#9fe6ff" hidden>
+    <span class="skill-hud-orb" aria-hidden="true"></span>
+    <span class="skill-hud-copy"><b id="shiftSkillName">Shift · 加速冲刺</b><small id="shiftSkillDesc">按住加速 2 秒 · 冷却 3 秒</small></span>
+    <span class="skill-hud-state" id="shiftSkillState">就绪</span>
+  </div>
 </div>
 <div class="hud panel" id="help">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键 移动（8 方向） ·
   <kbd>空格</kbd> 射击（耗 1 节） · <kbd>E</kbd> 核心技能 · <kbd>Q</kbd> 已装备技能 ·
-  <kbd>F</kbd> 视角 · <kbd>P</kbd> 暂停 · <kbd>R</kbd> 重开
+  <kbd>Shift</kbd> 加速冲刺 · <kbd>F</kbd> 视角 · <kbd>P</kbd> 暂停 · <kbd>R</kbd> 重开
 </div>
 
 <div id="touchControls" aria-label="触屏操作">
@@ -2591,8 +2614,9 @@
     <button class="touch-key touch-down" data-key="s" aria-label="向下">▼</button>
   </div>
   <div class="touch-actions">
-    <button class="touch-action" data-key="e"><small>核心 E</small>射击</button>
-    <button class="touch-shield" data-key="q"><small>消耗 1</small>技能 Q</button>
+    <button class="touch-action" id="touchSkillE" data-key="e"><small>核心 E</small>射击</button>
+    <button class="touch-shield" id="touchSkillQ" data-key="q"><small>消耗 1</small>技能 Q</button>
+    <button class="touch-speed" id="touchSkillShift" data-key="Shift" hidden><small>按住</small>疾冲</button>
     <button class="touch-fire" data-key=" "><small>消耗 1 节</small>射击</button>
   </div>
 </div>
@@ -2728,7 +2752,7 @@
       <section class="settings-panel" id="settingsPanelSkills" role="tabpanel"
         aria-labelledby="settingsTabSkills" data-settings-panel="skills" hidden>
         <div class="skill-settings-intro">
-          <span>击败 Boss 后吞噬场地中央的发光核心。绿、红核心共用 <b>E</b> 槽，黄、蓝核心共用 <b>Q</b> 槽。</span>
+          <span>击败 Boss 后吞噬场地中央的发光核心。绿、红核心共用 <b>E</b> 槽，黄、蓝核心共用 <b>Q</b> 槽，风暴核心使用 <b>Shift</b> 槽。</span>
           <span>新核心会<b>自动安装</b></span>
         </div>
         <div id="skillSettingsList" aria-live="polite"></div>
@@ -2737,10 +2761,10 @@
 </section>
 
 <script src="vendor/three.min.js?v=20261117"></script>
-<script src="skills.js?v=20261127-frostq1"></script>
-<script src="game.js?v=20261127-frostdragon35"></script>
+<script src="skills.js?v=20261127-stormdashall1"></script>
+<script src="game.js?v=20261127-stormdashall1"></script>
 <script src="campaign.js?v=20261125-unlockall1"></script>
 <script src="audio.js?v=20261121-settings2"></script>
-<script src="start.js?v=20261127-frostq1"></script>
+<script src="start.js?v=20261127-stormdashall1"></script>
 </body>
 </html>

@@ -21,6 +21,9 @@
   const ENEMY_HIT_RADIUS = 1.5;
   const SHIELD_DURATION = 2;
   const SHIELD_COOLDOWN = 5;
+  const SPEED_BOOST_MULT = 1.5;
+  const SPEED_BOOST_DURATION = 2;
+  const SPEED_BOOST_COOLDOWN = 3;
   const SHIELD_HALO_SCALE_X = 0.94;
   const SHIELD_HALO_SCALE_Y = 0.72;
   const MAX_ENEMIES = 48;
@@ -3046,7 +3049,7 @@
     pharaoh: { id: 'yellow', color: 0xf0c66c, core: 0xfff0b8, emissive: 0xc28d24 },
     magma_colossus: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     frost_dragon: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
-    storm_eagle: { id: 'yellow', color: 0x9fe6ff, core: 0xf1fdff, emissive: 0x3b9cc5 },
+    storm_eagle: { id: 'speed', color: 0x9fe6ff, core: 0xf1fdff, emissive: 0x3b9cc5 },
     black_curse_servant: { id: 'green', color: 0x68e7b8, core: 0xcaffea, emissive: 0x28b685 },
     blood_slave: { id: 'red', color: 0xff6542, core: 0xffd0a0, emissive: 0xd93a12 },
     black_mist_servant: { id: 'ice', color: 0x8de9ff, core: 0xe0fbff, emissive: 0x3fa6d9 },
@@ -3107,6 +3110,8 @@
     shieldTimer: 0,
     shieldCooldown: 0,
     shieldFlash: 0,
+    speedBoostTimer: 0,
+    speedCooldown: 0,
     frostCooldown: 0,
     frostEffectTimer: 0,
     iceSpawnTimer: ICE_SPAWN_INTERVAL,
@@ -3160,6 +3165,10 @@
     qSkillName: document.getElementById('qSkillName'),
     qSkillDesc: document.getElementById('qSkillDesc'),
     qSkillState: document.getElementById('qSkillState'),
+    shiftSkillHud: document.getElementById('shiftSkillHud'),
+    shiftSkillName: document.getElementById('shiftSkillName'),
+    shiftSkillDesc: document.getElementById('shiftSkillDesc'),
+    shiftSkillState: document.getElementById('shiftSkillState'),
     toast: document.getElementById('toast'),
     toasttext: document.getElementById('toasttext'),
     toastbig: document.getElementById('toastbig'),
@@ -4279,11 +4288,12 @@
     if (!el.skillHud) return;
     const eSkill = activeSkillId('e');
     const qSkill = activeSkillId('q');
+    const shiftSkill = activeSkillId('shift');
     const shieldText = state.shieldTimer > 0
       ? `${state.shieldTimer.toFixed(1)}s`
       : (state.shieldCooldown > 0 ? `${state.shieldCooldown.toFixed(1)}s` : '就绪');
-    const signature = `${eSkill}|${qSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}|${state.cells.length}`;
-    const showSkillHud = Boolean(eSkill || qSkill) && skillHudRevealTimer > 0;
+    const signature = `${eSkill}|${qSkill}|${shiftSkill}|${shieldText}|${state.shieldTimer > 0}|${state.frostCooldown.toFixed(1)}|${state.speedBoostTimer.toFixed(1)}|${state.speedCooldown.toFixed(1)}|${state.energyCd.toFixed(1)}|${state.cells.length}`;
+    const showSkillHud = Boolean(eSkill || qSkill || shiftSkill) && skillHudRevealTimer > 0;
     el.skillHud.hidden = !showSkillHud;
     el.skillHud.classList.toggle('is-fading', showSkillHud && skillHudRevealTimer <= 0.45);
     if (signature === lastSkillHudSignature) return;
@@ -4291,6 +4301,7 @@
 
     el.eSkillHud.hidden = !eSkill;
     el.qSkillHud.hidden = !qSkill;
+    el.shiftSkillHud.hidden = !shiftSkill;
 
     if (eSkill) {
       const red = eSkill === 'red';
@@ -4325,6 +4336,18 @@
       if (el.qSkillHud.style?.setProperty) {
         el.qSkillHud.style.setProperty('--skill-color', frost ? '#8de9ff' : '#f0c66c');
       }
+    }
+
+    if (shiftSkill) {
+      el.shiftSkillName.textContent = 'Shift · 加速冲刺';
+      el.shiftSkillDesc.textContent = '按住加速 2 秒 · 冷却 3 秒';
+      el.shiftSkillState.textContent = state.speedBoostTimer > 0
+        ? `${state.speedBoostTimer.toFixed(1)}s`
+        : (state.speedCooldown > 0 ? `${state.speedCooldown.toFixed(1)}s` : '就绪');
+      el.shiftSkillHud.classList.toggle(
+        'is-cooling',
+        state.speedBoostTimer <= 0 && state.speedCooldown > 0
+      );
     }
   }
 
@@ -4403,6 +4426,8 @@
     state.shieldTimer = 0;
     state.shieldCooldown = 0;
     state.shieldFlash = 0;
+    state.speedBoostTimer = 0;
+    state.speedCooldown = 0;
     state.frostCooldown = 0;
     state.frostEffectTimer = 0;
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
@@ -5173,6 +5198,28 @@
     }
   }
 
+  function startSpeedBoost(announce = true) {
+    if (state.over || state.paused) return false;
+    if (activeSkillId('shift') !== 'speed') return false;
+    if (state.speedBoostTimer > 0 || state.speedCooldown > 0) return false;
+    state.speedBoostTimer = SPEED_BOOST_DURATION;
+    if (announce) toast('加速冲刺', '按住 Shift · 移动速度 ×1.5');
+    updateHud();
+    return true;
+  }
+
+  function updateSpeedBoost(dt) {
+    if (state.speedBoostTimer > 0) {
+      state.speedBoostTimer = Math.max(0, state.speedBoostTimer - dt);
+      if (state.speedBoostTimer === 0) state.speedCooldown = SPEED_BOOST_COOLDOWN;
+      return;
+    }
+    if (state.speedCooldown > 0) {
+      state.speedCooldown = Math.max(0, state.speedCooldown - dt);
+    }
+    if (state.speedCooldown === 0 && held.has('shift')) startSpeedBoost(false);
+  }
+
   window.addEventListener('keydown', (e) => {
     if (document.body.classList.contains('settings-open')) return;
     const k = e.key.toLowerCase();
@@ -5198,6 +5245,12 @@
     }
     if (k === 'e') { e.preventDefault(); shoot('e'); return; }
     if (k === 'q') { e.preventDefault(); activateQSkill(); return; }
+    if (k === 'shift') {
+      e.preventDefault();
+      held.add('shift');
+      if (!e.repeat) startSpeedBoost();
+      return;
+    }
     if (DIRS[k]) { e.preventDefault(); held.add(k); applyDir(directionFromHeld()); }
   });
 
@@ -5217,7 +5270,8 @@
   // ---------- 更新 ----------
   function updateSnake(dt) {
     const slowMul = state.slowTimer > 0 ? 0.55 : 1;
-    state.progress += (dt / STEP) * slowMul;
+    const speedMul = state.speedBoostTimer > 0 ? SPEED_BOOST_MULT : 1;
+    state.progress += (dt / STEP) * slowMul * speedMul;
     let guard = 0;
     while (state.progress >= 1 && !state.over && guard++ < 4) {
       state.progress -= 1;
@@ -8653,6 +8707,8 @@
     state.shieldTimer = 0;
     state.shieldCooldown = 0;
     state.shieldFlash = 0;
+    state.speedBoostTimer = 0;
+    state.speedCooldown = 0;
     state.fireBursts.forEach((burst) => { burst.mesh.visible = false; });
     state.fireBursts.length = 0;
     state.fireTrails.forEach((trail) => { trail.mesh.visible = false; });
@@ -8759,6 +8815,7 @@
       state.shieldFlash = Math.max(0, state.shieldFlash - dt);
       state.frostCooldown = Math.max(0, state.frostCooldown - dt);
       state.frostEffectTimer = Math.max(0, state.frostEffectTimer - dt);
+      updateSpeedBoost(dt);
       skillHudRevealTimer = Math.max(0, skillHudRevealTimer - dt);
       playerFrostRig.visible = state.frostEffectTimer > 0;
       if (playerFrostRig.visible) {
@@ -8770,6 +8827,8 @@
       state.hitFlash = Math.max(0, state.hitFlash - dt);
       if (state.hitFlash > 0) {
         ribbon.material.color.setHex(0xffb3a0);
+      } else if (state.speedBoostTimer > 0) {
+        ribbon.material.color.setHex(0xc8fff2);
       } else {
         ribbon.material.color.setHex(0xffffff);
       }

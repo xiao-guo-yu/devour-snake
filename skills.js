@@ -4,6 +4,7 @@
 
   const STORAGE_KEY = 'devour-skills-v2';
   const TEST_SHIELD_FIRE = new URLSearchParams(window.location.search).get('skills') === 'shield-fire';
+  const TEST_ALL_SKILLS = new URLSearchParams(window.location.search).get('skills') === 'all';
   const SKILLS = {
     green: {
       id: 'green',
@@ -37,6 +38,14 @@
       subtitle: 'BLUE CORE · Q',
       desc: '按 Q 消耗 1 格身体，向面前 5 格扇形范围喷吐冰霜；造成 1 点伤害并减速敌人 3 秒，冷却 5 秒。',
     },
+    speed: {
+      id: 'speed',
+      slot: 'shift',
+      color: '#9fe6ff',
+      name: '加速冲刺',
+      subtitle: 'STORM CORE · SHIFT',
+      desc: '按住 Shift 获得 1.5 倍移动速度，持续 2 秒；结束后冷却 3 秒，持续按住会在冷却结束时再次触发。',
+    },
   };
 
   const tabs = [...document.querySelectorAll('[data-settings-tab]')];
@@ -48,9 +57,9 @@
 
   function freshData() {
     return {
-      version: 3,
-      unlocked: { green: false, yellow: false, red: false, ice: false },
-      equipped: { e: null, q: null },
+      version: 4,
+      unlocked: { green: false, yellow: false, red: false, ice: false, speed: false },
+      equipped: { e: null, q: null, shift: null },
     };
   }
 
@@ -62,7 +71,7 @@
       for (const id of Object.keys(SKILLS)) {
         fresh.unlocked[id] = Boolean(saved.unlocked && saved.unlocked[id]);
       }
-      for (const slot of ['e', 'q']) {
+      for (const slot of ['e', 'q', 'shift']) {
         const id = saved.equipped && saved.equipped[slot];
         if (id && SKILLS[id] && fresh.unlocked[id] && SKILLS[id].slot === slot) {
           fresh.equipped[slot] = id;
@@ -132,8 +141,8 @@
 
     // A newly found core is immediately useful. Red intentionally replaces green
     // on the shared E slot; replaying green must not overwrite a chosen red loadout.
-    if (skill.slot === 'q') {
-      data.equipped.q = id;
+    if (skill.slot !== 'e') {
+      data.equipped[skill.slot] = id;
     } else if (id === 'red' || !data.equipped.e) {
       data.equipped.e = id;
     }
@@ -202,8 +211,10 @@
         button.textContent = '卸下';
       } else if (skill.slot === 'e') {
         button.textContent = '替换 E 技能';
+      } else if (skill.slot === 'q') {
+        button.textContent = '替换 Q 技能';
       } else {
-        button.textContent = '安装 Q 技能';
+        button.textContent = '安装 Shift 技能';
       }
     }
   }
@@ -263,6 +274,13 @@
     data.unlocked.red = true;
     data.equipped.q = 'yellow';
     data.equipped.e = 'red';
+    save();
+  }
+  if (TEST_ALL_SKILLS) {
+    for (const id of Object.keys(SKILLS)) data.unlocked[id] = true;
+    data.equipped.e = 'red';
+    data.equipped.q = 'ice';
+    data.equipped.shift = 'speed';
     save();
   }
   render();

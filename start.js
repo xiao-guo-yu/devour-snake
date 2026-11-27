@@ -295,6 +295,7 @@
       '空格：发射毒牙（消耗 1 节体长，最低保留 2 节）',
       'E：使用已装备的核心技能（绿色 3×3 能量波 / 红色 2×2 烈焰弹）',
       'Q：已装备技能（金核壁垒护盾 / 冰霜吐息扇形攻击）',
+      'Shift：按住使用加速冲刺（1.5 倍移速，持续 2 秒，冷却 3 秒）',
       'F：切换全图 / 跟随视角　P：暂停　R：重开',
       '击败 Boss 后吞噬发光核心，可在“设置 → 技能”中更换 E / Q 槽',
       '体长就是血量：受伤从尾部断节，体长 ≤ 1 时死亡',
@@ -332,6 +333,19 @@
   const sendKey = (type, key) => {
     window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, cancelable: true }));
   };
+
+  const syncTouchSkills = () => {
+    const equipped = window.DevourSkills?.getState?.()?.equipped;
+    const touchE = document.getElementById('touchSkillE');
+    const touchQ = document.getElementById('touchSkillQ');
+    const touchShift = document.getElementById('touchSkillShift');
+    if (touchE) touchE.hidden = !equipped?.e;
+    if (touchQ) touchQ.hidden = !equipped?.q;
+    if (touchShift) touchShift.hidden = equipped?.shift !== 'speed';
+  };
+
+  syncTouchSkills();
+  document.addEventListener('devour:skills-changed', syncTouchSkills);
 
   document.querySelectorAll('[data-key]').forEach((button) => {
     const key = button.getAttribute('data-key');
