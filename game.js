@@ -170,11 +170,11 @@
   const BLOOD_SLAVE_FILM_DURATION = 5;
   const BLOOD_SLAVE_FILM_COOLDOWN = 10;
   const BLOOD_SLAVE_FILM_HEAL = 1;
-  const BLOOD_SLAVE_CLAW_RANGE = 8;
+  const BLOOD_SLAVE_CLAW_RANGE = 12;
   const BLOOD_SLAVE_CLAW_WINDUP = 0.38;
   const BLOOD_SLAVE_CLAW_DASH_TIME = 0.2;
   const BLOOD_SLAVE_CLAW_RECOVER = 0.55;
-  const BLOOD_SLAVE_CLAW_COOLDOWN = 6;
+  const BLOOD_SLAVE_CLAW_COOLDOWN = 4;
   const BLOOD_SLAVE_CLAW_DAMAGE = 3;
   const BLOOD_SLAVE_CLAW_HIT_RADIUS = 4.2;
   const BLOOD_SLAVE_POOL_COOLDOWN = 9;
@@ -7968,7 +7968,7 @@
       x: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.x + dirX * dashDistance)),
       z: Math.max(-HALF + 1.5, Math.min(HALF - 1.5, b.z + dirZ * dashDistance)),
     };
-    toast('畸变血奴 · 裂肉三爪', '八格内锁定蛇头 · 短距扑击后三连裂爪');
+    toast('畸变血奴 · 裂肉三爪', '十二格内锁定蛇头 · 短距扑击后三连裂爪');
     return true;
   }
 
@@ -8003,6 +8003,7 @@
       damage(bloodSlaveDamage(b, BLOOD_SLAVE_CLAW_DAMAGE), 'contact');
     }
     if (!state.over && state.damageTaken > damageBefore) {
+      if (b.bloodFilmTimer > 0) healBloodSlave(b, BLOOD_SLAVE_FILM_HEAL);
       toast('畸变血奴 · 三爪命中', b.bloodRageTimer > 0 ? '狂暴伤害 ×2' : '蛇身连续撕裂');
     }
   }
