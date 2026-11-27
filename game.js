@@ -180,8 +180,9 @@
   const BLOOD_SLAVE_POOL_COOLDOWN = 9;
   const BLOOD_SLAVE_POOL_COUNT = 4;
   const BLOOD_SLAVE_POOL_LIFE = 6;
-  const BLOOD_SLAVE_POOL_RADIUS = 2.7;
-  const BLOOD_SLAVE_POOL_DISTANCE = 5.2;
+  const BLOOD_SLAVE_POOL_RADIUS = 3;
+  const BLOOD_SLAVE_POOL_MIN_BOSS_DISTANCE = 8;
+  const BLOOD_SLAVE_POOL_MIN_SPACING = 6.5;
   const BLOOD_SLAVE_POOL_DAMAGE = 1;
   const BLOOD_SLAVE_RAGE_TIME = 5;
   const BLOOD_SLAVE_RAGE_MULT = 2;
@@ -8013,7 +8014,7 @@
     z = Math.max(-HALF + BLOOD_SLAVE_POOL_RADIUS, Math.min(HALF - BLOOD_SLAVE_POOL_RADIUS, z));
     mesh.position.set(x, 0.12, z);
     mesh.rotation.y = Math.random() * Math.PI * 2;
-    mesh.scale.setScalar(0.75);
+    mesh.scale.setScalar(0.88);
     mesh.material.opacity = 0;
     mesh.visible = true;
     state.bloodSlavePools.push({
@@ -8031,19 +8032,55 @@
     b.bloodState = 'poundWindup';
     b.bloodStateTimer = 0.55;
     b.bloodPoolCooldown = BLOOD_SLAVE_POOL_COOLDOWN;
-    toast('畸变血奴 · 裂胸血雨', '捶打胸膛后将向四周泼洒四片血滩');
+    toast('畸变血奴 · 裂胸血雨', '捶打胸膛后将在地图上随机泼洒四片 6×6 血滩');
     return true;
   }
 
-  function resolveBloodSlavePound(b) {
+  function chooseBloodSlavePoolCenters(b) {
+    const limit = HALF - BLOOD_SLAVE_POOL_RADIUS;
+    const centers = [];
+    const fallbackPoints = [
+      [-14, -14], [14, -14], [-14, 14], [14, 14],
+      [0, -15], [0, 15], [-15, 0], [15, 0],
+      [-8, -16], [8, 16], [-16, 8], [16, -8],
+    ];
+
     for (let index = 0; index < BLOOD_SLAVE_POOL_COUNT; index++) {
-      const angle = Math.PI / 4 + (index / BLOOD_SLAVE_POOL_COUNT) * Math.PI * 2;
-      spawnBloodSlavePool(
-        b.x + Math.cos(angle) * BLOOD_SLAVE_POOL_DISTANCE,
-        b.z + Math.sin(angle) * BLOOD_SLAVE_POOL_DISTANCE
-      );
+      let chosen = null;
+      for (let tries = 0; tries < 200; tries++) {
+        const candidate = {
+          x: (Math.random() * 2 - 1) * limit,
+          z: (Math.random() * 2 - 1) * limit,
+        };
+        if (Math.hypot(candidate.x - b.x, candidate.z - b.z) <
+          BLOOD_SLAVE_POOL_MIN_BOSS_DISTANCE) continue;
+        if (centers.some((center) => (
+          Math.hypot(center.x - candidate.x, center.z - candidate.z) <
+          BLOOD_SLAVE_POOL_MIN_SPACING
+        ))) continue;
+        chosen = candidate;
+        break;
+      }
+      if (!chosen) {
+        const fallback = fallbackPoints.find(([x, z]) => (
+          Math.hypot(x - b.x, z - b.z) >= BLOOD_SLAVE_POOL_MIN_BOSS_DISTANCE &&
+          centers.every((center) => (
+            Math.hypot(center.x - x, center.z - z) >= BLOOD_SLAVE_POOL_MIN_SPACING
+          ))
+        ));
+        chosen = fallback
+          ? { x: fallback[0], z: fallback[1] }
+          : { x: (Math.random() * 2 - 1) * limit, z: (Math.random() * 2 - 1) * limit };
+      }
+      centers.push(chosen);
     }
-    toast('畸变血奴 · 血滩喷涌', '四片血滩持续 6 秒 · 踩中减速并触发红眼狂暴');
+    return centers;
+  }
+
+  function resolveBloodSlavePound(b) {
+    chooseBloodSlavePoolCenters(b)
+      .forEach((center) => spawnBloodSlavePool(center.x, center.z));
+    toast('畸变血奴 · 血滩喷涌', '四片 6×6 血滩随机散布地图 · 踩中减速并触发红眼狂暴');
   }
 
   function updateBloodSlavePools(b, dt) {
@@ -8054,8 +8091,8 @@
       const fade = Math.min(1, age * 5, Math.max(0, pool.life) * 2);
       pool.mesh.material.opacity = fade * 0.92;
       pool.mesh.scale.setScalar(
-        0.75 + Math.min(1, age * 3.5) * 0.25 +
-        Math.sin(state.time * 3.4 + pool.x) * 0.015
+        0.88 + Math.min(1, age * 5) * 0.12 +
+        Math.sin(state.time * 3.4 + pool.x) * 0.012
       );
       if (state.cells.some((cell) => (
         Math.hypot(cellX(cell.i) - pool.x, cellZ(cell.j) - pool.z) <=
