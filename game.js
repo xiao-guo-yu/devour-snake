@@ -199,7 +199,7 @@
   const BLACK_MIST_BULLET_SPEED = 4.2;
   const BLACK_MIST_BULLET_BURST_SPEED = 4.7;
   const BLACK_MIST_BULLET_POOL_SIZE = 160;
-  const BLACK_WIZARD_RENDER_SCALE = 2.6;
+  const BLACK_WIZARD_RENDER_SCALE = 2.65;
   const BLACK_WIZARD_SKILL_RENDER_SCALE = 2.45;
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   const BLACK_WIZARD_CURSE_FIELD_INTERVAL = 8;
@@ -1517,9 +1517,9 @@
   const imageTextureLoader = typeof THREE.TextureLoader === 'function'
     ? new THREE.TextureLoader()
     : null;
-  const loadCharacterTexture = (file, fallback) => (
+  const loadCharacterTexture = (file, fallback, version = '20261124-frozenpillars1') => (
     imageTextureLoader
-      ? imageTextureLoader.load(`assets/${file}?v=20261124-frozenpillars1`)
+      ? imageTextureLoader.load(`assets/${file}?v=${version}`)
       : fallback
   );
   const loadIceEffectTexture = (file) => {
@@ -1636,7 +1636,7 @@
     black_curse_servant: loadCharacterTexture('black-curse-attendant.png', null),
     blood_slave: loadCharacterTexture('blood-slave.png', null),
     black_mist_servant: loadCharacterTexture('black-mist-servant.png', null),
-    black_wizard: loadCharacterTexture('black-wizard.png', null),
+    black_wizard: loadCharacterTexture('black-wizard.png', null, '20261128-idlepose1'),
   };
   const FROST_DRAGON_ATTACK_TEX = loadCharacterTexture('frost-dragon-attack.png', null);
   const DRAGON_BREATH_TEX = loadCharacterTexture('dragon-breath.png', null);
