@@ -149,6 +149,29 @@
   const ABYSS_LORD_TELEPORT_FRAMES = 11;
   const ABYSS_LORD_TELEPORT_DURATION = 0.99;
   const ABYSS_LORD_TELEPORT_INTERVAL = 8;
+  const ABYSS_TENTACLE_PULL_INTERVAL = 8.5;
+  const ABYSS_TENTACLE_PULL_WINDUP = 0.45;
+  const ABYSS_TENTACLE_PULL_COOLDOWN = 2.4;
+  const ABYSS_SHURIKEN_COUNT = 3;
+  const ABYSS_SHURIKEN_RADIUS = 2.8;
+  const ABYSS_SHURIKEN_ORBIT_SPEED = 2.2;
+  const ABYSS_SHURIKEN_LIFE = 4.2;
+  const ABYSS_SHURIKEN_HIT_RADIUS = 1.05;
+  const ABYSS_SHURIKEN_DAMAGE = 1;
+  const ABYSS_SPORE_INTERVAL = 5.8;
+  const ABYSS_SPORE_SPEED = 0.78;
+  const ABYSS_SPORE_LIFE = 9;
+  const ABYSS_SPORE_TRIGGER_RADIUS = 1.05;
+  const ABYSS_SPORE_BLAST_RADIUS = 2.4;
+  const ABYSS_SPORE_DAMAGE = 1;
+  const ABYSS_SPORE_MAX_ACTIVE = 18;
+  const ABYSS_BEAM_INTERVAL = 6.5;
+  const ABYSS_BEAM_WARNING = 1;
+  const ABYSS_BEAM_ACTIVE = 0.42;
+  const ABYSS_BEAM_LENGTH = 48;
+  const ABYSS_BEAM_WIDTH = 2.4;
+  const ABYSS_BEAM_HIT_HALF_WIDTH = 1.08;
+  const ABYSS_BEAM_DAMAGE = 2;
   const BLACK_GORGE_LEVEL_BASE = 48;
   const BLACK_GORGE_OBSTACLE_COUNT = 8;
   const BLACK_CURSE_ATTENDANT_HP = 290;
@@ -1531,9 +1554,9 @@
       ? imageTextureLoader.load(`assets/${file}?v=${version}`)
       : fallback
   );
-  const loadIceEffectTexture = (file) => {
+  const loadIceEffectTexture = (file, version = '20261124-frostbatch1') => {
     if (!imageTextureLoader) return null;
-    const texture = imageTextureLoader.load(`assets/${file}?v=20261124-frostbatch1`);
+    const texture = imageTextureLoader.load(`assets/${file}?v=${version}`);
     texture.colorSpace = THREE.SRGBColorSpace || 'srgb';
     if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy) {
       texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
@@ -1620,6 +1643,18 @@
   const ABYSS_LORD_THRUST_TEX = loadIceEffectTexture('abyss-lord-thrust.png');
   const ABYSS_BULLET_TEX = loadIceEffectTexture('abyss-bullet.png');
   const ABYSS_BULLET_AFTERIMAGE_TEX = loadIceEffectTexture('abyss-bullet-afterimage.png');
+  const ABYSS_SHADOW_SPORE_TEX = loadIceEffectTexture(
+    'abyss-shadow-spore.png',
+    '20261128-abyssenemies1'
+  );
+  const ABYSS_SHADOW_BEAM_TEX = loadIceEffectTexture(
+    'abyss-shadow-beam.png',
+    '20261128-abyssenemies1'
+  );
+  const ABYSS_SHURIKEN_TEX = loadIceEffectTexture(
+    'abyss-shuriken.png',
+    '20261128-abyssenemies1'
+  );
   const ABYSS_LORD_VANISH_TEX = loadIceEffectTexture('abyss-lord-vanish.png');
   const ABYSS_LORD_EMERGE_TEX = loadIceEffectTexture('abyss-lord-emerge.png');
   if (ABYSS_LORD_VANISH_TEX) {
@@ -2472,6 +2507,147 @@
     scene.add(mesh);
     abyssAfterimagePool.push(mesh);
   }
+
+  const abyssShurikenPool = [];
+  const abyssShurikenGeo = new THREE.PlaneGeometry(2.25, 2.25);
+  abyssShurikenGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 48; i++) {
+    const mesh = new THREE.Mesh(
+      abyssShurikenGeo,
+      new THREE.MeshBasicMaterial({
+        map: ABYSS_SHURIKEN_TEX || null,
+        color: ABYSS_SHURIKEN_TEX ? 0xffffff : 0xb45cff,
+        transparent: true,
+        opacity: 0.96,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.4;
+    mesh.renderOrder = 4;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssShurikenPool.push(mesh);
+  }
+
+  const abyssSporePool = [];
+  const abyssSporeGeo = new THREE.PlaneGeometry(2.45, 2.18);
+  abyssSporeGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 28; i++) {
+    const mesh = new THREE.Mesh(
+      abyssSporeGeo,
+      new THREE.MeshBasicMaterial({
+        map: ABYSS_SHADOW_SPORE_TEX || null,
+        color: ABYSS_SHADOW_SPORE_TEX ? 0xffffff : 0x6e2c91,
+        transparent: true,
+        opacity: 0.94,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.34;
+    mesh.renderOrder = 4;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssSporePool.push(mesh);
+  }
+
+  const abyssSporeBlastPool = [];
+  const abyssSporeBlastGeo = new THREE.RingGeometry(0.8, 1.05, 64, 1);
+  abyssSporeBlastGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 28; i++) {
+    const mesh = new THREE.Mesh(
+      abyssSporeBlastGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xbc62ff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    mesh.position.y = 0.2;
+    mesh.renderOrder = 5;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssSporeBlastPool.push(mesh);
+  }
+
+  const abyssBeamPool = [];
+  const abyssBeamGeo = new THREE.PlaneGeometry(ABYSS_BEAM_LENGTH, ABYSS_BEAM_WIDTH);
+  abyssBeamGeo.rotateX(-Math.PI / 2);
+  abyssBeamGeo.translate(ABYSS_BEAM_LENGTH / 2, 0, 0);
+  for (let i = 0; i < 16; i++) {
+    const mesh = new THREE.Mesh(
+      abyssBeamGeo,
+      new THREE.MeshBasicMaterial({
+        map: ABYSS_SHADOW_BEAM_TEX || null,
+        color: ABYSS_SHADOW_BEAM_TEX ? 0xffffff : 0xbc5cff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.36;
+    mesh.renderOrder = 5;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssBeamPool.push(mesh);
+  }
+
+  const abyssBeamWarningPool = [];
+  const abyssBeamWarningGeo = new THREE.RingGeometry(1.9, 2.2, 64, 1);
+  abyssBeamWarningGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 16; i++) {
+    const mesh = new THREE.Mesh(
+      abyssBeamWarningGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xc05cff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    mesh.position.y = 0.2;
+    mesh.renderOrder = 6;
+    mesh.visible = false;
+    scene.add(mesh);
+    abyssBeamWarningPool.push(mesh);
+  }
+
+  const abyssPullRingGeo = new THREE.RingGeometry(2.75, 3.15, 64, 1);
+  abyssPullRingGeo.rotateX(-Math.PI / 2);
+  const abyssPullRing = new THREE.Mesh(
+    abyssPullRingGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0xa83dff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  abyssPullRing.position.set(0, 0.2, 0);
+  abyssPullRing.renderOrder = 6;
+  abyssPullRing.visible = false;
+  scene.add(abyssPullRing);
 
   const bulletPool = [];
   for (let i = 0; i < 40; i++) {
@@ -3519,6 +3695,14 @@
     stormIntroShown: false,
     abyssBullets: [],
     abyssAfterimages: [],
+    abyssShurikens: [],
+    abyssSpores: [],
+    abyssSporeBlasts: [],
+    abyssBeamWarnings: [],
+    abyssEnemyBeams: [],
+    abyssPullDelay: 0,
+    abyssPullCooldown: 0,
+    abyssPullEffectTimer: 0,
     blackRunes: [],
     blackCurseRunes: [],
     blackPools: [],
@@ -3865,6 +4049,20 @@
       stormDiveTarget: null,
       stormDiveElapsed: 0,
       stormDiveHit: false,
+      abyssPullTimer: spawnType === 'abyssTentacle'
+        ? 3.5 + Math.random() * 3
+        : 0,
+      abyssSporeTimer: spawnType === 'voidTick'
+        ? 1.8 + Math.random() * 3
+        : 0,
+      soulBeamState: spawnType === 'soulWraith' ? 'idle' : 'none',
+      soulBeamTimer: spawnType === 'soulWraith'
+        ? 2.8 + Math.random() * 2.8
+        : 0,
+      soulBeamAngle: 0,
+      soulBeamHit: false,
+      soulBeamWarningMesh: null,
+      soulBeamMesh: null,
     });
     // 复用槽位时恢复当前类型的贴图与缩放。
     const idx = state.enemies.indexOf(slot);
@@ -4856,6 +5054,7 @@
     rootSummonRig.visible = false;
     clearStormArena();
     clearAbyssLordArena();
+    clearAbyssEnemyEffects();
     if (room.theme === 'temple') layoutTemple(idx);
     else if (room.theme === 'volcano') layoutVolcano(idx);
     else if (room.theme === 'frozen') layoutFrozen(idx);
@@ -5353,7 +5552,10 @@
     bossBreathMat.opacity = 0;
     if (bossKind === 'frost_dragon') clearFrostDragonArena();
     if (bossKind === 'storm_eagle') clearStormArena();
-    if (bossKind === 'abyss_lord') clearAbyssLordArena();
+    if (bossKind === 'abyss_lord') {
+      clearAbyssLordArena();
+      clearAbyssEnemyEffects();
+    }
     clearWispCombatEffects();
     clearBlackGorgeEffects();
     colossusShadow.visible = false;
@@ -6373,6 +6575,400 @@
     }
   }
 
+  function abyssEnemyContact(e) {
+    const stats = enemyStats(e.type);
+    if (bodyDistanceSq(e.x, e.z) >= stats.contactRadius * stats.contactRadius || e.cool > 0) {
+      return;
+    }
+    e.cool = stats.contactCooldown;
+    damage(stats.contactDamage, 'contact');
+  }
+
+  function moveAbyssEnemy(e, mesh, hp, dt) {
+    const stats = enemyStats(e.type);
+    const dx = hp.x - e.x;
+    const dz = hp.z - e.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const speed = stats.speed * enemySpeedFactor(e) *
+      (e.cool > 0 ? stats.retreatSpeedMul : 1);
+    let nx = e.x + (dx / len) * speed * dt;
+    let nz = e.z + (dz / len) * speed * dt;
+    const ci = Math.round(nx + HALF);
+    const cj = Math.round(nz + HALF);
+    if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+      nx = e.x - (dz / len) * speed * dt;
+      nz = e.z + (dx / len) * speed * dt;
+    }
+    e.x = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nx));
+    e.z = Math.max(-HALF + 0.45, Math.min(HALF - 0.45, nz));
+    e.i = Math.round(e.x + HALF);
+    e.j = Math.round(e.z + HALF);
+    mesh.material.color.setHex(0xffffff);
+    mesh.position.set(e.x, 0.58 + Math.sin(state.time * 4.2 + e.bob) * 0.06, e.z);
+    mesh.rotation.z = Math.sin(state.time * 2.8 + e.bob) * 0.05;
+    abyssEnemyContact(e);
+    return Math.hypot(hp.x - e.x, hp.z - e.z);
+  }
+
+  function spawnAbyssShurikens(e) {
+    if (state.abyssShurikens.some((shuriken) => shuriken.owner === e)) return false;
+    for (let index = 0; index < ABYSS_SHURIKEN_COUNT; index++) {
+      const mesh = abyssShurikenPool.find((item) => !item.visible);
+      if (!mesh) return false;
+      mesh.visible = true;
+      mesh.material.opacity = 0.96;
+      state.abyssShurikens.push({
+        mesh,
+        owner: e,
+        x: e.x,
+        z: e.z,
+        angle: (index / ABYSS_SHURIKEN_COUNT) * Math.PI * 2,
+        life: ABYSS_SHURIKEN_LIFE,
+        hitCooldown: 0,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    return true;
+  }
+
+  function pullSnakeTowardAbyssWell() {
+    if (state.spawnEmerging || state.cells.length === 0) return false;
+    const head = state.cells[0];
+    const di = Math.sign(HALF - head.i);
+    const dj = Math.sign(HALF - head.j);
+    if (di === 0 && dj === 0) return false;
+    const candidates = [];
+    if (Math.abs(HALF - head.i) >= Math.abs(HALF - head.j)) {
+      if (di) candidates.push({ i: di, j: 0 });
+      if (dj) candidates.push({ i: 0, j: dj });
+    } else {
+      if (dj) candidates.push({ i: 0, j: dj });
+      if (di) candidates.push({ i: di, j: 0 });
+    }
+    if (di && dj && !candidates.some((dir) => dir.i === di && dir.j === dj)) {
+      candidates.push({ i: di, j: dj });
+    }
+    for (const dir of candidates) {
+      const ni = head.i + dir.i;
+      const nj = head.j + dir.j;
+      if (!inBounds(ni, nj) || isObstacle(ni, nj) || hitsSelf(ni, nj)) continue;
+      state.cells.unshift({ i: ni, j: nj });
+      state.prevTail = state.cells.pop();
+      state.progress = 0;
+      return true;
+    }
+    return false;
+  }
+
+  function beginAbyssPull(e) {
+    if (state.abyssPullDelay > 0 || state.abyssPullCooldown > 0) return false;
+    state.abyssPullDelay = ABYSS_TENTACLE_PULL_WINDUP;
+    state.abyssPullCooldown = ABYSS_TENTACLE_PULL_COOLDOWN;
+    state.abyssPullEffectTimer = ABYSS_TENTACLE_PULL_WINDUP + 0.35;
+    abyssPullRing.position.set(0, 0.2, 0);
+    abyssPullRing.visible = true;
+    toast('暗影触须 · 深井牵引', '三枚手里剑展开 · 深井正在牵引蛇身');
+    return true;
+  }
+
+  function updateAbyssTentacle(e, mesh, hp, dt) {
+    moveAbyssEnemy(e, mesh, hp, dt);
+    if (state.over) return;
+    e.abyssPullTimer -= dt;
+    if (e.abyssPullTimer > 0) return;
+    e.abyssPullTimer = ABYSS_TENTACLE_PULL_INTERVAL + Math.random() * 1.8;
+    spawnAbyssShurikens(e);
+    beginAbyssPull(e);
+  }
+
+  function spawnAbyssSpore(e) {
+    if (state.abyssSpores.length >= ABYSS_SPORE_MAX_ACTIVE) return false;
+    const mesh = abyssSporePool.find((item) => !item.visible);
+    if (!mesh) return false;
+    let x = e.x;
+    let z = e.z;
+    for (let tries = 0; tries < 8; tries++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 1.1 + Math.random() * 1.2;
+      x = Math.max(-HALF + 0.6, Math.min(HALF - 0.6, e.x + Math.cos(angle) * distance));
+      z = Math.max(-HALF + 0.6, Math.min(HALF - 0.6, e.z + Math.sin(angle) * distance));
+      if (!isObstacle(Math.round(x + HALF), Math.round(z + HALF))) break;
+    }
+    mesh.position.set(x, 0.34, z);
+    mesh.material.opacity = 0.94;
+    mesh.visible = true;
+    state.abyssSpores.push({
+      mesh,
+      x,
+      z,
+      life: ABYSS_SPORE_LIFE,
+      speed: ABYSS_SPORE_SPEED * (0.9 + Math.random() * 0.2),
+      phase: Math.random() * Math.PI * 2,
+    });
+    return true;
+  }
+
+  function explodeAbyssSpore(spore) {
+    spore.mesh.visible = false;
+    if (bodyDistanceSq(spore.x, spore.z) <=
+      ABYSS_SPORE_BLAST_RADIUS * ABYSS_SPORE_BLAST_RADIUS) {
+      damage(ABYSS_SPORE_DAMAGE, 'hazard');
+    }
+    const mesh = abyssSporeBlastPool.find((item) => !item.visible);
+    if (mesh) {
+      mesh.position.set(spore.x, 0.2, spore.z);
+      mesh.scale.setScalar(0.35);
+      mesh.material.opacity = 0.88;
+      mesh.visible = true;
+      state.abyssSporeBlasts.push({ mesh, life: 0.36, maxLife: 0.36 });
+    }
+  }
+
+  function updateVoidTick(e, mesh, hp, dt) {
+    moveAbyssEnemy(e, mesh, hp, dt);
+    if (state.over) return;
+    e.abyssSporeTimer -= dt;
+    if (e.abyssSporeTimer > 0) return;
+    e.abyssSporeTimer = ABYSS_SPORE_INTERVAL + Math.random() * 1.4;
+    spawnAbyssSpore(e);
+  }
+
+  function beginSoulBeamWarning(e) {
+    if (state.abyssBeamWarnings.some((warning) => warning.owner === e)) return false;
+    const mesh = abyssBeamWarningPool.find((item) => !item.visible);
+    if (!mesh) return false;
+    const hp = headPosition(_tmpA).clone();
+    const angle = Math.atan2(hp.z - e.z, hp.x - e.x);
+    mesh.position.set(e.x, 0.2, e.z);
+    mesh.scale.setScalar(1);
+    mesh.material.opacity = 0.78;
+    mesh.visible = true;
+    e.soulBeamState = 'warning';
+    e.soulBeamAngle = angle;
+    e.soulBeamWarningMesh = mesh;
+    state.abyssBeamWarnings.push({
+      mesh,
+      owner: e,
+      angle,
+      timer: ABYSS_BEAM_WARNING,
+      maxTimer: ABYSS_BEAM_WARNING,
+    });
+    return true;
+  }
+
+  function updateSoulWraith(e, mesh, hp, dt) {
+    if (e.soulBeamState === 'idle') {
+      moveAbyssEnemy(e, mesh, hp, dt);
+      if (state.over) return;
+      e.soulBeamTimer -= dt;
+      if (e.soulBeamTimer <= 0) beginSoulBeamWarning(e);
+      return;
+    }
+    abyssEnemyContact(e);
+    if (state.over) return;
+    mesh.position.set(e.x, 0.58 + Math.sin(state.time * 4.8 + e.bob) * 0.08, e.z);
+    mesh.rotation.z = Math.sin(state.time * 5.2 + e.bob) * 0.06;
+    if (e.soulBeamState === 'recover') {
+      e.soulBeamTimer = Math.max(0, e.soulBeamTimer - dt);
+      if (e.soulBeamTimer === 0) {
+        e.soulBeamState = 'idle';
+        e.soulBeamTimer = ABYSS_BEAM_INTERVAL + Math.random() * 2.2;
+      }
+    }
+  }
+
+  function updateAbyssEnemyAbilities(dt) {
+    state.abyssPullCooldown = Math.max(0, state.abyssPullCooldown - dt);
+    state.abyssPullEffectTimer = Math.max(0, state.abyssPullEffectTimer - dt);
+    if (state.abyssPullDelay > 0) {
+      state.abyssPullDelay = Math.max(0, state.abyssPullDelay - dt);
+      if (state.abyssPullDelay === 0) pullSnakeTowardAbyssWell();
+    }
+    abyssPullRing.visible = state.abyssPullEffectTimer > 0;
+    if (abyssPullRing.visible) {
+      const progress = 1 - state.abyssPullEffectTimer /
+        (ABYSS_TENTACLE_PULL_WINDUP + 0.35);
+      abyssPullRing.rotation.y += dt * (1.2 + progress * 2.8);
+      abyssPullRing.scale.setScalar(0.9 + Math.sin(progress * Math.PI) * 0.24);
+      abyssPullRing.material.opacity =
+        0.34 + Math.sin(state.time * 16) * 0.12 + progress * 0.28;
+    }
+
+    for (let index = state.abyssShurikens.length - 1; index >= 0; index--) {
+      const shuriken = state.abyssShurikens[index];
+      shuriken.life -= dt;
+      shuriken.hitCooldown = Math.max(0, shuriken.hitCooldown - dt);
+      shuriken.angle += dt * ABYSS_SHURIKEN_ORBIT_SPEED;
+      const owner = shuriken.owner;
+      if (owner && owner.alive) {
+        shuriken.x = owner.x;
+        shuriken.z = owner.z;
+      }
+      const x = shuriken.x + Math.cos(shuriken.angle) * ABYSS_SHURIKEN_RADIUS;
+      const z = shuriken.z + Math.sin(shuriken.angle) * ABYSS_SHURIKEN_RADIUS;
+      shuriken.mesh.position.set(
+        x,
+        0.42 + Math.sin(state.time * 12 + shuriken.phase) * 0.025,
+        z
+      );
+      shuriken.mesh.rotation.y = -shuriken.angle - Math.PI / 2;
+      shuriken.mesh.scale.setScalar(1 + Math.sin(state.time * 14 + shuriken.phase) * 0.03);
+      if (shuriken.hitCooldown <= 0 &&
+        bodyDistanceSq(x, z) <= ABYSS_SHURIKEN_HIT_RADIUS * ABYSS_SHURIKEN_HIT_RADIUS) {
+        shuriken.hitCooldown = 0.8;
+        damage(ABYSS_SHURIKEN_DAMAGE, 'contact');
+        if (state.over) return;
+      }
+      if (shuriken.life <= 0) {
+        shuriken.mesh.visible = false;
+        state.abyssShurikens.splice(index, 1);
+      }
+    }
+
+    const hp = headPosition(_tmpA).clone();
+    for (let index = state.abyssSpores.length - 1; index >= 0; index--) {
+      const spore = state.abyssSpores[index];
+      spore.life -= dt;
+      const dx = hp.x - spore.x;
+      const dz = hp.z - spore.z;
+      const distance = Math.hypot(dx, dz) || 1;
+      let nx = spore.x + (dx / distance) * spore.speed * dt;
+      let nz = spore.z + (dz / distance) * spore.speed * dt;
+      const ci = Math.round(nx + HALF);
+      const cj = Math.round(nz + HALF);
+      if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+        nx = spore.x - (dz / distance) * spore.speed * dt;
+        nz = spore.z + (dx / distance) * spore.speed * dt;
+      }
+      spore.x = Math.max(-HALF + 0.3, Math.min(HALF - 0.3, nx));
+      spore.z = Math.max(-HALF + 0.3, Math.min(HALF - 0.3, nz));
+      spore.mesh.position.set(
+        spore.x,
+        0.34 + Math.sin(state.time * 5.2 + spore.phase) * 0.035,
+        spore.z
+      );
+      spore.mesh.rotation.z += dt * 0.7;
+      spore.mesh.scale.setScalar(1 + Math.sin(state.time * 6 + spore.phase) * 0.035);
+      const contact = bodyDistanceSq(spore.x, spore.z) <=
+        ABYSS_SPORE_TRIGGER_RADIUS * ABYSS_SPORE_TRIGGER_RADIUS;
+      if (contact || spore.life <= 0) {
+        explodeAbyssSpore(spore);
+        state.abyssSpores.splice(index, 1);
+        if (state.over) return;
+      }
+    }
+
+    for (let index = state.abyssSporeBlasts.length - 1; index >= 0; index--) {
+      const blast = state.abyssSporeBlasts[index];
+      blast.life = Math.max(0, blast.life - dt);
+      const progress = 1 - blast.life / blast.maxLife;
+      blast.mesh.scale.setScalar(0.35 + progress * 2.3);
+      blast.mesh.material.opacity = Math.max(0, 0.88 * (1 - progress));
+      if (blast.life === 0) {
+        blast.mesh.visible = false;
+        state.abyssSporeBlasts.splice(index, 1);
+      }
+    }
+
+    for (let index = state.abyssBeamWarnings.length - 1; index >= 0; index--) {
+      const warning = state.abyssBeamWarnings[index];
+      if (!warning.owner || !warning.owner.alive) {
+        warning.mesh.visible = false;
+        state.abyssBeamWarnings.splice(index, 1);
+        continue;
+      }
+      warning.timer = Math.max(0, warning.timer - dt);
+      const progress = 1 - warning.timer / warning.maxTimer;
+      warning.mesh.position.set(warning.owner.x, 0.2, warning.owner.z);
+      warning.mesh.rotation.y += dt * (1.4 + progress * 3.2);
+      warning.mesh.scale.setScalar(1 + progress * 0.22 +
+        Math.sin(state.time * 18) * 0.035);
+      warning.mesh.material.opacity = 0.62 + progress * 0.28 +
+        Math.sin(state.time * 22) * 0.08;
+      if (warning.timer > 0) continue;
+      warning.mesh.visible = false;
+      warning.owner.soulBeamWarningMesh = null;
+      const beamMesh = abyssBeamPool.find((item) => !item.visible);
+      if (beamMesh) {
+        beamMesh.position.set(warning.owner.x, 0.36, warning.owner.z);
+        beamMesh.rotation.y = -warning.angle;
+        beamMesh.material.opacity = 0.98;
+        beamMesh.visible = true;
+        state.abyssEnemyBeams.push({
+          mesh: beamMesh,
+          owner: warning.owner,
+          angle: warning.angle,
+          life: ABYSS_BEAM_ACTIVE,
+          maxLife: ABYSS_BEAM_ACTIVE,
+          hit: false,
+        });
+        warning.owner.soulBeamState = 'fire';
+      } else {
+        warning.owner.soulBeamState = 'recover';
+        warning.owner.soulBeamTimer = 0.4;
+      }
+      state.abyssBeamWarnings.splice(index, 1);
+    }
+
+    for (let index = state.abyssEnemyBeams.length - 1; index >= 0; index--) {
+      const beam = state.abyssEnemyBeams[index];
+      beam.life = Math.max(0, beam.life - dt);
+      const owner = beam.owner;
+      if (owner) {
+        beam.mesh.position.set(owner.x, 0.36, owner.z);
+      }
+      beam.mesh.material.opacity =
+        0.72 + Math.sin(state.time * 30) * 0.12 + beam.life / beam.maxLife * 0.16;
+      if (!beam.hit) {
+        const x = beam.mesh.position.x;
+        const z = beam.mesh.position.z;
+        if (stormEagleDashTouchesBody(
+          x,
+          z,
+          x + Math.cos(beam.angle) * ABYSS_BEAM_LENGTH,
+          z + Math.sin(beam.angle) * ABYSS_BEAM_LENGTH,
+          ABYSS_BEAM_HIT_HALF_WIDTH
+        )) {
+          beam.hit = true;
+          damage(ABYSS_BEAM_DAMAGE, 'hazard');
+          if (state.over) return;
+        }
+      }
+      if (beam.life === 0) {
+        beam.mesh.visible = false;
+        beam.mesh.material.opacity = 0;
+        if (owner) {
+          owner.soulBeamState = 'recover';
+          owner.soulBeamTimer = 0.45;
+        }
+        state.abyssEnemyBeams.splice(index, 1);
+      }
+    }
+  }
+
+  function clearAbyssEnemyEffects() {
+    state.abyssShurikens.forEach((shuriken) => { shuriken.mesh.visible = false; });
+    state.abyssShurikens.length = 0;
+    state.abyssSpores.forEach((spore) => { spore.mesh.visible = false; });
+    state.abyssSpores.length = 0;
+    state.abyssSporeBlasts.forEach((blast) => { blast.mesh.visible = false; });
+    state.abyssSporeBlasts.length = 0;
+    state.abyssBeamWarnings.forEach((warning) => { warning.mesh.visible = false; });
+    state.abyssBeamWarnings.length = 0;
+    state.abyssEnemyBeams.forEach((beam) => { beam.mesh.visible = false; });
+    state.abyssEnemyBeams.length = 0;
+    abyssShurikenPool.forEach((mesh) => { mesh.visible = false; });
+    abyssSporePool.forEach((mesh) => { mesh.visible = false; });
+    abyssSporeBlastPool.forEach((mesh) => { mesh.visible = false; });
+    abyssBeamWarningPool.forEach((mesh) => { mesh.visible = false; });
+    abyssBeamPool.forEach((mesh) => { mesh.visible = false; });
+    abyssPullRing.visible = false;
+    abyssPullRing.material.opacity = 0;
+    state.abyssPullDelay = 0;
+    state.abyssPullCooldown = 0;
+    state.abyssPullEffectTimer = 0;
+  }
+
   function updateMummyAbility(e, dt) {
     const stats = enemyStats(e.type);
     if (e.eyeTimer === undefined) e.eyeTimer = stats.eyeGlowCooldown;
@@ -6530,6 +7126,21 @@
 
       if (e.type === 'mummy') updateMummyAbility(e, dt);
       updateEnemyAbilityVisuals(e, mesh, k, dt);
+      if (e.type === 'abyssTentacle') {
+        updateAbyssTentacle(e, mesh, hp, dt);
+        if (state.over) return;
+        continue;
+      }
+      if (e.type === 'voidTick') {
+        updateVoidTick(e, mesh, hp, dt);
+        if (state.over) return;
+        continue;
+      }
+      if (e.type === 'soulWraith') {
+        updateSoulWraith(e, mesh, hp, dt);
+        if (state.over) return;
+        continue;
+      }
 
       const dx = hp.x - e.x;
       const dz = hp.z - e.z;
@@ -10352,6 +10963,7 @@
     clearWispCombatEffects();
     clearStormArena();
     clearAbyssLordArena();
+    clearAbyssEnemyEffects();
     clearBlackGorgeEffects();
     clearPurpleTeleport();
     state.iceSpawnTimer = ICE_SPAWN_INTERVAL;
@@ -10584,6 +11196,7 @@
       updateStormFeathers(dt);
       updateStormArena(dt);
       updateAbyssLordArena(dt);
+      updateAbyssEnemyAbilities(dt);
       updateBlackGorgeEffects(dt);
       updateBullets(dt);
       updateFireTrails(dt);
@@ -10727,6 +11340,35 @@
         slowTimer: state.slowTimer,
       };
     },
+    getAbyssEnemyEffects: () => ({
+      pullDelay: state.abyssPullDelay,
+      pullCooldown: state.abyssPullCooldown,
+      pullVisible: abyssPullRing.visible,
+      shurikens: state.abyssShurikens.map(({ x, z, angle, life }) => ({ x, z, angle, life })),
+      spores: state.abyssSpores.map(({ x, z, life, speed }) => ({ x, z, life, speed })),
+      sporeBlasts: state.abyssSporeBlasts.length,
+      beamWarnings: state.abyssBeamWarnings.map(({ timer, angle, owner }) => ({
+        timer,
+        angle,
+        x: owner?.x ?? null,
+        z: owner?.z ?? null,
+      })),
+      beams: state.abyssEnemyBeams.map(({ angle, life, hit }) => ({ angle, life, hit })),
+      enemyStates: state.enemies.filter((enemy) => (
+        enemy.alive &&
+        (enemy.type === 'abyssTentacle' ||
+          enemy.type === 'voidTick' ||
+          enemy.type === 'soulWraith')
+      )).map((enemy) => ({
+        type: enemy.type,
+        x: enemy.x,
+        z: enemy.z,
+        pullTimer: enemy.abyssPullTimer,
+        sporeTimer: enemy.abyssSporeTimer,
+        beamState: enemy.soulBeamState,
+      })),
+    }),
+    clearAbyssEnemyEffects,
     spawnAbyssBullet,
     spawnAbyssAfterimage,
     spawnBlackRune,
