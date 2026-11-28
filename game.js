@@ -149,9 +149,7 @@
   const ABYSS_LORD_TELEPORT_FRAMES = 11;
   const ABYSS_LORD_TELEPORT_DURATION = 0.99;
   const ABYSS_LORD_TELEPORT_INTERVAL = 8;
-  const ABYSS_TENTACLE_PULL_INTERVAL = 8.5;
-  const ABYSS_TENTACLE_PULL_WINDUP = 0.45;
-  const ABYSS_TENTACLE_PULL_COOLDOWN = 2.4;
+  const ABYSS_SHURIKEN_INTERVAL = 8.5;
   const ABYSS_SHURIKEN_COUNT = 3;
   const ABYSS_SHURIKEN_RADIUS = 2.8;
   const ABYSS_SHURIKEN_ORBIT_SPEED = 2.2;
@@ -174,6 +172,7 @@
   const ABYSS_BEAM_DAMAGE = 2;
   const ABYSS_TENTACLE_RENDER_SCALE = 1.54;
   const ABYSS_VOID_TICK_RENDER_SCALE = 1.01;
+  const ABYSS_SOUL_WRAITH_RENDER_SCALE = 2.24;
   const BLACK_GORGE_LEVEL_BASE = 48;
   const BLACK_GORGE_OBSTACLE_COUNT = 8;
   const BLACK_CURSE_ATTENDANT_HP = 290;
@@ -2631,26 +2630,6 @@
     abyssBeamWarningPool.push(mesh);
   }
 
-  const abyssPullRingGeo = new THREE.RingGeometry(2.75, 3.15, 64, 1);
-  abyssPullRingGeo.rotateX(-Math.PI / 2);
-  const abyssPullRing = new THREE.Mesh(
-    abyssPullRingGeo,
-    new THREE.MeshBasicMaterial({
-      color: 0xa83dff,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      fog: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-    })
-  );
-  abyssPullRing.position.set(0, 0.2, 0);
-  abyssPullRing.renderOrder = 6;
-  abyssPullRing.visible = false;
-  scene.add(abyssPullRing);
-
   const bulletPool = [];
   for (let i = 0; i < 40; i++) {
     const mesh = new THREE.Mesh(
@@ -3702,9 +3681,6 @@
     abyssSporeBlasts: [],
     abyssBeamWarnings: [],
     abyssEnemyBeams: [],
-    abyssPullDelay: 0,
-    abyssPullCooldown: 0,
-    abyssPullEffectTimer: 0,
     blackRunes: [],
     blackCurseRunes: [],
     blackPools: [],
@@ -4051,7 +4027,7 @@
       stormDiveTarget: null,
       stormDiveElapsed: 0,
       stormDiveHit: false,
-      abyssPullTimer: spawnType === 'abyssTentacle'
+      abyssShurikenTimer: spawnType === 'abyssTentacle'
         ? 3.5 + Math.random() * 3
         : 0,
       abyssSporeTimer: spawnType === 'voidTick'
@@ -4853,7 +4829,7 @@
     if (type === 'stormFalcon') return 1.18;
     if (type === 'abyssTentacle') return ABYSS_TENTACLE_RENDER_SCALE;
     if (type === 'voidTick') return ABYSS_VOID_TICK_RENDER_SCALE;
-    if (type === 'soulWraith') return 1.12;
+    if (type === 'soulWraith') return ABYSS_SOUL_WRAITH_RENDER_SCALE;
     return 1;
   }
 
@@ -6633,54 +6609,13 @@
     return true;
   }
 
-  function pullSnakeTowardAbyssWell() {
-    if (state.spawnEmerging || state.cells.length === 0) return false;
-    const head = state.cells[0];
-    const di = Math.sign(HALF - head.i);
-    const dj = Math.sign(HALF - head.j);
-    if (di === 0 && dj === 0) return false;
-    const candidates = [];
-    if (Math.abs(HALF - head.i) >= Math.abs(HALF - head.j)) {
-      if (di) candidates.push({ i: di, j: 0 });
-      if (dj) candidates.push({ i: 0, j: dj });
-    } else {
-      if (dj) candidates.push({ i: 0, j: dj });
-      if (di) candidates.push({ i: di, j: 0 });
-    }
-    if (di && dj && !candidates.some((dir) => dir.i === di && dir.j === dj)) {
-      candidates.push({ i: di, j: dj });
-    }
-    for (const dir of candidates) {
-      const ni = head.i + dir.i;
-      const nj = head.j + dir.j;
-      if (!inBounds(ni, nj) || isObstacle(ni, nj) || hitsSelf(ni, nj)) continue;
-      state.cells.unshift({ i: ni, j: nj });
-      state.prevTail = state.cells.pop();
-      state.progress = 0;
-      return true;
-    }
-    return false;
-  }
-
-  function beginAbyssPull(e) {
-    if (state.abyssPullDelay > 0 || state.abyssPullCooldown > 0) return false;
-    state.abyssPullDelay = ABYSS_TENTACLE_PULL_WINDUP;
-    state.abyssPullCooldown = ABYSS_TENTACLE_PULL_COOLDOWN;
-    state.abyssPullEffectTimer = ABYSS_TENTACLE_PULL_WINDUP + 0.35;
-    abyssPullRing.position.set(0, 0.2, 0);
-    abyssPullRing.visible = true;
-    toast('暗影触须 · 深井牵引', '三枚手里剑展开 · 深井正在牵引蛇身');
-    return true;
-  }
-
   function updateAbyssTentacle(e, mesh, hp, dt) {
     moveAbyssEnemy(e, mesh, hp, dt);
     if (state.over) return;
-    e.abyssPullTimer -= dt;
-    if (e.abyssPullTimer > 0) return;
-    e.abyssPullTimer = ABYSS_TENTACLE_PULL_INTERVAL + Math.random() * 1.8;
+    e.abyssShurikenTimer -= dt;
+    if (e.abyssShurikenTimer > 0) return;
+    e.abyssShurikenTimer = ABYSS_SHURIKEN_INTERVAL + Math.random() * 1.8;
     spawnAbyssShurikens(e);
-    beginAbyssPull(e);
   }
 
   function spawnAbyssSpore(e) {
@@ -6781,22 +6716,6 @@
   }
 
   function updateAbyssEnemyAbilities(dt) {
-    state.abyssPullCooldown = Math.max(0, state.abyssPullCooldown - dt);
-    state.abyssPullEffectTimer = Math.max(0, state.abyssPullEffectTimer - dt);
-    if (state.abyssPullDelay > 0) {
-      state.abyssPullDelay = Math.max(0, state.abyssPullDelay - dt);
-      if (state.abyssPullDelay === 0) pullSnakeTowardAbyssWell();
-    }
-    abyssPullRing.visible = state.abyssPullEffectTimer > 0;
-    if (abyssPullRing.visible) {
-      const progress = 1 - state.abyssPullEffectTimer /
-        (ABYSS_TENTACLE_PULL_WINDUP + 0.35);
-      abyssPullRing.rotation.y += dt * (1.2 + progress * 2.8);
-      abyssPullRing.scale.setScalar(0.9 + Math.sin(progress * Math.PI) * 0.24);
-      abyssPullRing.material.opacity =
-        0.34 + Math.sin(state.time * 16) * 0.12 + progress * 0.28;
-    }
-
     for (let index = state.abyssShurikens.length - 1; index >= 0; index--) {
       const shuriken = state.abyssShurikens[index];
       shuriken.life -= dt;
@@ -6964,11 +6883,6 @@
     abyssSporeBlastPool.forEach((mesh) => { mesh.visible = false; });
     abyssBeamWarningPool.forEach((mesh) => { mesh.visible = false; });
     abyssBeamPool.forEach((mesh) => { mesh.visible = false; });
-    abyssPullRing.visible = false;
-    abyssPullRing.material.opacity = 0;
-    state.abyssPullDelay = 0;
-    state.abyssPullCooldown = 0;
-    state.abyssPullEffectTimer = 0;
   }
 
   function updateMummyAbility(e, dt) {
@@ -11343,9 +11257,6 @@
       };
     },
     getAbyssEnemyEffects: () => ({
-      pullDelay: state.abyssPullDelay,
-      pullCooldown: state.abyssPullCooldown,
-      pullVisible: abyssPullRing.visible,
       shurikens: state.abyssShurikens.map(({ x, z, angle, life }) => ({ x, z, angle, life })),
       spores: state.abyssSpores.map(({ x, z, life, speed }) => ({ x, z, life, speed })),
       sporeBlasts: state.abyssSporeBlasts.length,
@@ -11365,7 +11276,8 @@
         type: enemy.type,
         x: enemy.x,
         z: enemy.z,
-        pullTimer: enemy.abyssPullTimer,
+        renderScale: enemyRenderScale(enemy.type),
+        shurikenTimer: enemy.abyssShurikenTimer,
         sporeTimer: enemy.abyssSporeTimer,
         beamState: enemy.soulBeamState,
       })),
