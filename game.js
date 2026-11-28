@@ -31,6 +31,7 @@
   const SHIELD_HALO_SCALE_X = 0.94;
   const SHIELD_HALO_SCALE_Y = 0.72;
   const MAX_ENEMIES = 48;
+  const DAMAGE_RESPAWN_ENEMY_CAP = 16;
   const ICE_SLUG_MAX_ACTIVE = 16;
   const FIRE_BULLET_COST = 2;
   const FIRE_BULLET_DAMAGE = 2;
@@ -4846,6 +4847,13 @@
     return types[randInt(types.length)];
   }
 
+  function shouldRandomlySpawnEnemyOnDamage() {
+    const theme = ROOMS[state.level]?.theme;
+    return state.phase === 'clear' &&
+      !state.doorOpen &&
+      (theme === 'storm' || theme === 'abyss');
+  }
+
   function updateHud() {
     const len = state.cells.length;
     const position = campaignPosition(state.level);
@@ -5687,9 +5695,16 @@
       gameOver('体长归零 —— 蛇不能没有身体。');
       return;
     }
-    if (state.phase === 'clear' && state.roomEnemyTypes.includes('frostWolf')) {
+    if (state.phase === 'clear' && !state.doorOpen) {
       const living = state.enemies.filter((enemy) => enemy.alive).length;
-      if (living < MAX_ENEMIES) spawnEnemy(8, true, 'frostWolf');
+      if (state.roomEnemyTypes.includes('frostWolf')) {
+        if (living < MAX_ENEMIES) spawnEnemy(8, true, 'frostWolf');
+      } else if (
+        living < DAMAGE_RESPAWN_ENEMY_CAP &&
+        shouldRandomlySpawnEnemyOnDamage()
+      ) {
+        spawnEnemy(8, true);
+      }
     }
   }
 
