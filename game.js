@@ -169,7 +169,7 @@
   const ABYSS_SPORE_BLAST_RADIUS = 2.4;
   const ABYSS_SPORE_DAMAGE = 1;
   const ABYSS_SPORE_MAX_ACTIVE = 18;
-  const ABYSS_BEAM_INTERVAL = 6.5;
+  const ABYSS_BEAM_INTERVAL = 5;
   const ABYSS_BEAM_WARNING = 1;
   const ABYSS_BEAM_ACTIVE = 0.42;
   const ABYSS_BEAM_LENGTH = 48;
@@ -380,7 +380,7 @@
       contactRadius: 0.72, retreatSpeedMul: 0.48,
     },
     soulWraith: {
-      hp: 2, speed: 1.08, contactDamage: 1, contactCooldown: 1.3,
+      hp: 5, speed: 1.08, contactDamage: 1, contactCooldown: 1.3,
       contactRadius: 0.78, retreatSpeedMul: 0.4,
     },
   };
@@ -11346,6 +11346,7 @@
         shurikenTimer: enemy.abyssShurikenTimer,
         sporeTimer: enemy.abyssSporeTimer,
         beamState: enemy.soulBeamState,
+        beamTimer: enemy.soulBeamTimer,
       })),
     }),
     clearAbyssEnemyEffects,
