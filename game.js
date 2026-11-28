@@ -201,6 +201,8 @@
   const BLACK_MIST_BULLET_POOL_SIZE = 160;
   const BLACK_WIZARD_RENDER_SCALE = 2.65;
   const BLACK_WIZARD_SKILL_RENDER_SCALE = 2.45;
+  const BLACK_WIZARD_BODY_WIDTH_SCALE = 0.62;
+  const BLACK_WIZARD_BODY_LENGTH_SCALE = 1.1;
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   const BLACK_WIZARD_CURSE_FIELD_INTERVAL = 8;
   const BLACK_WIZARD_CURSE_FIELD_SIZE = 10;
@@ -9163,7 +9165,12 @@
     const displayScale = b.blackWizardPose === 'idle'
       ? (b.renderScale || BLACK_WIZARD_RENDER_SCALE)
       : BLACK_WIZARD_SKILL_RENDER_SCALE;
-    bossMesh.scale.setScalar(displayScale * (1 + Math.sin(state.time * 2.5) * 0.02));
+    const animatedScale = displayScale * (1 + Math.sin(state.time * 2.5) * 0.02);
+    bossMesh.scale.set(
+      animatedScale * BLACK_WIZARD_BODY_WIDTH_SCALE,
+      animatedScale,
+      animatedScale * BLACK_WIZARD_BODY_LENGTH_SCALE
+    );
     updateBlackWizardPose(b, dt);
     updateBlackWizardCurseState(b, dt);
     updateBlackWizardCurseFields(b, dt);
