@@ -219,6 +219,11 @@
   const BLACK_WIZARD_SUMMON_INTERVAL = 15;
   const BLACK_WIZARD_SUMMON_HP = 5;
   const BLACK_WIZARD_SUMMON_LIFE = 15;
+  const BLACK_WIZARD_SUMMON_SKILL_NAMES = {
+    black_curse_servant: '三重禁阵',
+    blood_slave: '裂肉三爪',
+    black_mist_servant: '雾化瞬移',
+  };
   const BLACK_WIZARD_CAST_POSE_TIME = 0.8;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   let DEBUG_START_LEVEL = 0;
@@ -4694,7 +4699,8 @@
             const decay = curse > 0 ? `${Math.ceil(state.boss.blackWizardCurseDecayTimer)}s` : '稳定';
             const summon = state.blackWizardSummon;
             const summonText = summon
-              ? ` · 召唤物 ${summon.hp}/${summon.maxHp} ${Math.ceil(summon.life)}s`
+              ? ` · 召唤物 ${summon.hp}/${summon.maxHp} ${Math.ceil(summon.life)}s` +
+                (summon.skillName ? ` · ${summon.skillName}` : '')
               : '';
             el.bshield.textContent =
               `诅咒 ${curse}/${BLACK_WIZARD_MAX_CURSE} · 消退 ${decay} · ` +
@@ -8035,6 +8041,7 @@
     updateBlackPools(dt);
     updateBlackBeams(dt);
     updateBlackClones(dt);
+    updateBloodSlaveClawEffects(dt);
   }
 
   function moveBlackBossToward(b, target, speed, dt) {
@@ -8361,7 +8368,6 @@
     b.bloodPoolCooldown = Math.max(0, b.bloodPoolCooldown - dt);
     updateBloodSlavePassive(b, dt);
     updateBloodSlavePools(b, dt);
-    updateBloodSlaveClawEffects(dt);
     if (state.over) return;
 
     if (b.bloodState === 'clawWindup') {
@@ -8890,10 +8896,11 @@
     if (announce) toast('黑巫师 · 召唤终结', '召唤物已从战场消失');
   }
 
-  function spawnBlackWizardSummon(b) {
+  function spawnBlackWizardSummon(b, forcedKind = null) {
     clearBlackWizardSummon(false);
     const kinds = ['black_curse_servant', 'blood_slave', 'black_mist_servant'];
-    const kind = kinds[randInt(kinds.length)];
+    const kind = kinds.includes(forcedKind) ? forcedKind : kinds[randInt(kinds.length)];
+    const skillName = BLACK_WIZARD_SUMMON_SKILL_NAMES[kind];
     const head = state.cells[0] || BOSS_CELL;
     let cell = null;
     for (let tries = 0; tries < 100; tries++) {
@@ -8919,17 +8926,37 @@
       hp: BLACK_WIZARD_SUMMON_HP,
       maxHp: BLACK_WIZARD_SUMMON_HP,
       life: BLACK_WIZARD_SUMMON_LIFE,
-      shootTimer: 1.25,
+      skillName,
+      skillTimer: 1.2,
       contactCool: 0,
       hitFlash: 0,
-      teleportTimer: kind === 'black_mist_servant' ? 3 : 0,
+      invulnerable: false,
+      bloodState: kind === 'blood_slave' ? 'stalk' : 'none',
+      bloodStateTimer: 0,
+      bloodClawCooldown: kind === 'blood_slave' ? 0.8 : 0,
+      bloodClawTarget: null,
+      bloodClawFrom: null,
+      bloodClawTo: null,
+      bloodClawAngle: 0,
+      bloodRageTimer: 0,
+      mistState: kind === 'black_mist_servant' ? 'solid' : 'none',
+      mistStateTimer: kind === 'black_mist_servant' ? 1.8 : 0,
+      mistTarget: null,
+      mistTeleported: false,
     };
     updateHud();
-    toast('黑巫师 · 终焉召令', '随机召唤一名终章 Boss · 5 次命中可击破 · 持续 15 秒');
+    toast(
+      '黑巫师 · 终焉召令',
+      `召唤终章 Boss · 专属技能：${skillName} · 5 次命中可击破`
+    );
   }
 
   function damageBlackWizardSummon(summon, amount = 1) {
     if (!summon || state.blackWizardSummon !== summon) return false;
+    if (summon.invulnerable) {
+      summon.hitFlash = 0.18;
+      return true;
+    }
     summon.hp -= amount;
     summon.hitFlash = 0.18;
     updateHud();
@@ -8946,51 +8973,149 @@
     return Math.hypot(summon.x - x, summon.z - z) <= radius ? summon : null;
   }
 
-  function spawnWizardSummonBullet(summon, angle) {
-    const mesh = bossBulletPool.find((item) => !item.visible);
-    if (!mesh) return;
-    mesh.position.set(summon.x, 0.5, summon.z);
-    mesh.visible = true;
-    state.enemyBullets.push({
-      mesh,
-      x: summon.x,
-      z: summon.z,
-      vx: Math.cos(angle) * 4.1,
-      vz: Math.sin(angle) * 4.1,
-      life: 4.5,
-      wizardSummonBullet: true,
-    });
+  function moveWizardSummonToward(summon, hp, speed, dt, stopDistance = 6) {
+    const dx = hp.x - summon.x;
+    const dz = hp.z - summon.z;
+    const distance = Math.hypot(dx, dz) || 1;
+    if (distance <= stopDistance) return distance;
+    let nx = summon.x + (dx / distance) * speed * dt;
+    let nz = summon.z + (dz / distance) * speed * dt;
+    const ci = Math.round(nx + HALF);
+    const cj = Math.round(nz + HALF);
+    if (!inBounds(ci, cj) || isObstacle(ci, cj)) {
+      nx = summon.x - (dz / distance) * speed * dt;
+      nz = summon.z + (dx / distance) * speed * dt;
+    }
+    summon.x = nx;
+    summon.z = nz;
+    return distance;
+  }
+
+  function updateBlackCurseWizardSummon(summon, dt) {
+    summon.skillTimer -= dt;
+    if (summon.skillTimer > 0) return;
+    summon.skillTimer = 6.2;
+    spawnBlackCurseRuneWave();
+    toast('黑咒侍从 · 三重禁阵', '召唤物生成三处 8×8 法阵 · 2 秒后灼伤蛇身');
+  }
+
+  function updateBloodWizardSummon(summon, b, hp, dt) {
+    summon.bloodClawCooldown = Math.max(0, summon.bloodClawCooldown - dt);
+
+    if (summon.bloodState === 'clawWindup') {
+      summon.bloodStateTimer = Math.max(0, summon.bloodStateTimer - dt);
+      summon.mesh.scale.setScalar(2.05 *
+        (1 + (1 - summon.bloodStateTimer / BLOOD_SLAVE_CLAW_WINDUP) * 0.08));
+      summon.mesh.rotation.z = Math.sin(state.time * 24) * 0.035;
+      if (summon.bloodStateTimer === 0) {
+        summon.bloodState = 'clawDash';
+        summon.bloodStateTimer = BLOOD_SLAVE_CLAW_DASH_TIME;
+      }
+      return;
+    }
+
+    if (summon.bloodState === 'clawDash') {
+      summon.bloodStateTimer = Math.max(0, summon.bloodStateTimer - dt);
+      const progress = 1 - summon.bloodStateTimer / BLOOD_SLAVE_CLAW_DASH_TIME;
+      const eased = progress * progress * (3 - 2 * progress);
+      summon.x = summon.bloodClawFrom.x +
+        (summon.bloodClawTo.x - summon.bloodClawFrom.x) * eased;
+      summon.z = summon.bloodClawFrom.z +
+        (summon.bloodClawTo.z - summon.bloodClawFrom.z) * eased;
+      summon.mesh.scale.setScalar(2.05 * 0.96);
+      summon.mesh.rotation.z = Math.sin(progress * Math.PI) * 0.14;
+      if (summon.bloodStateTimer === 0) {
+        resolveBloodSlaveClaw(summon);
+        if (state.over) return;
+        summon.bloodState = 'clawRecover';
+        summon.bloodStateTimer = BLOOD_SLAVE_CLAW_RECOVER;
+      }
+      return;
+    }
+
+    if (summon.bloodState === 'clawRecover') {
+      summon.bloodStateTimer = Math.max(0, summon.bloodStateTimer - dt);
+      summon.mesh.scale.setScalar(2.05 * 0.93);
+      summon.mesh.rotation.z = -0.1 + Math.sin(state.time * 10) * 0.025;
+      if (summon.bloodStateTimer === 0) summon.bloodState = 'stalk';
+      return;
+    }
+
+    const distance = moveWizardSummonToward(summon, hp, 1.45, dt, 5.5);
+    summon.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 3) * 0.025));
+    summon.mesh.rotation.z = Math.sin(state.time * 2.1) * 0.04;
+    if (bodyDistanceSq(summon.x, summon.z) < 2.8 * 2.8 && summon.contactCool <= 0) {
+      summon.contactCool = 1.35;
+      dealBlackWizardDamage(b, 1, 'contact');
+      if (state.over) return;
+    }
+    if (distance <= BLOOD_SLAVE_CLAW_RANGE && summon.bloodClawCooldown <= 0) {
+      startBloodSlaveClaw(summon, hp);
+    }
+  }
+
+  function updateBlackMistWizardSummon(summon, b, hp, dt) {
+    if (summon.mistState === 'mist') {
+      summon.mistStateTimer = Math.max(0, summon.mistStateTimer - dt);
+      const half = BLACK_MIST_TIME * 0.5;
+      if (summon.mistStateTimer <= half && !summon.mistTeleported) {
+        summon.mistTeleported = true;
+        summon.x = summon.mistTarget.x;
+        summon.z = summon.mistTarget.z;
+      }
+      summon.mesh.material.opacity =
+        Math.max(0.12, summon.mistStateTimer / BLACK_MIST_TIME * 0.46);
+      summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xffffff : 0xcca6ff);
+      summon.mesh.scale.setScalar(2.05 * (1.04 - summon.mistStateTimer * 0.05));
+      if (summon.mistStateTimer === 0) {
+        summon.mistState = 'solid';
+        summon.mistStateTimer = 2.4;
+        summon.mistTeleported = false;
+        summon.invulnerable = false;
+        summon.mesh.material.opacity = 0.92;
+        summon.mesh.material.color.setHex(0xffffff);
+      }
+      return;
+    }
+
+    summon.mistStateTimer = Math.max(0, summon.mistStateTimer - dt);
+    moveWizardSummonToward(summon, hp, 0.92, dt, 6.5);
+    summon.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 4.1) * 0.02));
+    summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xffc0c0 : 0xffffff);
+    if (bodyDistanceSq(summon.x, summon.z) < 2.7 * 2.7 && summon.contactCool <= 0) {
+      summon.contactCool = 1.5;
+      dealBlackWizardDamage(b, 1, 'contact');
+      if (state.over) return;
+    }
+
+    if (summon.mistStateTimer === 0) {
+      const target = chooseBlackMistCloneCell();
+      summon.mistTarget = { x: cellX(target.i), z: cellZ(target.j) };
+      summon.mistState = 'mist';
+      summon.mistStateTimer = BLACK_MIST_TIME;
+      summon.mistTeleported = false;
+      summon.invulnerable = true;
+      spawnBlackRune(target.i - 0.5, target.j - 0.5, BLACK_MIST_TIME * 0.5, 0xa133ff);
+      toast('黑雾魔侍 · 雾影瞬移', '雾化期间免伤 · 紫色雾阵预警后造成范围伤害');
+    }
   }
 
   function updateBlackWizardSummon(b, dt) {
     const summon = state.blackWizardSummon;
     if (!summon) return;
     summon.life -= dt;
-    summon.shootTimer -= dt;
     summon.contactCool = Math.max(0, summon.contactCool - dt);
     summon.hitFlash = Math.max(0, summon.hitFlash - dt);
-    summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xff6262 : 0xffffff);
-    summon.mesh.material.opacity = 0.86 + Math.sin(state.time * 4.2) * 0.05;
+    const hp = headPosition(_tmpA).clone();
 
-    if (summon.kind === 'black_mist_servant') {
-      summon.teleportTimer -= dt;
-      if (summon.teleportTimer <= 0) {
-        summon.teleportTimer = 3;
-        const cell = randomFreeCell();
-        summon.x = cellX(cell.i);
-        summon.z = cellZ(cell.j);
-      }
-    } else {
-      const head = headPosition(_tmpA);
-      const dx = head.x - summon.x;
-      const dz = head.z - summon.z;
-      const distance = Math.hypot(dx, dz) || 1;
-      const speed = summon.kind === 'blood_slave' ? 1.45 : 0.82;
-      if (distance > 6) {
-        summon.x += (dx / distance) * speed * dt;
-        summon.z += (dz / distance) * speed * dt;
-      }
+    if (summon.kind === 'black_curse_servant') {
+      updateBlackCurseWizardSummon(summon, dt);
+    } else if (summon.kind === 'blood_slave') {
+      updateBloodWizardSummon(summon, b, hp, dt);
+    } else if (summon.kind === 'black_mist_servant') {
+      updateBlackMistWizardSummon(summon, b, hp, dt);
     }
+    if (state.over) return;
 
     summon.x = Math.max(-HALF + 2, Math.min(HALF - 2, summon.x));
     summon.z = Math.max(-HALF + 2, Math.min(HALF - 2, summon.z));
@@ -8999,18 +9124,13 @@
       0.62 + Math.sin(state.time * 3.4) * 0.035,
       summon.z
     );
-    summon.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 3) * 0.018));
-
-    if (bodyDistanceSq(summon.x, summon.z) < 2.7 * 2.7 && summon.contactCool <= 0) {
-      summon.contactCool = 1.5;
-      dealBlackWizardDamage(b, 1, 'contact');
-    }
-    if (summon.shootTimer <= 0) {
-      summon.shootTimer = 2.2;
-      const offset = state.time * 0.45;
-      for (let shot = 0; shot < 6; shot++) {
-        spawnWizardSummonBullet(summon, offset + (shot / 6) * Math.PI * 2);
-      }
+    if (summon.kind === 'black_curse_servant') {
+      summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xff6262 : 0xffffff);
+      summon.mesh.material.opacity = 0.86 + Math.sin(state.time * 4.2) * 0.05;
+      summon.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 3) * 0.018));
+    } else if (summon.kind === 'blood_slave') {
+      summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xff6262 : 0xffffff);
+      summon.mesh.material.opacity = 0.92;
     }
     if (summon.life <= 0) clearBlackWizardSummon(true);
   }
@@ -9346,11 +9466,7 @@
         : (b.blackMist ? BLACK_MIST_BULLET_HIT_RADIUS : 0.7);
       if (!dead && bodyDistanceSq(b.x, b.z) < hitRadius * hitRadius) {
         dead = true;
-        if (b.wizardSummonBullet && state.boss?.kind === 'black_wizard') {
-          dealBlackWizardDamage(state.boss, 1, 'projectile');
-        } else {
-          damage(1, 'projectile');
-        }
+        damage(1, 'projectile');
       }
       if (dead) {
         b.mesh.visible = false;
@@ -10613,9 +10729,9 @@
       fireBlackWizardShadowArrows(state.boss, { x, z });
       return true;
     },
-    spawnBlackWizardSummon: () => (
+    spawnBlackWizardSummon: (kind = null) => (
       state.boss?.kind === 'black_wizard'
-        ? (spawnBlackWizardSummon(state.boss), state.blackWizardSummon)
+        ? (spawnBlackWizardSummon(state.boss, kind), state.blackWizardSummon)
         : null
     ),
     damageBlackWizardSummon: (amount = 1) => (
@@ -10698,10 +10814,15 @@
       wizardSummon: state.blackWizardSummon
         ? {
           kind: state.blackWizardSummon.kind,
+          skill: state.blackWizardSummon.skillName,
           hp: state.blackWizardSummon.hp,
           life: state.blackWizardSummon.life,
           x: state.blackWizardSummon.x,
           z: state.blackWizardSummon.z,
+          skillTimer: state.blackWizardSummon.skillTimer,
+          bloodState: state.blackWizardSummon.bloodState,
+          mistState: state.blackWizardSummon.mistState,
+          invulnerable: state.blackWizardSummon.invulnerable,
         }
         : null,
       pools: state.blackPools.map(({ i, j, life }) => ({ i, j, life })),
