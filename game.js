@@ -172,6 +172,8 @@
   const ABYSS_BEAM_WIDTH = 2.4;
   const ABYSS_BEAM_HIT_HALF_WIDTH = 1.08;
   const ABYSS_BEAM_DAMAGE = 2;
+  const ABYSS_TENTACLE_RENDER_SCALE = 1.54;
+  const ABYSS_VOID_TICK_RENDER_SCALE = 1.01;
   const BLACK_GORGE_LEVEL_BASE = 48;
   const BLACK_GORGE_OBSTACLE_COUNT = 8;
   const BLACK_CURSE_ATTENDANT_HP = 290;
@@ -4849,8 +4851,8 @@
     if (type === 'stormSkimmer') return 0.84;
     if (type === 'stormMoth') return 0.98;
     if (type === 'stormFalcon') return 1.18;
-    if (type === 'abyssTentacle') return 1.34;
-    if (type === 'voidTick') return 0.88;
+    if (type === 'abyssTentacle') return ABYSS_TENTACLE_RENDER_SCALE;
+    if (type === 'voidTick') return ABYSS_VOID_TICK_RENDER_SCALE;
     if (type === 'soulWraith') return 1.12;
     return 1;
   }
@@ -6695,6 +6697,7 @@
       if (!isObstacle(Math.round(x + HALF), Math.round(z + HALF))) break;
     }
     mesh.position.set(x, 0.34, z);
+    mesh.rotation.z = 0;
     mesh.material.opacity = 0.94;
     mesh.visible = true;
     state.abyssSpores.push({
@@ -6847,7 +6850,6 @@
         0.34 + Math.sin(state.time * 5.2 + spore.phase) * 0.035,
         spore.z
       );
-      spore.mesh.rotation.z += dt * 0.7;
       spore.mesh.scale.setScalar(1 + Math.sin(state.time * 6 + spore.phase) * 0.035);
       const contact = bodyDistanceSq(spore.x, spore.z) <=
         ABYSS_SPORE_TRIGGER_RADIUS * ABYSS_SPORE_TRIGGER_RADIUS;
