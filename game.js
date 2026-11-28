@@ -199,6 +199,8 @@
   const BLACK_MIST_BULLET_SPEED = 4.2;
   const BLACK_MIST_BULLET_BURST_SPEED = 4.7;
   const BLACK_MIST_BULLET_POOL_SIZE = 160;
+  const BLACK_WIZARD_RENDER_SCALE = 2.6;
+  const BLACK_WIZARD_SKILL_RENDER_SCALE = 2.45;
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   const BLACK_WIZARD_CURSE_FIELD_INTERVAL = 8;
   const BLACK_WIZARD_CURSE_FIELD_SIZE = 10;
@@ -5029,7 +5031,7 @@
           : (isAbyssLord
             ? 2.2
             : (isBlackWizard
-              ? 2.45
+              ? BLACK_WIZARD_RENDER_SCALE
               : (isBlackBoss ? 2.05 : (isPharaoh ? 1.425 : 2))))));
     const bulletHitRadius = isRootcoil
       ? 4.6
@@ -8996,8 +8998,10 @@
     b.z = cellZ(BOSS_CELL.j);
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.9) * 0.02;
-    bossMesh.scale.setScalar((b.renderScale || 2.45) *
-      (1 + Math.sin(state.time * 2.5) * 0.02));
+    const displayScale = b.blackWizardPose === 'idle'
+      ? (b.renderScale || BLACK_WIZARD_RENDER_SCALE)
+      : BLACK_WIZARD_SKILL_RENDER_SCALE;
+    bossMesh.scale.setScalar(displayScale * (1 + Math.sin(state.time * 2.5) * 0.02));
     updateBlackWizardPose(b, dt);
     updateBlackWizardCurseState(b, dt);
     updateBlackWizardCurseFields(b, dt);
