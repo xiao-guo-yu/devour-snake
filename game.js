@@ -254,6 +254,13 @@
   const PHARAOH_BULLET_INTERVAL = 6;
   const PHARAOH_SHIELD_HP = 3;
   const PHARAOH_SHIELD_RESPAWN = 20;
+  const PHARAOH_SPEED_MULTIPLIER = 0.8;
+  const PHARAOH_VOLUME_MULTIPLIER = 1.5;
+  const PHARAOH_RENDER_SCALE = 1.425 * PHARAOH_VOLUME_MULTIPLIER;
+  const PHARAOH_BULLET_HIT_RADIUS = 3.45 * PHARAOH_VOLUME_MULTIPLIER;
+  const PHARAOH_ORB_HIT_RADIUS = 3.9 * PHARAOH_VOLUME_MULTIPLIER;
+  const PHARAOH_CONTACT_RADIUS = 3.75 * PHARAOH_VOLUME_MULTIPLIER;
+  const PHARAOH_ENERGY_CLEAR_RADIUS = 3;
   const SKILL_HUD_REVEAL_SECONDS = 6.5;
   const NORMAL_PELLET_COUNT = 10;
   const BOSS_PELLET_BONUS = 6;
@@ -5059,7 +5066,7 @@
             ? 2.2
             : (isBlackWizard
               ? BLACK_WIZARD_RENDER_SCALE
-              : (isBlackBoss ? 2.05 : (isPharaoh ? 1.425 : 2))))));
+              : (isBlackBoss ? 2.05 : (isPharaoh ? PHARAOH_RENDER_SCALE : 2))))));
     const bulletHitRadius = isRootcoil
       ? 4.6
       : (isDragon
@@ -5068,7 +5075,9 @@
           ? 4.55
           : (isAbyssLord
             ? 3.15
-            : (isBlackBoss ? (isBlackWizard ? 3.8 : 3.15) : (isPharaoh ? 3.45 : 2.3)))));
+              : (isBlackBoss
+                ? (isBlackWizard ? 3.8 : 3.15)
+                : (isPharaoh ? PHARAOH_BULLET_HIT_RADIUS : 2.3)))));
     const orbHitRadius = isRootcoil
       ? 5.2
       : (isDragon
@@ -5077,7 +5086,9 @@
           ? 4.15
           : (isAbyssLord
             ? 3.55
-            : (isBlackBoss ? (isBlackWizard ? 4.1 : 3.4) : (isPharaoh ? 3.9 : 2.6)))));
+              : (isBlackBoss
+                ? (isBlackWizard ? 4.1 : 3.4)
+                : (isPharaoh ? PHARAOH_ORB_HIT_RADIUS : 2.6)))));
     const contactRadius = isRootcoil
       ? 4.8
       : (isDragon
@@ -5086,7 +5097,9 @@
           ? 4.35
           : (isAbyssLord
             ? 3.35
-            : (isBlackBoss ? (isBlackWizard ? 3.5 : 3.0) : (isPharaoh ? 3.75 : 2.5)))));
+              : (isBlackBoss
+                ? (isBlackWizard ? 3.5 : 3.0)
+                : (isPharaoh ? PHARAOH_CONTACT_RADIUS : 2.5)))));
     const startCell = isBlackCurse ? BLACK_CURSE_BOSS_CELL : BOSS_CELL;
     const start = { x: cellX(startCell.i), z: cellZ(startCell.j) };
     state.boss = {
@@ -5158,6 +5171,7 @@
       shieldRespawnTimer: 0,
       shieldFlash: 0,
       shieldHudSecond: -1,
+      pharaohEnergyClearToastTimer: 0,
       blackAttackTimer: isBlackCurse ? 2.2 : (isBloodSlave ? 2.8 : (isBlackMist ? 1.2 : 2.4)),
       blackAttackCycle: 0,
       blackState: isBloodSlave ? 'stalk' : (isBlackMist ? 'solid' : 'idle'),
@@ -5301,10 +5315,31 @@
     pharaohShieldRig.position.set(b.x, 0, b.z);
     if (b.shieldActive) {
       const pulse = 1 + Math.sin(state.time * 3.4) * 0.035;
-      pharaohShieldRig.scale.setScalar(pulse);
+      pharaohShieldRig.scale.setScalar(PHARAOH_VOLUME_MULTIPLIER * pulse);
       pharaohShieldDisc.material.opacity = 0.08 + b.shieldFlash * 1.4 +
         (1 - b.shieldHp / PHARAOH_SHIELD_HP) * 0.04;
       pharaohShieldRing.material.opacity = 0.62 + b.shieldFlash * 1.5;
+    }
+  }
+
+  function clearEnergyPelletsNearPharaoh(b, dt) {
+    b.pharaohEnergyClearToastTimer = Math.max(0, b.pharaohEnergyClearToastTimer - dt);
+    const centerI = Math.round(b.x + HALF);
+    const centerJ = Math.round(b.z + HALF);
+    const radiusSq = PHARAOH_ENERGY_CLEAR_RADIUS * PHARAOH_ENERGY_CLEAR_RADIUS;
+    let cleared = 0;
+    for (let index = state.pellets.length - 1; index >= 0; index--) {
+      const pellet = state.pellets[index];
+      if (!pellet.energy) continue;
+      const dx = pellet.i - centerI;
+      const dz = pellet.j - centerJ;
+      if (dx * dx + dz * dz > radiusSq) continue;
+      state.pellets.splice(index, 1);
+      cleared += 1;
+    }
+    if (cleared > 0 && b.pharaohEnergyClearToastTimer <= 0) {
+      b.pharaohEnergyClearToastTimer = 2.4;
+      toast('黄金法老 · 能量吞噬', `${cleared} 枚能量豆在 3 格范围内消散`);
     }
   }
 
@@ -7325,12 +7360,16 @@
     const dx = hp.x - b.x;
     const dz = hp.z - b.z;
     const len = Math.hypot(dx, dz) || 1;
-    b.x += (dx / len) * BOSS_SPEED * dt;
-    b.z += (dz / len) * BOSS_SPEED * dt;
+    const moveSpeed = BOSS_SPEED * (b.kind === 'pharaoh' ? PHARAOH_SPEED_MULTIPLIER : 1);
+    b.x += (dx / len) * moveSpeed * dt;
+    b.z += (dz / len) * moveSpeed * dt;
     b.x = Math.max(-HALF + 2, Math.min(HALF - 2, b.x));
     b.z = Math.max(-HALF + 2, Math.min(HALF - 2, b.z));
     if (b.kind === 'rootcoil') updateRootcoilSummon(b, dt);
-    if (b.kind === 'pharaoh') updatePharaohShield(b, dt);
+    if (b.kind === 'pharaoh') {
+      updatePharaohShield(b, dt);
+      clearEnergyPelletsNearPharaoh(b, dt);
+    }
 
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.2) * 0.04;
