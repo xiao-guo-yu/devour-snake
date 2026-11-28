@@ -96,6 +96,8 @@
   const STORM_LIGHTNING_WARNING = 1;
   const STORM_LIGHTNING_IMPACT_TIME = 0.42;
   const STORM_LIGHTNING_DAMAGE = 1;
+  const STORM_LIGHTNING_COUNT = 3;
+  const STORM_LIGHTNING_FOOTPRINT = 3;
   const STORM_OBSTACLE_COUNT = 8;
   const STORM_EAGLE_HP = 470;
   const STORM_EAGLE_FEATHER_COUNT = 27;
@@ -122,9 +124,13 @@
   const STORM_TORNADO_SLOW_TIME = 3;
   const STORM_BOLT_SPEED = 4.6;
   const STORM_DIVE_RANGE = 10;
-  const STORM_DIVE_TELEGRAPH = 0.82;
+  const STORM_DIVE_TELEGRAPH = 0.55;
   const STORM_DIVE_TIME = 0.34;
-  const STORM_DIVE_RECOVER = 0.7;
+  const STORM_DIVE_RECOVER = 0.45;
+  const STORM_SKIMMER_DASH_DISTANCE = 6;
+  const STORM_MOTH_BARRAGE_COUNT = 6;
+  const STORM_MOTH_BARRAGE_RANGE = 6;
+  const STORM_FALCON_RENDER_SCALE = 2.36;
   const ABYSS_OBSTACLE_COUNT = 8;
   const ABYSS_LORD_HP = 520;
   const ABYSS_LEVEL_BASE = 40;
@@ -352,7 +358,8 @@
     stormSkimmer: {
       hp: 1, speed: 2.45, contactDamage: 1, contactCooldown: 1.15,
       contactRadius: 0.62, retreatSpeedMul: 0.48,
-      dashInterval: 2.6, dashDuration: 0.38, dashSpeedMul: 2.35,
+      dashInterval: 2.6, dashDuration: 0.38,
+      dashSpeedMul: STORM_SKIMMER_DASH_DISTANCE / (2.45 * 0.38),
     },
     stormMoth: {
       hp: 2, speed: 1.18, contactDamage: 1, contactCooldown: 1.3,
@@ -4022,7 +4029,7 @@
       stormDashActive: 0,
       stormPhase: Math.random() * Math.PI * 2,
       stormDiveState: 'idle',
-      stormDiveTimer: 3.4 + Math.random() * 1.8,
+      stormDiveTimer: 1.8 + Math.random() * 1.2,
       stormDiveFrom: null,
       stormDiveTarget: null,
       stormDiveElapsed: 0,
@@ -4826,7 +4833,7 @@
     if (type === 'frostWisp') return 1.28;
     if (type === 'stormSkimmer') return 0.84;
     if (type === 'stormMoth') return 0.98;
-    if (type === 'stormFalcon') return 1.18;
+    if (type === 'stormFalcon') return STORM_FALCON_RENDER_SCALE;
     if (type === 'abyssTentacle') return ABYSS_TENTACLE_RENDER_SCALE;
     if (type === 'voidTick') return ABYSS_VOID_TICK_RENDER_SCALE;
     if (type === 'soulWraith') return ABYSS_SOUL_WRAITH_RENDER_SCALE;
@@ -6448,7 +6455,7 @@
     e.shootTimer -= dt;
     if (e.shootTimer <= 0) {
       e.shootTimer = stats.shootCooldown;
-      if (len < stats.shootRange) spawnStormBolt(e.x, e.z, hp.x, hp.z);
+      spawnStormRadialBurst(e);
     }
   }
 
@@ -6547,7 +6554,7 @@
     if (e.stormDiveElapsed >= STORM_DIVE_RECOVER) {
       e.stormDiveState = 'idle';
       e.stormDiveElapsed = 0;
-      e.stormDiveTimer = 3.8 + Math.random() * 1.6;
+      e.stormDiveTimer = 1.8 + Math.random() * 1.0;
       e.stormDiveTarget = null;
       e.stormDiveFrom = null;
     }
@@ -7099,6 +7106,8 @@
       }
 
       const stats = enemyStats(e.type);
+      const previousX = e.x;
+      const previousZ = e.z;
       if (e.type === 'stormSkimmer') {
         e.stormDashTimer -= dt;
         e.stormDashActive = Math.max(0, e.stormDashActive - dt);
@@ -7130,7 +7139,16 @@
         mesh.rotation.z = Math.sin(state.time * 2 + e.bob) * 0.08;
       }
 
-      if (bodyDistanceSq(nx, nz) < stats.contactRadius * stats.contactRadius && e.cool <= 0) {
+      const touchingBody = e.type === 'stormSkimmer' && e.stormDashActive > 0
+        ? stormEagleDashTouchesBody(
+          previousX,
+          previousZ,
+          nx,
+          nz,
+          stats.contactRadius
+        )
+        : bodyDistanceSq(nx, nz) < stats.contactRadius * stats.contactRadius;
+      if (touchingBody && e.cool <= 0) {
         e.cool = stats.contactCooldown;
         e.x -= (dx / len) * 2.2;
         e.z -= (dz / len) * 2.2;
@@ -10161,7 +10179,7 @@
     const mesh = stormWarningPool.find((item) => !item.visible);
     if (!mesh) return null;
     const lightning = kind === 'lightning';
-    const footprint = lightning ? 2 : STORM_TORNADO_FOOTPRINT;
+    const footprint = lightning ? STORM_LIGHTNING_FOOTPRINT : STORM_TORNADO_FOOTPRINT;
     const centerOffset = footprint / 2 - 0.5;
     mesh.visible = true;
     mesh.position.set(cellX(anchor.i + centerOffset), 0.17, cellZ(anchor.j + centerOffset));
@@ -10184,7 +10202,12 @@
     if (mesh) {
       mesh.visible = true;
       mesh.material.opacity = 0.98;
-      mesh.position.set(cellX(anchor.i + 0.5), 0.34, cellZ(anchor.j + 0.5));
+      const centerOffset = STORM_LIGHTNING_FOOTPRINT / 2 - 0.5;
+      mesh.position.set(
+        cellX(anchor.i + centerOffset),
+        0.34,
+        cellZ(anchor.j + centerOffset)
+      );
       mesh.rotation.z = (Math.random() - 0.5) * 0.12;
       state.stormLightningStrikes.push({
         mesh,
@@ -10192,11 +10215,15 @@
         duration: STORM_LIGHTNING_IMPACT_TIME,
       });
     }
-    if (stormFootprintContainsBody(anchor, 2)) {
+    if (stormFootprintContainsBody(anchor, STORM_LIGHTNING_FOOTPRINT)) {
       const previousDamage = state.damageTaken;
       damage(STORM_LIGHTNING_DAMAGE, 'hazard');
       if (state.damageTaken > previousDamage && !state.over) {
-        toast('落雷命中', `2×2 雷区 · 体长 -${STORM_LIGHTNING_DAMAGE}`);
+        toast(
+          '落雷命中',
+          `${STORM_LIGHTNING_FOOTPRINT}×${STORM_LIGHTNING_FOOTPRINT} 雷区 · ` +
+          `体长 -${STORM_LIGHTNING_DAMAGE}`
+        );
       }
     }
   }
@@ -10313,15 +10340,37 @@
     state.stormLightningTimer -= dt;
     if (state.stormLightningTimer > 0) return;
     state.stormLightningTimer = STORM_LIGHTNING_INTERVAL;
-    const anchor = chooseStormAnchor();
-    showStormWarning(anchor, 'lightning', STORM_LIGHTNING_WARNING);
+    const anchors = [];
+    for (let index = 0; index < STORM_LIGHTNING_COUNT; index++) {
+      const anchor = chooseStormAnchor(anchors, false, STORM_LIGHTNING_FOOTPRINT);
+      anchors.push(anchor);
+      showStormWarning(anchor, 'lightning', STORM_LIGHTNING_WARNING);
+    }
     if (!state.stormIntroShown) {
       state.stormIntroShown = true;
-      toast('雷暴将至', '每 5 秒随机落下 2×2 雷区 · 预警 1 秒');
+      toast(
+        '雷暴将至',
+        `每 5 秒随机落下 ${STORM_LIGHTNING_COUNT} 道 ` +
+        `${STORM_LIGHTNING_FOOTPRINT}×${STORM_LIGHTNING_FOOTPRINT} 雷区 · 预警 1 秒`
+      );
     }
   }
 
-  function spawnStormBolt(x, z, tx, tz) {
+  function spawnStormRadialBurst(e) {
+    const offset = state.time * 0.38;
+    for (let index = 0; index < STORM_MOTH_BARRAGE_COUNT; index++) {
+      const angle = offset + (index / STORM_MOTH_BARRAGE_COUNT) * Math.PI * 2;
+      spawnStormBolt(
+        e.x,
+        e.z,
+        e.x + Math.cos(angle) * STORM_MOTH_BARRAGE_RANGE,
+        e.z + Math.sin(angle) * STORM_MOTH_BARRAGE_RANGE,
+        STORM_MOTH_BARRAGE_RANGE
+      );
+    }
+  }
+
+  function spawnStormBolt(x, z, tx, tz, maxDistance = null) {
     const mesh = stormBoltPool.find((item) => !item.visible);
     if (!mesh) return;
     const dx = tx - x;
@@ -10335,7 +10384,7 @@
       z,
       vx: (dx / len) * STORM_BOLT_SPEED,
       vz: (dz / len) * STORM_BOLT_SPEED,
-      life: 4.8,
+      life: maxDistance === null ? 4.8 : maxDistance / STORM_BOLT_SPEED,
       phase: Math.random() * Math.PI * 2,
     });
   }
@@ -11198,7 +11247,9 @@
         ...anchor,
         kind,
         remaining,
-        footprint: kind === 'tornado' ? STORM_TORNADO_FOOTPRINT : 2,
+        footprint: kind === 'tornado'
+          ? STORM_TORNADO_FOOTPRINT
+          : STORM_LIGHTNING_FOOTPRINT,
       })),
       strikes: state.stormLightningStrikes.length,
       tornadoes: state.stormTornadoes.map(({ anchor, life }) => ({
@@ -11224,6 +11275,21 @@
       dashTarget: state.boss?.kind === 'storm_eagle' && state.boss.stormDashTo
         ? { ...state.boss.stormDashTo }
         : null,
+      enemyStates: state.enemies.filter((enemy) => (
+        enemy.alive &&
+        (enemy.type === 'stormSkimmer' ||
+          enemy.type === 'stormMoth' ||
+          enemy.type === 'stormFalcon')
+      )).map((enemy) => ({
+        type: enemy.type,
+        x: enemy.x,
+        z: enemy.z,
+        renderScale: enemyRenderScale(enemy.type),
+        dashTimer: enemy.stormDashTimer,
+        dashActive: enemy.stormDashActive,
+        diveState: enemy.stormDiveState,
+        diveTimer: enemy.stormDiveTimer,
+      })),
     }),
     getAbyssLordArena: () => {
       const boss = state.boss?.kind === 'abyss_lord' ? state.boss : null;
