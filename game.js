@@ -200,6 +200,23 @@
   const BLACK_MIST_BULLET_BURST_SPEED = 4.7;
   const BLACK_MIST_BULLET_POOL_SIZE = 160;
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
+  const BLACK_WIZARD_CURSE_FIELD_INTERVAL = 8;
+  const BLACK_WIZARD_CURSE_FIELD_SIZE = 10;
+  const BLACK_WIZARD_CURSE_FIELD_LIFE = 6;
+  const BLACK_WIZARD_CURSE_FIELD_DAMAGE = 1;
+  const BLACK_WIZARD_ARROW_INTERVAL = 6;
+  const BLACK_WIZARD_ARROW_COUNT = 3;
+  const BLACK_WIZARD_ARROW_SPEED = 16.5;
+  const BLACK_WIZARD_ARROW_LENGTH = 5;
+  const BLACK_WIZARD_ARROW_WIDTH = 2;
+  const BLACK_WIZARD_ARROW_DAMAGE = 2;
+  const BLACK_WIZARD_ARROW_SLOW_TIME = 1.8;
+  const BLACK_WIZARD_MAX_CURSE = 3;
+  const BLACK_WIZARD_CURSE_DECAY_TIME = 5;
+  const BLACK_WIZARD_SUMMON_INTERVAL = 15;
+  const BLACK_WIZARD_SUMMON_HP = 5;
+  const BLACK_WIZARD_SUMMON_LIFE = 15;
+  const BLACK_WIZARD_CAST_POSE_TIME = 0.8;
   // 默认从第一关开始；开发时可用 ?level=11 显式进入指定房间。
   let DEBUG_START_LEVEL = 0;
   const DOOR_CELL = { i: 22, j: 1 };
@@ -1640,6 +1657,11 @@
   const BLOOD_SLAVE_CLAW_TEX = loadIceEffectTexture('blood-slave-claw.png');
   const BLOOD_SLAVE_POOL_TEX = loadIceEffectTexture('blood-slave-pool.png');
   const BLACK_MIST_BULLET_TEX = loadIceEffectTexture('black-mist-bullet.png');
+  const BLACK_WIZARD_CURSE_MARK_TEX = loadIceEffectTexture('black-wizard-curse-mark.png');
+  const BLACK_WIZARD_CURSE_FIELD_TEX = loadIceEffectTexture('black-wizard-curse-field.png');
+  const BLACK_WIZARD_CAST_TEX = loadIceEffectTexture('black-wizard-cast.png');
+  const BLACK_WIZARD_SUMMON_TEX = loadIceEffectTexture('black-wizard-summon.png');
+  const BLACK_WIZARD_SHADOW_ARROW_TEX = loadIceEffectTexture('black-wizard-shadow-arrow.png');
 
   // ---------- 障碍外观：温室用树桩，神庙用石柱（每处占 2×2 = 4 格） ----------
   const OBSTACLE_PLANES = 16;
@@ -2797,6 +2819,100 @@
     blackMistCloneMeshes.push(mesh);
   }
 
+  const blackWizardCurseFieldPool = [];
+  const blackWizardCurseFieldGeo = new THREE.PlaneGeometry(
+    BLACK_WIZARD_CURSE_FIELD_SIZE,
+    BLACK_WIZARD_CURSE_FIELD_SIZE
+  );
+  blackWizardCurseFieldGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 4; i++) {
+    const mesh = new THREE.Mesh(
+      blackWizardCurseFieldGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_WIZARD_CURSE_FIELD_TEX || null,
+        color: BLACK_WIZARD_CURSE_FIELD_TEX ? 0xffffff : 0x8f1018,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.13;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackWizardCurseFieldPool.push(mesh);
+  }
+
+  const blackWizardArrowPool = [];
+  const blackWizardArrowGeo = new THREE.PlaneGeometry(
+    BLACK_WIZARD_ARROW_LENGTH,
+    BLACK_WIZARD_ARROW_WIDTH
+  );
+  blackWizardArrowGeo.rotateX(-Math.PI / 2);
+  blackWizardArrowGeo.translate(-BLACK_WIZARD_ARROW_LENGTH / 2, 0, 0);
+  for (let i = 0; i < 12; i++) {
+    const mesh = new THREE.Mesh(
+      blackWizardArrowGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_WIZARD_SHADOW_ARROW_TEX || null,
+        color: BLACK_WIZARD_SHADOW_ARROW_TEX ? 0xffffff : 0x8b42ff,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.42;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackWizardArrowPool.push(mesh);
+  }
+
+  const blackWizardCurseMarks = [];
+  const blackWizardCurseMarkGeo = new THREE.PlaneGeometry(0.92, 0.92);
+  blackWizardCurseMarkGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < BLACK_WIZARD_MAX_CURSE; i++) {
+    const mesh = new THREE.Mesh(
+      blackWizardCurseMarkGeo,
+      new THREE.MeshBasicMaterial({
+        map: BLACK_WIZARD_CURSE_MARK_TEX || null,
+        color: BLACK_WIZARD_CURSE_MARK_TEX ? 0xffffff : 0xff1d25,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      })
+    );
+    mesh.position.y = 0.82;
+    mesh.visible = false;
+    scene.add(mesh);
+    blackWizardCurseMarks.push(mesh);
+  }
+
+  const blackWizardSummonMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.4, 5.4),
+    new THREE.MeshBasicMaterial({
+      map: BOSS_TEX.black_wizard || null,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
+    })
+  );
+  blackWizardSummonMesh.rotation.x = -Math.PI / 2;
+  blackWizardSummonMesh.position.y = 0.62;
+  blackWizardSummonMesh.scale.setScalar(2.05);
+  blackWizardSummonMesh.visible = false;
+  scene.add(blackWizardSummonMesh);
+
   const blackPoolPool = [];
   for (let i = 0; i < 20; i++) {
     const mesh = new THREE.Mesh(
@@ -3374,6 +3490,9 @@
     blackBeamEffects: [],
     blackClones: [],
     blackMistClones: [],
+    blackWizardCurseFields: [],
+    blackWizardArrows: [],
+    blackWizardSummon: null,
     bloodSlavePools: [],
     bloodSlaveClaws: [],
     lavaBalls: [],
@@ -4549,10 +4668,21 @@
               : clones > 0
                 ? `分身 ${clones} · 本体受击 ${hits}/${BLACK_MIST_CLONE_BREAK_HITS} · 分裂 ${Math.ceil(state.boss.blackMistSplitTimer)}s`
                 : `分身冷却 ${Math.ceil(state.boss.blackMistSplitTimer)}s · 瞬移 ${BLACK_MIST_TELEPORT_INTERVAL}s`;
+          } else if (state.boss.kind === 'black_wizard') {
+            const curse = state.boss.blackWizardCurseLayers || 0;
+            const decay = curse > 0 ? `${Math.ceil(state.boss.blackWizardCurseDecayTimer)}s` : '稳定';
+            const summon = state.blackWizardSummon;
+            const summonText = summon
+              ? ` · 召唤物 ${summon.hp}/${summon.maxHp} ${Math.ceil(summon.life)}s`
+              : '';
+            el.bshield.textContent =
+              `诅咒 ${curse}/${BLACK_WIZARD_MAX_CURSE} · 消退 ${decay} · ` +
+              `法阵 ${Math.ceil(state.boss.blackWizardCurseFieldTimer)}s · ` +
+              `暗影箭 ${Math.ceil(state.boss.blackWizardArrowTimer)}s · ` +
+              `召唤 ${Math.ceil(state.boss.blackWizardSummonTimer)}s` +
+              summonText;
           } else {
-            el.bshield.textContent = state.boss.kind === 'black_wizard' && state.boss.blackPhase === 2
-                ? `狂暴阶段 · ${hpPercent}%`
-                : `首领阶段 1 · ${hpPercent}%`;
+            el.bshield.textContent = `首领阶段 1 · ${hpPercent}%`;
           }
         } else {
           el.bshield.textContent = state.boss.shieldActive
@@ -5014,6 +5144,14 @@
       blackMistSplitTimer: isBlackMist ? BLACK_MIST_CLONE_SPLIT_INTERVAL : 0,
       blackMistCloneHits: 0,
       blackMistHudSignature: '',
+      blackWizardCurseFieldTimer: isBlackWizard ? BLACK_WIZARD_CURSE_FIELD_INTERVAL : 0,
+      blackWizardArrowTimer: isBlackWizard ? BLACK_WIZARD_ARROW_INTERVAL : 0,
+      blackWizardSummonTimer: isBlackWizard ? BLACK_WIZARD_SUMMON_INTERVAL : 0,
+      blackWizardCurseLayers: 0,
+      blackWizardCurseDecayTimer: BLACK_WIZARD_CURSE_DECAY_TIME,
+      blackWizardPose: 'idle',
+      blackWizardPoseTimer: 0,
+      blackWizardHudSignature: '',
       blackCurseBulletTimer: isBlackCurse ? BLACK_CURSE_BULLET_INTERVAL : 0,
       blackCurseRuneTimer: isBlackCurse ? BLACK_CURSE_RUNE_INTERVAL : 0,
       blackCurseLockTimer: 0,
@@ -5536,6 +5674,14 @@
       if (damageEnemy(enemy, FROST_SKILL_DAMAGE)) {
         hitCount += 1;
         enemy.slowTimer = Math.max(enemy.slowTimer || 0, FROST_SKILL_SLOW_DURATION);
+        slowed += 1;
+      }
+    }
+
+    const wizardSummon = state.blackWizardSummon;
+    if (wizardSummon && pointInFrostCone(wizardSummon.x, wizardSummon.z, head, angle)) {
+      if (damageBlackWizardSummon(wizardSummon, 1)) {
+        hitCount += 1;
         slowed += 1;
       }
     }
@@ -7831,11 +7977,21 @@
     state.bloodSlavePools.length = 0;
     state.bloodSlaveClaws.forEach((claw) => { claw.mesh.visible = false; });
     state.bloodSlaveClaws.length = 0;
+    state.blackWizardCurseFields.forEach((field) => { field.mesh.visible = false; });
+    state.blackWizardCurseFields.length = 0;
+    state.blackWizardArrows.forEach((arrow) => { arrow.mesh.visible = false; });
+    state.blackWizardArrows.length = 0;
+    if (state.blackWizardSummon) state.blackWizardSummon.mesh.visible = false;
+    state.blackWizardSummon = null;
     blackRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseBulletPool.forEach((mesh) => { mesh.visible = false; });
     blackMistCloneMeshes.forEach((mesh) => { mesh.visible = false; });
     blackMistBulletPool.forEach((mesh) => { mesh.visible = false; });
+    blackWizardCurseFieldPool.forEach((mesh) => { mesh.visible = false; });
+    blackWizardArrowPool.forEach((mesh) => { mesh.visible = false; });
+    blackWizardCurseMarks.forEach((mesh) => { mesh.visible = false; });
+    blackWizardSummonMesh.visible = false;
     blackPoolPool.forEach((mesh) => { mesh.visible = false; });
     bloodSlavePoolPool.forEach((mesh) => { mesh.visible = false; });
     bloodSlaveClawPool.forEach((mesh) => { mesh.visible = false; });
@@ -8482,78 +8638,412 @@
     }
   }
 
+  function blackWizardDamageAmount(b, baseDamage) {
+    return baseDamage * (1 + (b.blackWizardCurseLayers || 0));
+  }
+
+  function addBlackWizardCurse(b, layers = 1) {
+    const previous = b.blackWizardCurseLayers || 0;
+    b.blackWizardCurseLayers = Math.min(
+      BLACK_WIZARD_MAX_CURSE,
+      previous + layers
+    );
+    b.blackWizardCurseDecayTimer = BLACK_WIZARD_CURSE_DECAY_TIME;
+    if (b.blackWizardCurseLayers === previous) return false;
+    updateHud();
+    toast(
+      `黑巫师 · 诅咒 ${b.blackWizardCurseLayers}/${BLACK_WIZARD_MAX_CURSE}`,
+      `黑巫师造成的伤害提升至 ${1 + b.blackWizardCurseLayers} 倍`
+    );
+    return true;
+  }
+
+  function noteBlackWizardSkillHit(b, addCurse = false) {
+    b.blackWizardCurseDecayTimer = BLACK_WIZARD_CURSE_DECAY_TIME;
+    if (addCurse) addBlackWizardCurse(b, 1);
+    else updateHud();
+  }
+
+  function dealBlackWizardDamage(b, baseDamage, source, addCurse = false, slowTime = 0) {
+    const damageBefore = state.damageTaken;
+    damage(blackWizardDamageAmount(b, baseDamage), source);
+    if (state.over || state.damageTaken <= damageBefore) return false;
+    noteBlackWizardSkillHit(b, addCurse);
+    if (slowTime > 0) state.slowTimer = Math.max(state.slowTimer, slowTime);
+    return true;
+  }
+
+  function updateBlackWizardCurseMarks(b, dt) {
+    const head = headPosition(_tmpA);
+    for (let index = 0; index < blackWizardCurseMarks.length; index++) {
+      const mark = blackWizardCurseMarks[index];
+      mark.visible = b.alive && index < b.blackWizardCurseLayers;
+      if (!mark.visible) continue;
+      const angle = state.time * 1.35 + (index / BLACK_WIZARD_MAX_CURSE) * Math.PI * 2;
+      mark.position.set(
+        head.x + Math.cos(angle) * 0.92,
+        0.82 + Math.sin(state.time * 4 + index) * 0.025,
+        head.z + Math.sin(angle) * 0.92
+      );
+      mark.rotation.y = -angle;
+      mark.scale.setScalar(0.94 + Math.sin(state.time * 5 + index) * 0.06);
+    }
+  }
+
+  function updateBlackWizardCurseState(b, dt) {
+    if ((b.blackWizardCurseLayers || 0) > 0) {
+      b.blackWizardCurseDecayTimer = Math.max(0, b.blackWizardCurseDecayTimer - dt);
+      if (b.blackWizardCurseDecayTimer === 0) {
+        b.blackWizardCurseLayers -= 1;
+        b.blackWizardCurseDecayTimer = BLACK_WIZARD_CURSE_DECAY_TIME;
+        updateHud();
+        toast(
+          '诅咒消退',
+          b.blackWizardCurseLayers > 0
+            ? `剩余 ${b.blackWizardCurseLayers} 层`
+            : '诅咒已完全消退'
+        );
+      }
+    }
+    updateBlackWizardCurseMarks(b, dt);
+  }
+
+  function blackWizardBasicContact(b, dt) {
+    if (b.cool > 0) b.cool = Math.max(0, b.cool - dt);
+    if (bodyDistanceSq(b.x, b.z) >= 3.5 * 3.5 || b.cool > 0) return;
+    b.cool = 1.35;
+    dealBlackWizardDamage(b, 2, 'contact');
+  }
+
+  function spawnBlackWizardCurseField(b, hp) {
+    state.blackWizardCurseFields.forEach((field) => { field.mesh.visible = false; });
+    state.blackWizardCurseFields.length = 0;
+    const mesh = blackWizardCurseFieldPool.find((item) => !item.visible);
+    if (!mesh) return;
+    const limit = HALF - BLACK_WIZARD_CURSE_FIELD_SIZE / 2;
+    const x = Math.max(-limit, Math.min(limit, hp.x));
+    const z = Math.max(-limit, Math.min(limit, hp.z));
+    mesh.position.set(x, 0.13, z);
+    mesh.rotation.y = Math.random() * Math.PI * 2;
+    mesh.scale.setScalar(1);
+    mesh.material.opacity = 0.2;
+    mesh.visible = true;
+    state.blackWizardCurseFields.push({
+      mesh,
+      x,
+      z,
+      life: BLACK_WIZARD_CURSE_FIELD_LIFE,
+      maxLife: BLACK_WIZARD_CURSE_FIELD_LIFE,
+    });
+  }
+
+  function updateBlackWizardCurseFields(b, dt) {
+    for (let index = state.blackWizardCurseFields.length - 1; index >= 0; index--) {
+      const field = state.blackWizardCurseFields[index];
+      field.life -= dt;
+      const fade = Math.min(1, (field.maxLife - field.life) * 4, field.life * 2);
+      field.mesh.material.opacity = Math.max(0, fade * 0.72);
+      field.mesh.rotation.y += dt * 0.34;
+      field.mesh.scale.setScalar(1 + Math.sin(state.time * 2.8) * 0.018);
+      const containsBody = state.cells.some((cell) => (
+        Math.hypot(cellX(cell.i) - field.x, cellZ(cell.j) - field.z) <=
+        BLACK_WIZARD_CURSE_FIELD_SIZE / 2
+      ));
+      if (containsBody) {
+        state.slowTimer = Math.max(state.slowTimer, 0.45);
+        dealBlackWizardDamage(
+          b,
+          BLACK_WIZARD_CURSE_FIELD_DAMAGE,
+          'hazard',
+          true
+        );
+        if (state.over) return;
+      }
+      if (field.life <= 0) {
+        field.mesh.visible = false;
+        state.blackWizardCurseFields.splice(index, 1);
+      }
+    }
+  }
+
+  function spawnBlackWizardShadowArrow(x, z, angle) {
+    const mesh = blackWizardArrowPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.position.set(x, 0.42, z);
+    mesh.rotation.y = -angle;
+    mesh.visible = true;
+    state.blackWizardArrows.push({
+      mesh,
+      x,
+      z,
+      vx: Math.cos(angle) * BLACK_WIZARD_ARROW_SPEED,
+      vz: Math.sin(angle) * BLACK_WIZARD_ARROW_SPEED,
+      angle,
+      life: 2.2,
+    });
+  }
+
+  function fireBlackWizardShadowArrows(b, hp) {
+    const base = Math.atan2(hp.z - b.z, hp.x - b.x);
+    for (let index = 0; index < BLACK_WIZARD_ARROW_COUNT; index++) {
+      const lane = index - (BLACK_WIZARD_ARROW_COUNT - 1) / 2;
+      const angle = base + lane * 0.025;
+      const sideX = Math.cos(base + Math.PI / 2) * lane * 1.9;
+      const sideZ = Math.sin(base + Math.PI / 2) * lane * 1.9;
+      spawnBlackWizardShadowArrow(
+        b.x + Math.cos(base) * 3.8 + sideX,
+        b.z + Math.sin(base) * 3.8 + sideZ,
+        angle
+      );
+    }
+  }
+
+  function updateBlackWizardShadowArrows(b, dt) {
+    for (let index = state.blackWizardArrows.length - 1; index >= 0; index--) {
+      const arrow = state.blackWizardArrows[index];
+      arrow.life -= dt;
+      arrow.x += arrow.vx * dt;
+      arrow.z += arrow.vz * dt;
+      arrow.mesh.position.set(arrow.x, 0.42, arrow.z);
+      arrow.mesh.rotation.y = -arrow.angle;
+      const ci = Math.round(arrow.x + HALF);
+      const cj = Math.round(arrow.z + HALF);
+      let dead = arrow.life <= 0 || Math.abs(arrow.x) > HALF + 2 ||
+        Math.abs(arrow.z) > HALF + 2 || isObstacle(ci, cj);
+      if (!dead) {
+        const tailX = arrow.x - Math.cos(arrow.angle) * BLACK_WIZARD_ARROW_LENGTH;
+        const tailZ = arrow.z - Math.sin(arrow.angle) * BLACK_WIZARD_ARROW_LENGTH;
+        if (stormEagleDashTouchesBody(
+          tailX,
+          tailZ,
+          arrow.x,
+          arrow.z,
+          BLACK_WIZARD_ARROW_WIDTH / 2
+        )) {
+          const hadCurse = (b.blackWizardCurseLayers || 0) > 0;
+          dealBlackWizardDamage(
+            b,
+            BLACK_WIZARD_ARROW_DAMAGE,
+            'projectile',
+            true,
+            hadCurse ? BLACK_WIZARD_ARROW_SLOW_TIME : 0
+          );
+          dead = true;
+        }
+      }
+      if (dead) {
+        arrow.mesh.visible = false;
+        state.blackWizardArrows.splice(index, 1);
+      }
+    }
+  }
+
+  function clearBlackWizardSummon(announce = false) {
+    if (!state.blackWizardSummon) return;
+    state.blackWizardSummon.mesh.visible = false;
+    state.blackWizardSummon = null;
+    updateHud();
+    if (announce) toast('黑巫师 · 召唤终结', '召唤物已从战场消失');
+  }
+
+  function spawnBlackWizardSummon(b) {
+    clearBlackWizardSummon(false);
+    const kinds = ['black_curse_servant', 'blood_slave', 'black_mist_servant'];
+    const kind = kinds[randInt(kinds.length)];
+    const head = state.cells[0] || BOSS_CELL;
+    let cell = null;
+    for (let tries = 0; tries < 100; tries++) {
+      const candidate = randomFreeCell();
+      if (Math.abs(candidate.i - head.i) + Math.abs(candidate.j - head.j) < 8) continue;
+      if (Math.abs(candidate.i - BOSS_CELL.i) + Math.abs(candidate.j - BOSS_CELL.j) < 5) continue;
+      cell = candidate;
+      break;
+    }
+    cell = cell || randomFreeCell();
+    const mesh = blackWizardSummonMesh;
+    mesh.material.map = BOSS_TEX[kind] || BOSS_TEX.black_wizard || null;
+    mesh.material.color.setHex(0xffffff);
+    mesh.material.opacity = 0.92;
+    mesh.material.needsUpdate = true;
+    mesh.position.set(cellX(cell.i), 0.62, cellZ(cell.j));
+    mesh.visible = true;
+    state.blackWizardSummon = {
+      kind,
+      mesh,
+      x: cellX(cell.i),
+      z: cellZ(cell.j),
+      hp: BLACK_WIZARD_SUMMON_HP,
+      maxHp: BLACK_WIZARD_SUMMON_HP,
+      life: BLACK_WIZARD_SUMMON_LIFE,
+      shootTimer: 1.25,
+      contactCool: 0,
+      hitFlash: 0,
+      teleportTimer: kind === 'black_mist_servant' ? 3 : 0,
+    };
+    updateHud();
+    toast('黑巫师 · 终焉召令', '随机召唤一名终章 Boss · 5 次命中可击破 · 持续 15 秒');
+  }
+
+  function damageBlackWizardSummon(summon, amount = 1) {
+    if (!summon || state.blackWizardSummon !== summon) return false;
+    summon.hp -= amount;
+    summon.hitFlash = 0.18;
+    updateHud();
+    if (summon.hp <= 0) {
+      clearBlackWizardSummon(false);
+      toast('黑巫师 · 召唤物被击破', '召唤物消散');
+    }
+    return true;
+  }
+
+  function blackWizardSummonAt(x, z, radius = 3.0) {
+    const summon = state.blackWizardSummon;
+    if (!summon || summon.hp <= 0) return null;
+    return Math.hypot(summon.x - x, summon.z - z) <= radius ? summon : null;
+  }
+
+  function spawnWizardSummonBullet(summon, angle) {
+    const mesh = bossBulletPool.find((item) => !item.visible);
+    if (!mesh) return;
+    mesh.position.set(summon.x, 0.5, summon.z);
+    mesh.visible = true;
+    state.enemyBullets.push({
+      mesh,
+      x: summon.x,
+      z: summon.z,
+      vx: Math.cos(angle) * 4.1,
+      vz: Math.sin(angle) * 4.1,
+      life: 4.5,
+      wizardSummonBullet: true,
+    });
+  }
+
+  function updateBlackWizardSummon(b, dt) {
+    const summon = state.blackWizardSummon;
+    if (!summon) return;
+    summon.life -= dt;
+    summon.shootTimer -= dt;
+    summon.contactCool = Math.max(0, summon.contactCool - dt);
+    summon.hitFlash = Math.max(0, summon.hitFlash - dt);
+    summon.mesh.material.color.setHex(summon.hitFlash > 0 ? 0xff6262 : 0xffffff);
+    summon.mesh.material.opacity = 0.86 + Math.sin(state.time * 4.2) * 0.05;
+
+    if (summon.kind === 'black_mist_servant') {
+      summon.teleportTimer -= dt;
+      if (summon.teleportTimer <= 0) {
+        summon.teleportTimer = 3;
+        const cell = randomFreeCell();
+        summon.x = cellX(cell.i);
+        summon.z = cellZ(cell.j);
+      }
+    } else {
+      const head = headPosition(_tmpA);
+      const dx = head.x - summon.x;
+      const dz = head.z - summon.z;
+      const distance = Math.hypot(dx, dz) || 1;
+      const speed = summon.kind === 'blood_slave' ? 1.45 : 0.82;
+      if (distance > 6) {
+        summon.x += (dx / distance) * speed * dt;
+        summon.z += (dz / distance) * speed * dt;
+      }
+    }
+
+    summon.x = Math.max(-HALF + 2, Math.min(HALF - 2, summon.x));
+    summon.z = Math.max(-HALF + 2, Math.min(HALF - 2, summon.z));
+    summon.mesh.position.set(
+      summon.x,
+      0.62 + Math.sin(state.time * 3.4) * 0.035,
+      summon.z
+    );
+    summon.mesh.scale.setScalar(2.05 * (1 + Math.sin(state.time * 3) * 0.018));
+
+    if (bodyDistanceSq(summon.x, summon.z) < 2.7 * 2.7 && summon.contactCool <= 0) {
+      summon.contactCool = 1.5;
+      dealBlackWizardDamage(b, 1, 'contact');
+    }
+    if (summon.shootTimer <= 0) {
+      summon.shootTimer = 2.2;
+      const offset = state.time * 0.45;
+      for (let shot = 0; shot < 6; shot++) {
+        spawnWizardSummonBullet(summon, offset + (shot / 6) * Math.PI * 2);
+      }
+    }
+    if (summon.life <= 0) clearBlackWizardSummon(true);
+  }
+
+  function setBlackWizardPose(b, pose) {
+    b.blackWizardPose = pose;
+    b.blackWizardPoseTimer = BLACK_WIZARD_CAST_POSE_TIME;
+    bossPlaneMat.map = pose === 'summon'
+      ? (BLACK_WIZARD_SUMMON_TEX || BOSS_TEX.black_wizard)
+      : (BLACK_WIZARD_CAST_TEX || BOSS_TEX.black_wizard);
+    bossPlaneMat.needsUpdate = true;
+  }
+
+  function updateBlackWizardPose(b, dt) {
+    if (b.blackWizardPoseTimer <= 0) return;
+    b.blackWizardPoseTimer = Math.max(0, b.blackWizardPoseTimer - dt);
+    if (b.blackWizardPoseTimer === 0) {
+      b.blackWizardPose = 'idle';
+      bossPlaneMat.map = BOSS_TEX.black_wizard || null;
+      bossPlaneMat.needsUpdate = true;
+    }
+  }
+
   function updateBlackWizard(b, dt, hp) {
-    bossPlaneMat.opacity = 0.9 + Math.sin(state.time * 3) * 0.1;
+    bossPlaneMat.opacity = 0.94 + Math.sin(state.time * 3) * 0.06;
     b.x = cellX(BOSS_CELL.i);
     b.z = cellZ(BOSS_CELL.j);
     bossMesh.position.set(b.x, 0, b.z);
     bossMesh.rotation.z = Math.sin(state.time * 1.9) * 0.02;
-    bossMesh.scale.setScalar((b.renderScale || 2.45) * (1 + Math.sin(state.time * 2.5) * 0.02));
-    blackBossContact(b, dt, 3.5, 2);
+    bossMesh.scale.setScalar((b.renderScale || 2.45) *
+      (1 + Math.sin(state.time * 2.5) * 0.02));
+    updateBlackWizardPose(b, dt);
+    updateBlackWizardCurseState(b, dt);
+    updateBlackWizardCurseFields(b, dt);
+    updateBlackWizardShadowArrows(b, dt);
+    updateBlackWizardSummon(b, dt);
     if (state.over) return;
+    blackWizardBasicContact(b, dt);
 
-    if (b.blackPhase === 1 && b.hp <= b.max * BLACK_WIZARD_ENRAGE_RATIO) {
-      b.blackPhase = 2;
-      b.blackAttackTimer = 1.2;
-      updateHud();
-      for (let shot = 0; shot < 24; shot++) {
-        const angle = (shot / 24) * Math.PI * 2;
-        spawnBossBullet(
-          b.x, b.z,
-          Math.cos(angle) * 5.1,
-          Math.sin(angle) * 5.1,
-          5
-        );
+    b.blackWizardCurseFieldTimer -= dt;
+    b.blackWizardArrowTimer -= dt;
+    b.blackWizardSummonTimer -= dt;
+    const readySkills = [];
+    if (b.blackWizardCurseFieldTimer <= 0) readySkills.push('field');
+    if (b.blackWizardArrowTimer <= 0) readySkills.push('arrows');
+    if (b.blackWizardSummonTimer <= 0) readySkills.push('summon');
+    if (readySkills.length > 0) {
+      const skill = readySkills[randInt(readySkills.length)];
+      if (skill === 'field') {
+        b.blackWizardCurseFieldTimer = BLACK_WIZARD_CURSE_FIELD_INTERVAL;
+        spawnBlackWizardCurseField(b, hp);
+        setBlackWizardPose(b, 'cast');
+        toast('黑巫师 · 十环诅咒', '10×10 诅咒法阵降临 · 踩入会持续受伤并叠加诅咒');
+      } else if (skill === 'arrows') {
+        b.blackWizardArrowTimer = BLACK_WIZARD_ARROW_INTERVAL;
+        fireBlackWizardShadowArrows(b, hp);
+        setBlackWizardPose(b, 'cast');
+        toast('黑巫师 · 三重暗影箭', '三支 2×5 高速暗影箭齐射 · 命中叠加诅咒');
+      } else {
+        b.blackWizardSummonTimer = BLACK_WIZARD_SUMMON_INTERVAL;
+        spawnBlackWizardSummon(b);
+        setBlackWizardPose(b, 'summon');
       }
-      toast('黑巫师 · 血色狂暴', '咒印加速，双环弹幕即将展开');
     }
 
-    b.blackAttackTimer -= dt;
-    if (b.blackAttackTimer > 0) return;
-    b.blackAttackTimer = b.blackPhase === 2 ? 3.7 : 4.8;
-    b.blackAttackCycle += 1;
-    const cycle = b.blackAttackCycle % 3;
-
-    if (cycle === 1) {
-      const base = state.time * 0.32;
-      const count = b.blackPhase === 2 ? 6 : 4;
-      for (let i = 0; i < count; i++) {
-        spawnBlackBeam({
-          x: b.x, z: b.z,
-          angle: base + (i / count) * Math.PI * 2,
-          length: 22, width: 0.52,
-          warning: 0.92, active: b.blackPhase === 2 ? 1.7 : 1.45,
-          color: 0xff2626,
-          spin: b.blackPhase === 2 ? 0.34 : 0.22,
-        });
-      }
-      toast('黑巫师 · 咒印轮转', '光柱预警结束后开始旋转');
-    } else if (cycle === 2) {
-      const base = Math.atan2(hp.z - b.z, hp.x - b.x);
-      for (let shot = -4; shot <= 4; shot++) {
-        const angle = base + shot * 0.13;
-        spawnBossBullet(
-          b.x, b.z,
-          Math.cos(angle) * 5.4,
-          Math.sin(angle) * 5.4,
-          5.2
-        );
-      }
-      if (b.blackPhase === 2) {
-        for (let shot = 0; shot < 18; shot++) {
-          const angle = (shot / 18) * Math.PI * 2 + Math.PI / 18;
-          spawnBossBullet(
-            b.x, b.z,
-            Math.cos(angle) * 3.7,
-            Math.sin(angle) * 3.7,
-            5
-          );
-        }
-      }
-      toast('黑巫师 · 法球锁定', b.blackPhase === 2 ? '正面扇形与内环双层弹幕' : '九枚法球扇形齐射');
-    } else {
-      spawnBlackClonePair(b);
-      toast('黑巫师 · 黑镜幻影', '两名幻影将从两侧夹击');
+    const hudSignature = [
+      Math.ceil(b.blackWizardCurseFieldTimer),
+      Math.ceil(b.blackWizardArrowTimer),
+      Math.ceil(b.blackWizardSummonTimer),
+      b.blackWizardCurseLayers || 0,
+      Math.ceil(b.blackWizardCurseDecayTimer),
+      state.blackWizardSummon?.hp || 0,
+      Math.ceil(state.blackWizardSummon?.life || 0),
+    ].join(':');
+    if (b.blackWizardHudSignature !== hudSignature) {
+      b.blackWizardHudSignature = hudSignature;
+      updateHud();
     }
   }
 
@@ -8810,7 +9300,11 @@
         : (b.blackMist ? BLACK_MIST_BULLET_HIT_RADIUS : 0.7);
       if (!dead && bodyDistanceSq(b.x, b.z) < hitRadius * hitRadius) {
         dead = true;
-        damage(1, 'projectile');
+        if (b.wizardSummonBullet && state.boss?.kind === 'black_wizard') {
+          dealBlackWizardDamage(state.boss, 1, 'projectile');
+        } else {
+          damage(1, 'projectile');
+        }
       }
       if (dead) {
         b.mesh.visible = false;
@@ -9253,6 +9747,16 @@
       }
 
       if (!boom) {
+        const summon = blackWizardSummonAt(orb.x, orb.z);
+        if (summon) {
+          boom = true;
+          damageBlackWizardSummon(summon, 1);
+          orb.boomX = summon.x;
+          orb.boomZ = summon.z;
+        }
+      }
+
+      if (!boom) {
         const clone = blackMistBlockingClone(orb.x, orb.z);
         if (clone) {
           boom = true;
@@ -9466,6 +9970,18 @@
             updateHud();
             dead = true;
             break;
+          }
+        }
+      }
+
+      if (!dead) {
+        const summon = blackWizardSummonAt(b.x, b.z);
+        if (summon) {
+          damageBlackWizardSummon(summon, 1);
+          dead = true;
+          if (b.fire && !burstSpawned) {
+            spawnFireBurst(b.x, b.z);
+            burstSpawned = true;
           }
         }
       }
@@ -10041,6 +10557,39 @@
     stepBullets: (dt = 1 / 60, count = 1) => {
       for (let index = 0; index < count && !state.over; index++) updateBullets(dt);
     },
+    spawnBlackWizardCurseField: (x, z) => {
+      if (state.boss?.kind !== 'black_wizard') return false;
+      spawnBlackWizardCurseField(state.boss, { x, z });
+      return true;
+    },
+    fireBlackWizardShadowArrows: (x, z) => {
+      if (state.boss?.kind !== 'black_wizard') return false;
+      fireBlackWizardShadowArrows(state.boss, { x, z });
+      return true;
+    },
+    spawnBlackWizardSummon: () => (
+      state.boss?.kind === 'black_wizard'
+        ? (spawnBlackWizardSummon(state.boss), state.blackWizardSummon)
+        : null
+    ),
+    damageBlackWizardSummon: (amount = 1) => (
+      state.blackWizardSummon
+        ? damageBlackWizardSummon(state.blackWizardSummon, amount)
+        : false
+    ),
+    addBlackWizardCurse: (layers = 1) => (
+      state.boss?.kind === 'black_wizard'
+        ? addBlackWizardCurse(state.boss, layers)
+        : false
+    ),
+    stepBlackWizard: (dt = 1 / 60, count = 1) => {
+      if (!state.boss || state.boss.kind !== 'black_wizard') return false;
+      const hp = headPosition(new THREE.Vector3());
+      for (let index = 0; index < count && !state.over; index++) {
+        updateBlackWizard(state.boss, dt, hp);
+      }
+      return true;
+    },
     getBlackGorgeArena: () => ({
       theme: ROOMS[state.level]?.theme || null,
       bossKind: state.boss?.kind || null,
@@ -10084,6 +10633,25 @@
         stateTimer,
         teleported,
       })),
+      wizardCurseLayers: state.boss?.blackWizardCurseLayers ?? null,
+      wizardCurseDecay: state.boss?.blackWizardCurseDecayTimer ?? null,
+      wizardPose: state.boss?.blackWizardPose ?? null,
+      wizardFields: state.blackWizardCurseFields.map(({ x, z, life }) => ({ x, z, life })),
+      wizardArrows: state.blackWizardArrows.map(({ x, z, angle, life }) => ({
+        x,
+        z,
+        angle,
+        life,
+      })),
+      wizardSummon: state.blackWizardSummon
+        ? {
+          kind: state.blackWizardSummon.kind,
+          hp: state.blackWizardSummon.hp,
+          life: state.blackWizardSummon.life,
+          x: state.blackWizardSummon.x,
+          z: state.blackWizardSummon.z,
+        }
+        : null,
       pools: state.blackPools.map(({ i, j, life }) => ({ i, j, life })),
       beams: state.blackBeamEffects.map(({ x, z, angle, age }) => ({ x, z, angle, age })),
       clones: state.blackClones.length,
