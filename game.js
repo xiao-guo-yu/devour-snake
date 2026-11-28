@@ -204,6 +204,7 @@
   const BLACK_WIZARD_ENRAGE_RATIO = 0.5;
   const BLACK_WIZARD_CURSE_FIELD_INTERVAL = 8;
   const BLACK_WIZARD_CURSE_FIELD_SIZE = 10;
+  const BLACK_WIZARD_CURSE_FIELD_WARNING = 1;
   const BLACK_WIZARD_CURSE_FIELD_LIFE = 6;
   const BLACK_WIZARD_CURSE_FIELD_DAMAGE = 1;
   const BLACK_WIZARD_ARROW_INTERVAL = 6;
@@ -2846,6 +2847,24 @@
     scene.add(mesh);
     blackWizardCurseFieldPool.push(mesh);
   }
+  const blackWizardFieldWarningGeo = new THREE.RingGeometry(4.62, 5, 96, 1);
+  blackWizardFieldWarningGeo.rotateX(-Math.PI / 2);
+  const blackWizardFieldWarningRing = new THREE.Mesh(
+    blackWizardFieldWarningGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0xff3838,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
+    })
+  );
+  blackWizardFieldWarningRing.position.y = 0.16;
+  blackWizardFieldWarningRing.renderOrder = 3;
+  blackWizardFieldWarningRing.visible = false;
+  scene.add(blackWizardFieldWarningRing);
 
   const blackWizardArrowPool = [];
   const blackWizardArrowGeo = new THREE.PlaneGeometry(
@@ -7985,6 +8004,8 @@
     state.blackWizardArrows.length = 0;
     if (state.blackWizardSummon) state.blackWizardSummon.mesh.visible = false;
     state.blackWizardSummon = null;
+    blackWizardFieldWarningRing.visible = false;
+    blackWizardFieldWarningRing.material.opacity = 0;
     blackRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseRunePool.forEach((mesh) => { mesh.visible = false; });
     blackCurseBulletPool.forEach((mesh) => { mesh.visible = false; });
@@ -8720,6 +8741,7 @@
   function spawnBlackWizardCurseField(b, hp) {
     state.blackWizardCurseFields.forEach((field) => { field.mesh.visible = false; });
     state.blackWizardCurseFields.length = 0;
+    blackWizardFieldWarningRing.visible = false;
     const mesh = blackWizardCurseFieldPool.find((item) => !item.visible);
     if (!mesh) return;
     const limit = HALF - BLACK_WIZARD_CURSE_FIELD_SIZE / 2;
@@ -8728,12 +8750,17 @@
     mesh.position.set(x, 0.13, z);
     mesh.rotation.y = Math.random() * Math.PI * 2;
     mesh.scale.setScalar(1);
-    mesh.material.opacity = 0.2;
-    mesh.visible = true;
+    mesh.material.opacity = 0;
+    mesh.visible = false;
+    blackWizardFieldWarningRing.position.set(x, 0.16, z);
+    blackWizardFieldWarningRing.scale.setScalar(1);
+    blackWizardFieldWarningRing.material.opacity = 0.82;
+    blackWizardFieldWarningRing.visible = true;
     state.blackWizardCurseFields.push({
       mesh,
       x,
       z,
+      warningTimer: BLACK_WIZARD_CURSE_FIELD_WARNING,
       life: BLACK_WIZARD_CURSE_FIELD_LIFE,
       maxLife: BLACK_WIZARD_CURSE_FIELD_LIFE,
     });
@@ -8742,6 +8769,21 @@
   function updateBlackWizardCurseFields(b, dt) {
     for (let index = state.blackWizardCurseFields.length - 1; index >= 0; index--) {
       const field = state.blackWizardCurseFields[index];
+      if (field.warningTimer > 0) {
+        field.warningTimer = Math.max(0, field.warningTimer - dt);
+        const warningProgress = 1 - field.warningTimer / BLACK_WIZARD_CURSE_FIELD_WARNING;
+        blackWizardFieldWarningRing.position.set(field.x, 0.16, field.z);
+        blackWizardFieldWarningRing.scale.setScalar(0.94 + warningProgress * 0.06);
+        blackWizardFieldWarningRing.material.opacity =
+          0.5 + Math.sin(state.time * 18) * 0.18 + warningProgress * 0.28;
+        if (field.warningTimer === 0) {
+          blackWizardFieldWarningRing.visible = false;
+          blackWizardFieldWarningRing.material.opacity = 0;
+          field.mesh.material.opacity = 0.2;
+          field.mesh.visible = true;
+        }
+        continue;
+      }
       field.life -= dt;
       const fade = Math.min(1, (field.maxLife - field.life) * 4, field.life * 2);
       field.mesh.material.opacity = Math.max(0, fade * 0.72);
@@ -9023,7 +9065,7 @@
         b.blackWizardCurseFieldTimer = BLACK_WIZARD_CURSE_FIELD_INTERVAL;
         spawnBlackWizardCurseField(b, hp);
         setBlackWizardPose(b, 'cast');
-        toast('黑巫师 · 十环诅咒', '10×10 诅咒法阵降临 · 踩入会持续受伤并叠加诅咒');
+        toast('黑巫师 · 十环诅咒', '红圈预警 1 秒 · 法阵生成后持续受伤并叠加诅咒');
       } else if (skill === 'arrows') {
         b.blackWizardArrowTimer = BLACK_WIZARD_ARROW_INTERVAL;
         fireBlackWizardShadowArrows(b, hp);
@@ -10640,7 +10682,13 @@
       wizardCurseLayers: state.boss?.blackWizardCurseLayers ?? null,
       wizardCurseDecay: state.boss?.blackWizardCurseDecayTimer ?? null,
       wizardPose: state.boss?.blackWizardPose ?? null,
-      wizardFields: state.blackWizardCurseFields.map(({ x, z, life }) => ({ x, z, life })),
+      wizardFields: state.blackWizardCurseFields.map(({ x, z, life, warningTimer }) => ({
+        x,
+        z,
+        life,
+        warningTimer,
+        warningVisible: warningTimer > 0,
+      })),
       wizardArrows: state.blackWizardArrows.map(({ x, z, angle, life }) => ({
         x,
         z,
